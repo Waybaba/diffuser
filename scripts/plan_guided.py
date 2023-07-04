@@ -1,7 +1,13 @@
 import pdb
 
+import pyrootutils
+root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True)
+
+
 import diffuser.sampling as sampling
 import diffuser.utils as utils
+
+
 
 
 #-----------------------------------------------------------------------------#
