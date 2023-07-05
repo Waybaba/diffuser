@@ -1,3 +1,6 @@
+import pyrootutils
+root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True)
+
 import json
 import numpy as np
 from os.path import join
