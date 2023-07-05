@@ -12,6 +12,34 @@
 			"console": "integratedTerminal",
 			"justMyCode": true
 		},
+		// python scripts/train.py --dataset maze2d-umaze-v0
+		{
+			"name": "train",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/scripts/train.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"--dataset",
+				"maze2d-large-v1",
+				// "antmaze-umaze-v0",
+				// "halfcheetah-medium-expert-v2",
+			]
+		},
+		// python scripts/train_values.py --dataset halfcheetah-medium-expert-v2
+		{
+			"name": "train_values",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/scripts/train_values.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"--dataset",
+				"halfcheetah-medium-expert-v2"
+			]
+		},
 		// python scripts/plan_guided.py --dataset halfcheetah-medium-expert-v2 --logbase logs/pretrained
 		{
 			"name": "planning",
