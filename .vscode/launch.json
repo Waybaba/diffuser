@@ -23,6 +23,8 @@
 			"args": [
 				"--dataset",
 				"maze2d-large-v1",
+				"--config",
+				"config.maze2d",
 				// "antmaze-umaze-v0",
 				// "halfcheetah-medium-expert-v2",
 			]
