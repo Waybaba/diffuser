@@ -7,3 +7,4 @@ from .rendering import *
 from .arrays import *
 from .colab import *
 from .logger import *
+from .rendering_maze2d import *
