@@ -2,9 +2,13 @@ import pyrootutils
 root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True)
 
 import json
+import shutil
+import os
 import numpy as np
 from os.path import join
 import pdb
+import imageio
+from tqdm import tqdm
 
 from diffuser.guides.policies import Policy
 import diffuser.datasets as datasets
@@ -51,13 +55,15 @@ cond = {
 rollout = [observation.copy()]
 
 total_reward = 0
+# env.max_episode_steps = 40 # DEBUG
 for t in range(env.max_episode_steps):
 
     state = env.state_vector().copy()
 
     ## can replan if desired, but the open-loop plans are good enough for maze2d
     ## that we really only need to plan once
-    if t == 0:
+    # if t == 0:
+    if True: 
         cond[0] = observation
 
         action, samples = policy(cond, batch_size=args.batch_size)
@@ -109,7 +115,8 @@ for t in range(env.max_episode_steps):
 
     # logger.log(score=score, step=t)
 
-    if t % args.vis_freq == 0 or terminal:
+    # if t % args.vis_freq == 0 or terminal:
+    if t % 1 == 0 or terminal:
         fullpath = join(args.savepath, f'{t}.png')
 
         if t == 0: renderer.composite(fullpath, samples.observations, ncol=1)
@@ -118,7 +125,11 @@ for t in range(env.max_episode_steps):
         # renderer.render_plan(join(args.savepath, f'{t}_plan.mp4'), samples.actions, samples.observations, state)
 
         ## save rollout thus far
-        renderer.composite(join(args.savepath, 'rollout.png'), np.array(rollout)[None], ncol=1)
+        # renderer.composite(join(args.savepath, 'rollout.png'), np.array(rollout)[None], ncol=1)
+        # make as [*rollout, target]
+        renderer.composite(join(args.savepath, f'rollout_frames/{t}.png'), np.array([*rollout, np.concatenate([target, target])])[None], ncol=1)
+        shutil.copy(join(args.savepath, f'rollout_frames/{t}.png'), join(args.savepath, f'rollout.png'))
+
 
         # renderer.render_rollout(join(args.savepath, f'rollout.mp4'), rollout, fps=80)
 
@@ -136,3 +147,16 @@ json_path = join(args.savepath, 'rollout.json')
 json_data = {'score': score, 'step': t, 'return': total_reward, 'term': terminal,
     'epoch_diffusion': diffusion_experiment.epoch}
 json.dump(json_data, open(json_path, 'w'), indent=2, sort_keys=True)
+
+
+## combine rollout frames into a video
+# e.g.
+# frames = []
+# for t in time:
+#     image = imageio.v2.imread(f'./img/img_{t}.png')
+#     frames.append(image)
+frames = []
+for t in tqdm(range(env.max_episode_steps)):
+    frame = join(args.savepath, f'rollout_frames/{t}.png')
+    frames.append(imageio.imread(frame))
+imageio.mimsave(join(args.savepath, 'rollout.gif'), frames, fps=env.max_episode_steps // 10)
