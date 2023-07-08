@@ -36,8 +36,7 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				"--dataset",
-				"halfcheetah-medium-expert-v2"
+				"--dataset", "halfcheetah-medium-expert-v2",
 			]
 		},
 		// python scripts/plan_guided.py --dataset halfcheetah-medium-expert-v2 --logbase logs/pretrained

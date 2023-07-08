@@ -126,8 +126,13 @@ for t in range(env.max_episode_steps):
 
         ## save rollout thus far
         # renderer.composite(join(args.savepath, 'rollout.png'), np.array(rollout)[None], ncol=1)
-        # make as [*rollout, target]
-        renderer.composite(join(args.savepath, f'rollout_frames/{t}.png'), np.array([*rollout, np.concatenate([target, target])])[None], ncol=1)
+        # make seq as [*rollout, sequence, target] # rollout = [list of np.array([4])], sequence = np.array([horizon, 4]), target = np.array([2])
+        seq_plot = np.concatenate([
+            np.array(rollout),
+            sequence,
+            np.concatenate([target, target])[np.newaxis, :]
+        ])
+        renderer.composite(join(args.savepath, f'rollout_frames/{t}.png'), seq_plot[None], ncol=1)
         shutil.copy(join(args.savepath, f'rollout_frames/{t}.png'), join(args.savepath, f'rollout.png'))
 
 
