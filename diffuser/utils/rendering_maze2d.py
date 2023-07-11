@@ -4,6 +4,7 @@ import einops
 import imageio
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import matplotlib.animation as animation
 import gym
 import mujoco_py as mjc
 import warnings
@@ -300,6 +301,24 @@ class MazeRenderer:
         plt.title(title)
         img = plot2img(fig, remove_margins=self._remove_margins)
         return img
+    
+    def render_to_gif(self, observation, savepath, conditions=None, title=None, **kwargs):
+        # Define function for animation
+        def update(i):
+            plt.clf()
+            fig = plt.gcf()
+            plt.imshow(self._background * .5, extent=self._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
+            colors = plt.cm.jet(np.linspace(0,1,len(observation)))
+            plt.plot(observation[i, 1], observation[i, 0], c='black', zorder=10)
+            plt.scatter(observation[i, 1], observation[i, 0], c=[colors[i]], zorder=20)
+            plt.axis('off')
+            plt.title(title)
+
+        # Create the animation object
+        ani = animation.FuncAnimation(plt.gcf(), update, frames=len(observation), interval=200)
+
+        # Save to file
+        ani.save(savepath, writer='pillow')
 
     def composite(self, savepath, paths, ncol=5, **kwargs):
         '''
@@ -319,6 +338,10 @@ class MazeRenderer:
             '(nrow ncol) H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
         imageio.imsave(savepath, images)
         print(f'Saved {len(paths)} samples to: {savepath}')
+
+        # render only first sample to gif
+        self.render_to_gif(paths[0], savepath[:-4] + '.gif')
+        
 
 class Maze2dRenderer(MazeRenderer):
 
