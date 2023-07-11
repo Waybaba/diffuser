@@ -38,6 +38,7 @@ class Trainer(object):
         diffusion_model,
         dataset,
         renderer,
+        n_render_samples,
         ema_decay=0.995,
         train_batch_size=32,
         train_lr=2e-5,
@@ -65,13 +66,14 @@ class Trainer(object):
         self.save_freq = save_freq
         self.label_freq = label_freq
         self.save_parallel = save_parallel
+        self.n_render_samples = n_render_samples
 
         self.batch_size = train_batch_size
         self.gradient_accumulate_every = gradient_accumulate_every
 
         self.dataset = dataset
         self.dataloader = cycle(torch.utils.data.DataLoader(
-            self.dataset, batch_size=train_batch_size, num_workers=1, shuffle=True, pin_memory=True
+            self.dataset, batch_size=train_batch_size, num_workers=0, shuffle=True, pin_memory=True
         ))
         self.dataloader_vis = cycle(torch.utils.data.DataLoader(
             self.dataset, batch_size=1, num_workers=0, shuffle=True, pin_memory=True
@@ -129,6 +131,7 @@ class Trainer(object):
                 self.render_reference(self.n_reference)
 
             if self.sample_freq and self.step % self.sample_freq == 0:
+            # if True:
                 self.render_samples()
 
             self.step += 1
@@ -187,10 +190,11 @@ class Trainer(object):
         savepath = os.path.join(self.logdir, f'_sample-reference.png')
         self.renderer.composite(savepath, observations)
 
-    def render_samples(self, batch_size=2, n_samples=2):
+    def render_samples(self, batch_size=2):
         '''
             renders samples from (ema) diffusion model
         '''
+        n_samples = self.n_render_samples
         for i in range(batch_size):
 
             ## get a single datapoint

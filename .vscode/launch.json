@@ -22,11 +22,12 @@
 			"justMyCode": true,
 			"args": [
 				"--dataset",
+				// "halfcheetah-medium-expert-v2",
 				"maze2d-large-v1",
 				"--config",
+				// "config.locomotion",
 				"config.maze2d",
 				// "antmaze-umaze-v0",
-				// "halfcheetah-medium-expert-v2",
 			]
 		},
 		// python scripts/train_values.py --dataset halfcheetah-medium-expert-v2

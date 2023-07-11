@@ -40,6 +40,7 @@ base = {
         'loss_discount': 1,
         'predict_epsilon': False,
         'dim_mults': (1, 4, 8),
+        'attention': False,
         'renderer': 'utils.Maze2dRenderer',
 
         ## dataset
@@ -61,6 +62,7 @@ base = {
         'loss_type': 'l2',
         'n_train_steps': 2e6,
         'batch_size': 32,
+        # 'batch_size': 1, # for DEBUG
         'learning_rate': 2e-4,
         'gradient_accumulate_every': 2,
         'ema_decay': 0.995,
@@ -72,6 +74,7 @@ base = {
         'n_samples': 10,
         'bucket': None,
         'device': 'cuda',
+        'n_render_samples': 10,
     },
 
     'plan': {
