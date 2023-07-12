@@ -22,7 +22,7 @@ base = {
         ## model
         'model': 'models.TemporalUnet',
         'diffusion': 'models.GaussianDiffusion',
-        'horizon': 4, # origin 32
+        'horizon': 32,
         'n_diffusion_steps': 20,
         'action_weight': 10,
         'loss_weights': None,
@@ -61,6 +61,7 @@ base = {
         'bucket': None,
         'device': 'cuda',
         'seed': None,
+        "n_render_samples": 2,
     },
 
     'values': {
@@ -104,6 +105,7 @@ base = {
         'bucket': None,
         'device': 'cuda',
         'seed': None,
+        'n_render_samples': 2,
     },
 
     'plan': {
@@ -134,7 +136,7 @@ base = {
         'n_diffusion_steps': 20,
 
         ## value function
-        'discount': 0.997,
+        'discount': 0.99, # DEBUG previous is 0.997
 
         ## loading
         'diffusion_loadpath': 'f:diffusion/defaults_H{horizon}_T{n_diffusion_steps}',

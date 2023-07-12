@@ -340,7 +340,7 @@ class MazeRenderer:
         print(f'Saved {len(paths)} samples to: {savepath}')
 
         # render only first sample to gif
-        self.render_to_gif(paths[0], savepath[:-4] + '.gif')
+        # self.render_to_gif(paths[0], savepath[:-4] + '.gif')
         
 
 class Maze2dRenderer(MazeRenderer):

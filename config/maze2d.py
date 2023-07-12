@@ -76,10 +76,14 @@ base = {
         'device': 'cuda',
         'n_render_samples': 10,
     },
+    
 
     'plan': {
         'batch_size': 1,
         'device': 'cuda',
+        'seed': None,
+        'guide': 'sampling.ValueGuide',
+        'policy': 'sampling.GuidedPolicy',
 
         ## diffusion model
         'horizon': 256,
@@ -87,6 +91,7 @@ base = {
         'normalizer': 'LimitsNormalizer',
 
         ## serialization
+        'loadbase': None,
         'vis_freq': 10,
         'logbase': 'logs',
         'prefix': 'plans/release',

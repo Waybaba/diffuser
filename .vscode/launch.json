@@ -22,11 +22,11 @@
 			"justMyCode": true,
 			"args": [
 				"--dataset",
-				// "halfcheetah-medium-expert-v2",
-				"maze2d-large-v1",
+				"halfcheetah-medium-expert-v2",
+				// "maze2d-large-v1",
 				"--config",
-				// "config.locomotion",
-				"config.maze2d",
+				"config.locomotion",
+				// "config.maze2d",
 				// "antmaze-umaze-v0",
 			]
 		},
@@ -40,7 +40,12 @@
 			"justMyCode": true,
 			"args": [
 				"--dataset",
-				"halfcheetah-medium-expert-v2"
+				// "halfcheetah-medium-expert-v2",
+				"maze2d-large-v1",
+				"--config",
+				// "config.locomotion",
+				"config.maze2d",
+				// "antmaze-umaze-v0",
 			]
 		},
 		// python scripts/plan_guided.py --dataset halfcheetah-medium-expert-v2 --logbase logs/pretrained
@@ -54,8 +59,13 @@
 			"args": [
 				"--dataset",
 				"halfcheetah-medium-expert-v2",
-				"--logbase",
-				"logs/pretrained"
+				// "maze2d-large-v1",
+				"--config",
+				"config.locomotion",
+				// "config.maze2d",
+				// "antmaze-umaze-v0",
+				// "--logbase",
+				// "logs/pretrained",
 			]
 		}
 	]

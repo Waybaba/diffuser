@@ -85,6 +85,7 @@ trainer_config = utils.Config(
     results_folder=args.savepath,
     bucket=args.bucket,
     n_reference=args.n_reference,
+    n_render_samples=args.n_render_samples,
 )
 
 #-----------------------------------------------------------------------------#
