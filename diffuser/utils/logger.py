@@ -10,7 +10,7 @@ class Logger:
         self.vis_freq = vis_freq
         self.max_render = max_render
 
-    def log(self, t, samples, state, rollout=None):
+    def log(self, t, samples, state, rollout=None, conditions=None):
         if t % self.vis_freq != 0:
             return
 
@@ -18,6 +18,7 @@ class Logger:
         self.renderer.composite(
             os.path.join(self.savepath, f'{t}.png'),
             samples.observations,
+            conditions
         )
 
         ## render video of plans
@@ -26,15 +27,17 @@ class Logger:
         #     samples.actions[:self.max_render],
         #     samples.observations[:self.max_render],
         #     state,
+        #     conditions, 
         # )
 
-        # if rollout is not None:
-        #     ## render video of rollout thus far
-        #     self.renderer.render_rollout(
-        #         os.path.join(self.savepath, f'rollout.mp4'),
-        #         rollout,
-        #         fps=80,
-        #     )
+        if rollout is not None:
+            ## render video of rollout thus far
+            self.renderer.render_rollout(
+                os.path.join(self.savepath, f'rollout.png'),
+                rollout,
+                conditions,
+                fps=80,
+            )
 
     def finish(self, t, score, total_reward, terminal, diffusion_experiment, value_experiment):
         json_path = os.path.join(self.savepath, 'rollout.json')

@@ -32,22 +32,29 @@ diffusion_experiment = utils.load_diffusion(
     args.loadbase, args.dataset, args.diffusion_loadpath,
     epoch=args.diffusion_epoch, seed=args.seed,
 )
-value_experiment = utils.load_diffusion(
-    args.loadbase, args.dataset, args.value_loadpath,
-    epoch=args.value_epoch, seed=args.seed,
-)
+
 
 ## ensure that the diffusion model and value function are compatible with each other
-utils.check_compatibility(diffusion_experiment, value_experiment)
+# utils.check_compatibility(diffusion_experiment, value_experiment)
 
 diffusion = diffusion_experiment.ema
 dataset = diffusion_experiment.dataset
 renderer = diffusion_experiment.renderer
 
-## initialize value guide
-value_function = value_experiment.ema
-guide_config = utils.Config(args.guide, model=value_function, verbose=False)
-guide = guide_config()
+## initialize guide function
+if args.guide == 'sampling.ValueGuide':
+    value_experiment = utils.load_diffusion(
+        args.loadbase, args.dataset, args.value_loadpath,
+        epoch=args.value_epoch, seed=args.seed,
+    )
+    value_func = value_experiment.ema
+    guide_config = utils.Config(args.guide, model=value_func, verbose=False)
+    guide = guide_config()
+elif args.guide == 'sampling.NoTrainGuide':
+    guide_config = utils.Config(args.guide, verbose=False) # no model here
+    guide = guide_config()
+else:
+    raise NotImplementedError
 
 logger_config = utils.Config(
     utils.Logger,
@@ -117,7 +124,7 @@ for t in range(args.max_episode_length):
     rollout.append(next_observation.copy())
 
     ## render every `args.vis_freq` steps
-    logger.log(t, samples, state, rollout)
+    logger.log(t, samples, state, rollout, conditions)
 
     if terminal:
         break

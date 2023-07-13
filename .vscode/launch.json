@@ -66,6 +66,10 @@
 				// "antmaze-umaze-v0",
 				// "--logbase",
 				// "logs/pretrained",
+				"--guide",
+				"sampling.NoTrainGuide",
+				"--scale",
+				"0.1",
 			]
 		}
 	]

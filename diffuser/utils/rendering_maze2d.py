@@ -182,7 +182,7 @@ class MuJoCoRenderer:
 
         return composite
 
-    def composite(self, savepath, paths, dim=(1024, 256), **kwargs):
+    def composite(self, savepath, paths, conditions=None, dim=(1024, 256), **kwargs):
 
         render_kwargs = {
             'trackbodyid': 2,
@@ -204,12 +204,12 @@ class MuJoCoRenderer:
 
         return images
 
-    def render_rollout(self, savepath, states, **video_kwargs):
+    def render_rollout(self, savepath, states, conditions=None, **video_kwargs):
         if type(states) is list: states = np.array(states)
         images = self._renders(states, partial=True)
         save_video(savepath, images, **video_kwargs)
 
-    def render_plan(self, savepath, actions, observations_pred, state, fps=30):
+    def render_plan(self, savepath, actions, observations_pred, state, conditions=None, fps=30):
         ## [ batch_size x horizon x observation_dim ]
         observations_real = rollouts_from_state(self.env, state, actions)
 
@@ -290,6 +290,7 @@ class MazeRenderer:
         plt.clf()
         fig = plt.gcf()
         fig.set_size_inches(5, 5)
+        
         plt.imshow(self._background * .5,
             extent=self._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
 
@@ -297,10 +298,26 @@ class MazeRenderer:
         colors = plt.cm.jet(np.linspace(0,1,path_length))
         plt.plot(observations[:,1], observations[:,0], c='black', zorder=10)
         plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20)
+        
+        if conditions is not None:
+            # plot a green at the start and red at the end
+            # conditions = {0: np.array(4), path_length-1: np.array(4)}
+            if 0 in conditions:
+                plt.scatter(conditions[0][1], conditions[0][0], c='green', zorder=30, s=400, marker='o', edgecolors='black')
+            if path_length-1 in conditions:
+                plt.scatter(conditions[path_length-1][1], conditions[path_length-1][0], c='red', zorder=30, s=600, marker='*',edgecolors='black')
+        
         plt.axis('off')
         plt.title(title)
         img = plot2img(fig, remove_margins=self._remove_margins)
         return img
+
+    # def _renders(self, observations, **kwargs):
+    #     images = []
+    #     for observation in observations:
+    #         img = self.renders(observation, **kwargs)
+    #         images.append(img)
+    #     return np.stack(images, axis=0)
     
     def render_to_gif(self, observation, savepath, conditions=None, title=None, **kwargs):
         # Define function for animation
@@ -320,7 +337,7 @@ class MazeRenderer:
         # Save to file
         ani.save(savepath, writer='pillow')
 
-    def composite(self, savepath, paths, ncol=5, **kwargs):
+    def composite(self, savepath, paths, conditions=None, ncol=5, **kwargs):
         '''
             savepath : str
             observations : [ n_paths x horizon x 2 ]
@@ -329,7 +346,7 @@ class MazeRenderer:
 
         images = []
         for path, kw in zipkw(paths, **kwargs):
-            img = self.renders(*path, **kw)
+            img = self.renders(*path, conditions=conditions, **kw)
             images.append(img)
         images = np.stack(images, axis=0)
 
@@ -370,8 +387,50 @@ class Maze2dRenderer(MazeRenderer):
             raise RuntimeError(f'Unrecognized bounds for {self.env_name}: {bounds}')
 
         if conditions is not None:
-            conditions /= scale
+            conditions = conditions.copy()
+            for k, v in conditions.items():
+                conditions[k] = v + .5
+            if len(bounds) == 2:
+                for k, v in conditions.items():
+                    conditions[k] = v / scale
+            elif len(bounds) == 4:
+                for k, v in conditions.items():
+                    conditions[k][0] /= iscale
+                    conditions[k][1] /= jscale
+            else:
+                raise RuntimeError(f'Unrecognized bounds for {self.env_name}: {bounds}')
+            
         return super().renders(observations, conditions, **kwargs)
+
+    def render_rollout(self, savepath, states, conditions=None, **video_kwargs):
+        if type(states) is list: states = np.array(states)
+        image = self.renders(states)
+        # save_video(savepath, images, **video_kwargs)
+        imageio.imsave(savepath, image)
+        print(f'Saved rollout to: {savepath}')
+
+    def render_plan(self, savepath, actions, observations_pred, state, conditions=None, fps=30):
+        ## [ batch_size x horizon x observation_dim ]
+        observations_real = rollouts_from_state(self.env, state, actions)
+
+        ## there will be one more state in `observations_real`
+        ## than in `observations_pred` because the last action
+        ## does not have an associated next_state in the sampled trajectory
+        observations_real = observations_real[:,:-1]
+
+        images_pred = np.stack([
+            self._renders(obs_pred, partial=True)
+            for obs_pred in observations_pred
+        ])
+
+        images_real = np.stack([
+            self._renders(obs_real, partial=False)
+            for obs_real in observations_real
+        ])
+
+        ## [ batch_size x horizon x H x W x C ]
+        images = np.concatenate([images_pred, images_real], axis=-2)
+        save_videos(savepath, *images)
 
 #-----------------------------------------------------------------------------#
 #---------------------------------- rollouts ---------------------------------#

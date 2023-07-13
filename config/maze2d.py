@@ -33,6 +33,8 @@ plan_args_to_watch = [
     ('batch_size', 'b'),
     ##
     ('conditional', 'cond'),
+    ##
+    ('scale', 'S'),
 ]
 
 base = {
