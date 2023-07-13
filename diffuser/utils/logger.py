@@ -21,20 +21,20 @@ class Logger:
         )
 
         ## render video of plans
-        self.renderer.render_plan(
-            os.path.join(self.savepath, f'{t}_plan.mp4'),
-            samples.actions[:self.max_render],
-            samples.observations[:self.max_render],
-            state,
-        )
+        # self.renderer.render_plan(
+        #     os.path.join(self.savepath, f'{t}_plan.mp4'),
+        #     samples.actions[:self.max_render],
+        #     samples.observations[:self.max_render],
+        #     state,
+        # )
 
-        if rollout is not None:
-            ## render video of rollout thus far
-            self.renderer.render_rollout(
-                os.path.join(self.savepath, f'rollout.mp4'),
-                rollout,
-                fps=80,
-            )
+        # if rollout is not None:
+        #     ## render video of rollout thus far
+        #     self.renderer.render_rollout(
+        #         os.path.join(self.savepath, f'rollout.mp4'),
+        #         rollout,
+        #         fps=80,
+        #     )
 
     def finish(self, t, score, total_reward, terminal, diffusion_experiment, value_experiment):
         json_path = os.path.join(self.savepath, 'rollout.json')

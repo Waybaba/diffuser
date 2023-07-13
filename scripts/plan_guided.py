@@ -7,6 +7,8 @@ root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True)
 import diffuser.sampling as sampling
 import diffuser.utils as utils
 
+import numpy as np
+
 
 
 
@@ -95,6 +97,8 @@ for t in range(args.max_episode_length):
 
     ## format current observation for conditioning
     conditions = {0: observation}
+    if "maze" in args.dataset:
+        conditions[args.horizon-1] = np.array(env.goal_locations[0] + env.goal_locations[0])
     action, samples = policy(conditions, batch_size=args.batch_size, verbose=args.verbose)
 
     ## execute action in environment

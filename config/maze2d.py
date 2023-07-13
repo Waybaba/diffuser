@@ -132,30 +132,45 @@ base = {
     },
 
     'plan': {
-        'batch_size': 1,
-        'device': 'cuda',
-        'seed': None,
         'guide': 'sampling.ValueGuide',
         'policy': 'sampling.GuidedPolicy',
+        'batch_size': 10,
+        'max_episode_length': 1000,
+        'preprocess_fns': [],
+        'device': 'cuda',
+        'seed': None,
+
+        ## sample_kwargs
+        'n_guide_steps': 2,
+        'scale': 0.1,
+        't_stopgrad': 2,
+        'scale_grad_by_std': True,
+
+        ## serialization
+        'loadbase': None,
+        'logbase': 'logs/pretrained/',
+        'prefix': 'plans/',
+        'exp_name': watch(plan_args_to_watch),
+        'vis_freq': 10,
+        'max_render': 10,
+        'conditional': False,
 
         ## diffusion model
         'horizon': 256,
         'n_diffusion_steps': 256,
-        'normalizer': 'LimitsNormalizer',
+        # 'normalizer': 'LimitsNormalizer', # TODO seem to be removed?
 
-        ## serialization
-        'loadbase': None,
-        'vis_freq': 10,
-        'logbase': 'logs',
-        'prefix': 'plans/release',
-        'exp_name': watch(plan_args_to_watch),
-        'suffix': '0',
-
-        'conditional': False,
+        ## value function
+        'discount': 0.99, # DEBUG previous is 0.997
 
         ## loading
         'diffusion_loadpath': 'f:diffusion/H{horizon}_T{n_diffusion_steps}',
         'diffusion_epoch': 'latest',
+        'value_loadpath': 'f:values/defaults_H{horizon}_T{n_diffusion_steps}_d{discount}',
+        'value_epoch': 'latest',
+
+        'suffix': '0',
+        'verbose': False,
     },
 
 }
@@ -178,6 +193,10 @@ maze2d_umaze_v1 = {
         'horizon': 128,
         'n_diffusion_steps': 64,
     },
+    'values': {
+        'horizon': 128,
+        'n_diffusion_steps': 64,
+    },
 }
 
 maze2d_large_v1 = {
@@ -186,6 +205,10 @@ maze2d_large_v1 = {
         'n_diffusion_steps': 256,
     },
     'plan': {
+        'horizon': 384,
+        'n_diffusion_steps': 256,
+    },
+    'values': {
         'horizon': 384,
         'n_diffusion_steps': 256,
     },
