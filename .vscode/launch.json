@@ -12,6 +12,20 @@
 			"console": "integratedTerminal",
 			"justMyCode": true
 		},
+		// entry.py
+		{
+			"name": "entry",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/src/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"experiment=diffuser",
+				// "env.name=HalfCheetah-v4",
+				// "env.delay=0",
+			],
+		},
 		// python scripts/train.py --dataset maze2d-umaze-v0
 		{
 			"name": "train",
