@@ -35,6 +35,7 @@ plan_args_to_watch = [
     ('conditional', 'cond'),
     ##
     ('scale', 'S'),
+    ('guide', 'G'),
 ]
 
 base = {

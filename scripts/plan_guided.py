@@ -50,7 +50,7 @@ if args.guide == 'sampling.ValueGuide':
     value_func = value_experiment.ema
     guide_config = utils.Config(args.guide, model=value_func, verbose=False)
     guide = guide_config()
-elif args.guide == 'sampling.NoTrainGuide':
+elif 'sampling.NoTrainGuide' in args.guide:
     guide_config = utils.Config(args.guide, verbose=False) # no model here
     guide = guide_config()
 else:
@@ -132,4 +132,4 @@ for t in range(args.max_episode_length):
     observation = next_observation
 
 ## write results to json file at `args.savepath`
-logger.finish(t, score, total_reward, terminal, diffusion_experiment, value_experiment)
+# logger.finish(t, score, total_reward, terminal, diffusion_experiment, value_experiment)

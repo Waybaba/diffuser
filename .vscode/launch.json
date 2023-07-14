@@ -67,7 +67,7 @@
 				// "--logbase",
 				// "logs/pretrained",
 				"--guide",
-				"sampling.NoTrainGuide",
+				"sampling.NoTrainGuideShort",
 				"--scale",
 				"0.1",
 			]
