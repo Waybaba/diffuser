@@ -1,69 +1,102 @@
 # @package _global_
 
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
-  n_train_steps: 2000000
-  n_steps_per_epoch: 10000
-  horizon: 384
+  null
 
 runner:
-  _target_: src.runner.TrainDiffuserRunner
+  _target_: src.runner.PlanGuidedRunner
   _partial_: true
 
-dataset:
-  _target_: diffuser.datasets.GoalDataset
+    # 'plan': {
+    #     'guide': 'sampling.ValueGuide',
+    #     'policy': 'sampling.GuidedPolicy',
+    #     'batch_size': 10,
+    #     'max_episode_length': 1000,
+    #     'preprocess_fns': [],
+    #     'device': 'cuda',
+    #     'seed': None,
+
+    #     ## sample_kwargs
+    #     'n_guide_steps': 2,
+    #     'scale': 0.1,
+    #     't_stopgrad': 2,
+    #     'scale_grad_by_std': True,
+
+    #     ## serialization
+    #     'loadbase': None,
+    #     'logbase': 'logs/pretrained/',
+    #     'prefix': 'plans/',
+    #     'exp_name': watch(plan_args_to_watch),
+    #     'vis_freq': 10,
+    #     'max_render': 10,
+    #     'conditional': False,
+
+    #     ## diffusion model
+    #     'horizon': 256,
+    #     'n_diffusion_steps': 256,
+    #     # 'normalizer': 'LimitsNormalizer', # TODO seem to be removed?
+
+    #     ## value function
+    #     'discount': 0.99, # DEBUG previous is 0.997
+
+    #     ## loading
+    #     'diffusion_loadpath': 'f:diffusion/H{horizon}_T{n_diffusion_steps}',
+    #     'diffusion_epoch': 'latest',
+    #     'value_loadpath': 'f:values/defaults_H{horizon}_T{n_diffusion_steps}_d{discount}',
+    #     'value_epoch': 'latest',
+
+    #     'suffix': '0',
+    #     'verbose': False,
+    # },
+  
+
+# diffusion_experiment = utils.load_diffusion(
+#     args.loadbase, args.dataset, args.diffusion_loadpath,
+#     epoch=args.diffusion_epoch, seed=args.seed,
+# )
+# def load_diffusion(*loadpath, epoch='latest', device='cuda:0', seed=None):
+
+
+diffusion_experiment:
+  _target_: diffuser.utils.load_diffusion
+  _args_:
+    - 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # TODO
+  epoch: 'latest'
+  seed: ${seed}
+  device: ${device}
+
+guide:
+  _target_: diffuser.sampling.NoTrainGuideShort
+
+
+policy:
+  _target_: diffuser.sampling.GuidedPolicy
   _partial_: true
-  env: "maze2d-large-v1"
-  horizon: ${global_cfg.horizon}
-  normalizer: "LimitsNormalizer"
-  preprocess_fns: ["maze2d_set_terminals"]
-  use_padding: false
-  max_path_length: 40000
-
-render:
-  _target_: diffuser.utils.Maze2dRenderer
-  _partial_: true
-  env: ${dataset.env}
-
-
-net:
-  _target_: diffuser.models.TemporalUnet
-  _partial_: true
-  horizon: ${global_cfg.horizon}
-  dim_mults: [1, 4, 8]
-  attention: false
-
-model:
-  _target_: diffuser.models.GaussianDiffusion
-  _partial_: true
-  horizon: ${global_cfg.horizon}
-  n_timesteps: 256 # n_diffusion_steps in source code
-  loss_type: "l2"
-  clip_denoised: true
-  predict_epsilon: false
-  action_weight: 1
-  loss_weights: null
-  loss_discount: 1
-  # TODO add config for large0maze 2 in py file
-
-
+  scale: 0.1
+  preprocess_fns: []
+  sample_fn: 
+    _target_: diffuser.sampling.n_step_guided_p_sample
+    _partial_: true
+  n_guide_steps: 2
+  t_stopgrad: 2
+  scale_grad_by_std: true
 
 trainer:
-  _target_: diffuser.utils.Trainer
-  _partial_: true
-  train_batch_size: 32
-  train_lr: 2e-4
-  gradient_accumulate_every: 2
-  ema_decay: 0.995
-  sample_freq: 1000
-  save_freq: 1000
-  label_freq: 40000
-  save_parallel: false
-  results_folder: ${output_dir} # TODO
-  bucket: null # TODO ? what
-  n_reference: 25 # TODO ? what
-  n_render_samples: 5
+  max_episode_length: 1000
+  batch_size: 10
+  verbose: true
 
 
+# logger_config = utils.Config(
+#     utils.Logger,
+#     renderer=renderer,
+#     logpath=args.savepath,
+#     vis_freq=args.vis_freq,
+#     max_render=args.max_render,
+# )
+
+vis_freq: 10
+max_render: 10
 
 
 # common - for all tasks (task_name, tags, output_dir, device)

@@ -14,21 +14,33 @@
 		},
 		// entry.py
 		{
-			"name": "entry",
+			"name": "entry - train_diffuser",
 			"type": "python",
 			"request": "launch",
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				// "experiment=train_diffuser",
-				"experiment=plan_guided",
+				"experiment=train_diffuser",
 				// "wandb.buf_dir=null",
 				// "wandb.mode=disabled",
 				// "env.name=HalfCheetah-v4",
 				// "env.delay=0",
 			],
 		},
+		{
+			"name": "entry - plan_guided",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"experiment=plan_guided",
+				// "wandb.mode=disabled",
+			],
+		},
+
 		// python scripts/train.py --dataset maze2d-umaze-v0
 		{
 			"name": "train",

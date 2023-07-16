@@ -409,6 +409,7 @@ class Maze2dRenderer(MazeRenderer):
         # save_video(savepath, images, **video_kwargs)
         imageio.imsave(savepath, image)
         print(f'Saved rollout to: {savepath}')
+        return image
 
     def render_plan(self, savepath, actions, observations_pred, state, conditions=None, fps=30):
         ## [ batch_size x horizon x observation_dim ]
