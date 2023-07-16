@@ -1,0 +1,57 @@
+code:
+  local_dir: $CONFIG_DIR/../../
+description: AMLT
+environment:
+  image: waybaba/rl:v5
+  setup:
+  - echo "setup start..."
+  - export UPRJDIR=/mnt/default/
+  - export UDATADIR=/mnt/storage/data
+  - export UOUTDIR=/mnt/storage/output
+  - mkdir -p /mnt/storage/output /mnt/storage/data
+  - echo "setup finished!"
+  username: waybaba
+search:
+  job_template:
+    command:
+    - python entry/entry.py -m experiment=train_diffuser hydra/launcher=wsl_parallel
+      wandb.buf_dir=true wandb.mode=online n_jobs=5 tags=test2  trainer.train_lr={trainer_train_lr_}
+      trainer.train_batch_size={trainer_train_batch_size_} trainer.ema_decay={trainer_ema_decay_}
+      seed={seed_}
+    name: RL_Delayed_{experiment_name:s}_{auto:5s}
+    sku: G1
+  max_trials: 10000
+  params:
+  - name: trainer_train_lr_
+    values:
+    - 1e-2
+    - 1e-3
+    - 2e-4
+    - 1e-4
+    - 1e-5
+  - name: trainer_train_batch_size_
+    values:
+    - 32
+    - 16
+    - 64
+  - name: trainer_ema_decay_
+    values:
+    - 0.995
+    - 0.999
+    - 0.998
+    - 0.99
+  - name: seed_
+    values:
+    - 1
+    - 2
+    - 3
+  type: grid
+storage:
+  input:
+    container_name: v-wangwei1
+    local_dir: /home/v-wangwei1/storage
+    mount_dir: /mnt/storage
+    storage_account_name: resrchvc4data
+target:
+  name: msrresrchvc
+  service: singularity
