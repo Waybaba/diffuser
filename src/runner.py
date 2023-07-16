@@ -1,7 +1,5 @@
 
 class TrainDiffuserRunner:
-	def __init__(self, **kwargs):
-		return
 	
 	def start(self, cfg):
 		print("Running default runner")
@@ -39,3 +37,8 @@ class TrainDiffuserRunner:
 			trainer.train(n_train_steps=cfg.global_cfg.n_steps_per_epoch)
 		
 		print("Finished!")
+
+
+class PlanGuidedRunner:
+	def start(cfg):
+		return

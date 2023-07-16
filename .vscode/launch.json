@@ -21,8 +21,8 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				"experiment=train_diffuser",
-				// "experiment=plan_guided",
+				// "experiment=train_diffuser",
+				"experiment=plan_guided",
 				// "wandb.buf_dir=null",
 				// "wandb.mode=disabled",
 				// "env.name=HalfCheetah-v4",
