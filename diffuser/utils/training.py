@@ -8,6 +8,7 @@ import pdb
 from .arrays import batch_to_device, to_np, to_device, apply_dict
 from .timer import Timer
 from .cloud import sync_logs
+import wandb
 
 def cycle(dl):
     while True:
@@ -125,14 +126,18 @@ class Trainer(object):
 
             if self.step % self.log_freq == 0:
                 infos_str = ' | '.join([f'{key}: {val:8.4f}' for key, val in infos.items()])
+                wandb.log(infos)
                 print(f'{self.step}: {loss:8.4f} | {infos_str} | t: {timer():8.4f}', flush=True)
 
             if self.step == 0 and self.sample_freq:
-                self.render_reference(self.n_reference)
+                img_ref = self.render_reference(self.n_reference)
+                wandb.log({"reference": [wandb.Image(_) for _ in img_ref]})
 
             if self.sample_freq and self.step % self.sample_freq == 0:
             # if True:
-                self.render_samples()
+                img_samples = self.render_samples()
+                wandb.log({"samples": [wandb.Image(img_) for img_ in img_samples[0]]})
+
 
             self.step += 1
 
@@ -188,13 +193,14 @@ class Trainer(object):
         observations = self.dataset.normalizer.unnormalize(normed_observations, 'observations')
 
         savepath = os.path.join(self.logdir, f'_sample-reference.png')
-        self.renderer.composite(savepath, observations)
+        return self.renderer.composite(savepath, observations)
 
     def render_samples(self, batch_size=2):
         '''
             renders samples from (ema) diffusion model
         '''
         n_samples = self.n_render_samples
+        img_res = []
         for i in range(batch_size):
 
             ## get a single datapoint
@@ -228,4 +234,5 @@ class Trainer(object):
             observations = self.dataset.normalizer.unnormalize(normed_observations, 'observations')
 
             savepath = os.path.join(self.logdir, f'sample-{self.step}-{i}.png')
-            self.renderer.composite(savepath, observations)
+            img_res.append(self.renderer.composite(savepath, observations))
+        return img_res

@@ -1,0 +1,72 @@
+# @package _global_
+
+global_cfg: # would be passed to actor, critic1, critic2, policy, env
+  n_train_steps: 2000000
+  n_steps_per_epoch: 10000
+  horizon: 384
+
+runner:
+  _target_: src.runner.TrainDiffuserRunner
+  _partial_: true
+
+dataset:
+  _target_: diffuser.datasets.GoalDataset
+  _partial_: true
+  env: "maze2d-large-v1"
+  horizon: ${global_cfg.horizon}
+  normalizer: "LimitsNormalizer"
+  preprocess_fns: ["maze2d_set_terminals"]
+  use_padding: false
+  max_path_length: 40000
+
+render:
+  _target_: diffuser.utils.Maze2dRenderer
+  _partial_: true
+  env: ${dataset.env}
+
+
+net:
+  _target_: diffuser.models.TemporalUnet
+  _partial_: true
+  horizon: ${global_cfg.horizon}
+  dim_mults: [1, 4, 8]
+  attention: false
+
+model:
+  _target_: diffuser.models.GaussianDiffusion
+  _partial_: true
+  horizon: ${global_cfg.horizon}
+  n_timesteps: 256 # n_diffusion_steps in source code
+  loss_type: "l2"
+  clip_denoised: true
+  predict_epsilon: false
+  action_weight: 1
+  loss_weights: null
+  loss_discount: 1
+  # TODO add config for large0maze 2 in py file
+
+
+
+trainer:
+  _target_: diffuser.utils.Trainer
+  _partial_: true
+  train_batch_size: 32
+  train_lr: 2e-4
+  gradient_accumulate_every: 2
+  ema_decay: 0.995
+  sample_freq: 1000
+  save_freq: 1000
+  label_freq: 40000
+  save_parallel: false
+  results_folder: ${output_dir} # TODO
+  bucket: null # TODO ? what
+  n_reference: 25 # TODO ? what
+  n_render_samples: 5
+
+
+
+
+# common - for all tasks (task_name, tags, output_dir, device)
+algorithm_name: "DefaultAlgName"
+task_name: "RL_Diffuser"
+tags: ["debug"]

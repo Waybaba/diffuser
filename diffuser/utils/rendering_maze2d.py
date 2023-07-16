@@ -337,18 +337,18 @@ class MazeRenderer:
         # Save to file
         ani.save(savepath, writer='pillow')
 
-    def composite(self, savepath, paths, conditions=None, ncol=5, **kwargs):
+    def composite(self, savepath, paths, conditions=None, ncol=1, **kwargs):
         '''
             savepath : str
             observations : [ n_paths x horizon x 2 ]
         '''
         assert len(paths) % ncol == 0, 'Number of paths must be divisible by number of columns'
 
-        images = []
+        images_res = []
         for path, kw in zipkw(paths, **kwargs):
             img = self.renders(*path, conditions=conditions, **kw)
-            images.append(img)
-        images = np.stack(images, axis=0)
+            images_res.append(img)
+        images = np.stack(images_res, axis=0)
 
         nrow = len(images) // ncol
         images = einops.rearrange(images,
@@ -358,6 +358,7 @@ class MazeRenderer:
 
         # render only first sample to gif
         # self.render_to_gif(paths[0], savepath[:-4] + '.gif')
+        return images_res
         
 
 class Maze2dRenderer(MazeRenderer):
