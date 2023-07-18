@@ -182,6 +182,32 @@ def main(cfg):
 	if not os.path.exists(root / ".env"):
 		raise FileNotFoundError("Please create .env file in the root directory. See .env.example for reference.")
 
+	print("entryxxx")
+	# print environment variables
+	print("\n\n\n### Printing environment variables ...")
+	# HYDRA_FULL_ERROR
+	print("HYDRA_FULL_ERROR: ", os.environ["HYDRA_FULL_ERROR"])
+	# print where torch gpu is available
+	import torch
+	print("torch.cuda.is_available(): ", torch.cuda.is_available())
+	# print username
+	# print("username: ", os.environ["USER"])
+	import subprocess
+	result = subprocess.run(["whoami"], capture_output=True, text=True)
+	print("username: ", result.stdout.strip())
+
+	# try to import d4rl to test mujoco
+	try:
+		import d4rl
+		print("imported d4rl, no error")
+	except Exception as e:
+		print("Exception caught! when importing d4rl ...")
+		print("This is not a fatal error, main code would still run.")
+		print(e)
+	from diffuser.datasets import GoalDataset
+	print("imported GoalDataset, no error")
+
+
 	print("\n\n\n### Printing Hydra config ...")
 	print_config_tree(cfg, resolve=True)
 

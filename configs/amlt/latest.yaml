@@ -2,7 +2,7 @@ code:
   local_dir: $CONFIG_DIR/../../
 description: AMLT
 environment:
-  image: waybaba/rl:v5
+  image: waybaba/rl:v6
   setup:
   - echo "setup start..."
   - export UPRJDIR=/mnt/default/
@@ -14,37 +14,15 @@ environment:
 search:
   job_template:
     command:
-    - python entry/entry.py -m experiment=train_diffuser hydra/launcher=wsl_parallel
-      wandb.buf_dir=true wandb.mode=online n_jobs=5 tags=test2  trainer.train_lr={trainer_train_lr_}
-      trainer.train_batch_size={trainer_train_batch_size_} trainer.ema_decay={trainer_ema_decay_}
-      seed={seed_}
+    - 'python entry/entry.py -m experiment=train_diffuser hydra/launcher=wsl_parallel
+      wandb.buf_dir=true wandb.mode=online n_jobs=5 seed=1 tags=[test3]  '
     name: RL_Delayed_{experiment_name:s}_{auto:5s}
-    sku: G1
+    sku: G1-P40
+    submit_args:
+      container_args:
+        user: root
   max_trials: 10000
-  params:
-  - name: trainer_train_lr_
-    values:
-    - 1e-2
-    - 1e-3
-    - 2e-4
-    - 1e-4
-    - 1e-5
-  - name: trainer_train_batch_size_
-    values:
-    - 32
-    - 16
-    - 64
-  - name: trainer_ema_decay_
-    values:
-    - 0.995
-    - 0.999
-    - 0.998
-    - 0.99
-  - name: seed_
-    values:
-    - 1
-    - 2
-    - 3
+  params: []
   type: grid
 storage:
   input:

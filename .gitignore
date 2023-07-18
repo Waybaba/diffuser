@@ -146,3 +146,4 @@ dmypy.json
 /output
 /outputs
 /debug
+/configs/amlt/latest.yaml
