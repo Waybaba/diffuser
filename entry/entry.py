@@ -190,7 +190,12 @@ def seed_everything(seed):
     # torch.backends.cudnn.deterministic = True # this would slow down training
     # torch.backends.cudnn.benchmark = False # this would slow down training
 
-
+def save_config(cfg, path):
+	import os
+	import yaml
+	os.makedirs(os.path.dirname(path), exist_ok=True)
+	with open(path, "w") as file:
+		yaml.dump(OmegaConf.to_container(cfg, resolve=True), file, default_flow_style=False)
 
 @hydra.main(version_base=None, config_path=str(root / "configs"), config_name="entry.yaml")	
 def main(cfg):
@@ -200,20 +205,10 @@ def main(cfg):
 	# pre print
 	pre_start_check(cfg)
 
-	# try to import d4rl to test mujoco
-	try:
-		import d4rl
-		print("imported d4rl, no error")
-	except Exception as e:
-		print("Exception caught! when importing d4rl ...")
-		print("This is not a fatal error, main code would still run.")
-		print(e)
-	from diffuser.datasets import GoalDataset
-	print("imported GoalDataset, no error")
-
-
 	print("\n\n\n### Printing Hydra config ...")
 	print_config_tree(cfg, resolve=True)
+	save_config(cfg, cfg.output_dir+"/hydra_config.yaml")
+
 
 	print("\n\n\n### Initializing wandb ...")
 	try:

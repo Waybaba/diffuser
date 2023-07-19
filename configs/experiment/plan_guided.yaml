@@ -7,67 +7,19 @@ runner:
   _target_: src.runner.PlanGuidedRunner
   _partial_: true
 
-    # 'plan': {
-    #     'guide': 'sampling.ValueGuide',
-    #     'policy': 'sampling.GuidedPolicy',
-    #     'batch_size': 10,
-    #     'max_episode_length': 1000,
-    #     'preprocess_fns': [],
-    #     'device': 'cuda',
-    #     'seed': None,
-
-    #     ## sample_kwargs
-    #     'n_guide_steps': 2,
-    #     'scale': 0.1,
-    #     't_stopgrad': 2,
-    #     'scale_grad_by_std': True,
-
-    #     ## serialization
-    #     'loadbase': None,
-    #     'logbase': 'logs/pretrained/',
-    #     'prefix': 'plans/',
-    #     'exp_name': watch(plan_args_to_watch),
-    #     'vis_freq': 10,
-    #     'max_render': 10,
-    #     'conditional': False,
-
-    #     ## diffusion model
-    #     'horizon': 256,
-    #     'n_diffusion_steps': 256,
-    #     # 'normalizer': 'LimitsNormalizer', # TODO seem to be removed?
-
-    #     ## value function
-    #     'discount': 0.99, # DEBUG previous is 0.997
-
-    #     ## loading
-    #     'diffusion_loadpath': 'f:diffusion/H{horizon}_T{n_diffusion_steps}',
-    #     'diffusion_epoch': 'latest',
-    #     'value_loadpath': 'f:values/defaults_H{horizon}_T{n_diffusion_steps}_d{discount}',
-    #     'value_epoch': 'latest',
-
-    #     'suffix': '0',
-    #     'verbose': False,
-    # },
-  
-
-# diffusion_experiment = utils.load_diffusion(
-#     args.loadbase, args.dataset, args.diffusion_loadpath,
-#     epoch=args.diffusion_epoch, seed=args.seed,
-# )
-# def load_diffusion(*loadpath, epoch='latest', device='cuda:0', seed=None):
-
-
-diffusion_experiment:
-  _target_: diffuser.utils.load_diffusion
-  _args_:
-    - 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # TODO
-  epoch: 'latest'
-  seed: ${seed}
-  device: ${device}
+diffusion_dir: 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
+epoch: 'latest'
+# TODO make a separate config for diffusion model
+# diffusion_experiment:
+#   _target_: diffuser.utils.load_diffusion
+#   _args_:
+#     - 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
+#   epoch: 'latest'
+#   seed: ${seed}
+#   device: ${device}
 
 guide:
   _target_: diffuser.sampling.NoTrainGuideShort
-
 
 policy:
   _target_: diffuser.sampling.GuidedPolicy
@@ -86,14 +38,6 @@ trainer:
   batch_size: 10
   verbose: true
 
-
-# logger_config = utils.Config(
-#     utils.Logger,
-#     renderer=renderer,
-#     logpath=args.savepath,
-#     vis_freq=args.vis_freq,
-#     max_render=args.max_render,
-# )
 
 vis_freq: 10
 max_render: 10
