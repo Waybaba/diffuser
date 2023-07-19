@@ -6,7 +6,7 @@ ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES},display \
     LC_ALL=C.UTF-8
 
 ### environment variables
-ARG USERNAME=aiscuser
+ARG USERNAME=waybaba
 ENV UDATADIR=/data \
     UPRJDIR=/code \
     UOUTDIR=/output \
@@ -34,19 +34,11 @@ RUN apt-get update && apt-get install -y \
     libmpc-dev
     # && rm -rf /var/lib/apt/lists/*
 
-
-RUN apt-get update && \
-    apt-get install -y apt-utils software-properties-common gnupg2 wget git curl && \
-    add-apt-repository -y ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y libosmesa6-dev libgl1-mesa-glx libglfw3
-
-
 ### conda
 RUN conda install -y --name base -c conda-forge \
     tensorboard \
-    pandas
-    # && rm -rf /var/lib/apt/lists/*
+    pandas \
+    && rm -rf /var/lib/apt/lists/*
 
 ### pip - base
 RUN pip install \
@@ -105,10 +97,9 @@ RUN mv mujoco210 /usr/local/mujoco/
 RUN rm mujoco210-linux-x86_64.tar.gz
 ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/usr/local/mujoco/mujoco210/bin
 ENV MUJOCO_PY_MUJOCO_PATH /usr/local/mujoco/mujoco210
-
-# RUN pip install dm_control mujoco-py==2.1.2.14
 RUN pip install 'mujoco-py<2.2,>=2.1' 'cython<3'
-
+RUN python -c "import mujoco_py; print(mujoco_py.__version__)" # prebuild mujoco ps. first import mujoco with non-root user would cause error
+RUN chmod -R a+rwx /opt/conda/lib/python3.7/site-packages/mujoco_py/generated
 
 
 ### (optional) mujoco user version
@@ -123,17 +114,13 @@ RUN pip install 'mujoco-py<2.2,>=2.1' 'cython<3'
 
 ### (optional) d4rl
 RUN pip install git+https://github.com/Farama-Foundation/d4rl@master#egg=d4rl
-RUN pip install dm_control mujoco-py==2.1.2.14
+RUN pip install dm_control 'mujoco-py<2.2,>=2.1' # avoid mujoco version change
 
 ### (optional) diffuser
 RUN pip install gym==0.18.0 einops typed-argument-parser scikit-video==1.1.11 scikit-image==0.17.2
-
-### prebuild mujoco ps. first import mujoco with non-root user would cause error
-RUN python -c "import mujoco_py; print(mujoco_py.__version__)"
-RUN chmod -R a+rwx /opt/conda/lib/python3.7/site-packages/mujoco_py/generated
+RUN pip install 'mujoco-py<2.2,>=2.1' # avoid mujoco version change
 
 
-USER $USERNAME
-
-# end
+### end # comment the following when amlt: amlt need root user to build, but it will switch to a user called aiscuser when running
+USER $USERNAME 
 CMD sleep infinity

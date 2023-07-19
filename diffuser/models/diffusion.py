@@ -156,7 +156,7 @@ class GaussianDiffusion(nn.Module):
         return model_mean, posterior_variance, posterior_log_variance
 
     @torch.no_grad()
-    def p_sample_loop(self, shape, cond, verbose=True, return_chain=False, sample_fn=default_sample_fn, **sample_kwargs):
+    def p_sample_loop(self, shape, cond, verbose=False, return_chain=False, sample_fn=default_sample_fn, **sample_kwargs):
         device = self.betas.device
 
         batch_size = shape[0]
@@ -172,6 +172,7 @@ class GaussianDiffusion(nn.Module):
             x = apply_conditioning(x, cond, self.action_dim)
 
             progress.update({'t': i, 'vmin': values.min().item(), 'vmax': values.max().item()})
+
             if return_chain: chain.append(x)
 
         progress.stamp()

@@ -118,6 +118,19 @@ def move_output_to_wandb_dir(src_dir, dest_dir):
 	copy_all_files(src_dir, dest_dir)
 	print("Moving wandb done!")
 
+def pre_start_check(cfg):
+	# print environment variables
+	print("\n\n\n### Printing environment variables ...")
+	# HYDRA_FULL_ERROR
+	print("HYDRA_FULL_ERROR: ", os.environ["HYDRA_FULL_ERROR"])
+	# print where torch gpu is available
+	import torch
+	print("torch.cuda.is_available(): ", torch.cuda.is_available())
+	# print username
+	# print("username: ", os.environ["USER"])
+	import subprocess
+	result = subprocess.run(["whoami"], capture_output=True, text=True)
+	print("username: ", result.stdout.strip())
 
 ### main functions
 
@@ -177,24 +190,15 @@ def seed_everything(seed):
     # torch.backends.cudnn.deterministic = True # this would slow down training
     # torch.backends.cudnn.benchmark = False # this would slow down training
 
+
+
 @hydra.main(version_base=None, config_path=str(root / "configs"), config_name="entry.yaml")	
 def main(cfg):
 	if not os.path.exists(root / ".env"):
 		raise FileNotFoundError("Please create .env file in the root directory. See .env.example for reference.")
 
-	print("entryxxx")
-	# print environment variables
-	print("\n\n\n### Printing environment variables ...")
-	# HYDRA_FULL_ERROR
-	print("HYDRA_FULL_ERROR: ", os.environ["HYDRA_FULL_ERROR"])
-	# print where torch gpu is available
-	import torch
-	print("torch.cuda.is_available(): ", torch.cuda.is_available())
-	# print username
-	# print("username: ", os.environ["USER"])
-	import subprocess
-	result = subprocess.run(["whoami"], capture_output=True, text=True)
-	print("username: ", result.stdout.strip())
+	# pre print
+	pre_start_check(cfg)
 
 	# try to import d4rl to test mujoco
 	try:

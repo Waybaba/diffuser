@@ -96,7 +96,7 @@ target:
     name: msrresrchvc
 
 environment:
-    image: waybaba/rl:v6
+    image: waybaba/rl:debug
     username: waybaba
     setup:
         - echo "setup start..."
@@ -121,10 +121,10 @@ search:
     name: RL_Delayed_{experiment_name:s}_{auto:5s}
     # sku: 24G1-P40
     sku: G1
-    submit_args:
-      container_args:
-        user: root
-        # gpus: all
+    # submit_args:
+    #   container_args:
+    #     user: root
+    #     # gpus: all
     command:
     - python src/entry.py
       -m
