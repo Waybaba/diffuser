@@ -7,17 +7,11 @@ runner:
   _target_: src.runner.PlanGuidedRunner
   _partial_: true
 
-diffusion_dir: 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
-epoch: 'latest'
-# TODO make a separate config for diffusion model
-# diffusion_experiment:
-#   _target_: diffuser.utils.load_diffusion
-#   _args_:
-#     - 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
-#   epoch: 'latest'
-#   seed: ${seed}
-#   device: ${device}
 
+
+diffusion:
+  dir: 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
+  epoch: 'latest'
 guide:
   _target_: diffuser.sampling.NoTrainGuideShort
 

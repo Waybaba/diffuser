@@ -78,7 +78,6 @@ def parse_diffusion(diffusion_dir, epoch, device):
     )
     # find latest
     import glob
-    import os
     def get_latest_epoch(loadpath):
         states = glob.glob1(loadpath, 'state_*')
         latest_epoch = -1
@@ -100,7 +99,7 @@ class PlanGuidedRunner:
     def start(self, cfg):
         self.cfg = cfg
         import numpy as np
-        diffusion, dataset, self.renderer = parse_diffusion(cfg.diffusion_dir, cfg.epoch, cfg.device)
+        diffusion, dataset, self.renderer = parse_diffusion(cfg.diffusion.dir, cfg.diffusion.epoch, cfg.device)
 
         guide = cfg.guide
 
