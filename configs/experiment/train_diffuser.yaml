@@ -2,7 +2,7 @@
 
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
   n_train_steps: 2000000
-  n_steps_per_epoch: 10000
+  n_steps_per_epoch: 10000 # so n_epochs = n_train_steps / n_steps_per_epoch
   horizon: 384
 
 runner:
@@ -54,9 +54,9 @@ trainer:
   train_lr: 2e-4
   gradient_accumulate_every: 2
   ema_decay: 0.995
-  sample_freq: 1000
-  save_freq: 1000
-  label_freq: 40000
+  sample_freq: 100000 # for x step, render samples
+  save_freq: 100000 # for x step, save model
+  label_freq: 10000 # not important, just use for name. e.g. 12234 -> 12000
   save_parallel: false
   results_folder: ${output_dir} # TODO
   bucket: null # TODO ? what

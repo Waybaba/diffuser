@@ -219,7 +219,12 @@ def link_output(cfg):
 
 	print(f"Linked output_dir to {latest_dir}")
 
-
+def pre_debug(cfg):
+	print("###"*9999)
+	print("\n\n\n### Listing all files in cfg.data_dir ...")
+	import glob
+	for file in glob.glob(cfg.paths.data_dir+"/*"):
+		print(file)
 
 @hydra.main(version_base=None, config_path=str(root / "configs"), config_name="entry.yaml")	
 def main(cfg):
@@ -235,6 +240,9 @@ def main(cfg):
 	print("\n\n\n### Printing Hydra config ...")
 	print_config_tree(cfg, resolve=True)
 	save_config(cfg, cfg.output_dir+"/hydra_config.yaml")
+
+	if 0:
+		pre_debug(cfg)
 
 
 	print("\n\n\n### Initializing wandb ...")

@@ -222,6 +222,20 @@ def replace_with_dot_keys(source_dict, dot_keys):
 
     return source_dict
 
+def safe_conversion(s):
+    try:
+        return int(s)
+    except ValueError:
+        try:
+            return float(s)
+        except ValueError:
+            if s.lower() == 'true':
+                return True
+            elif s.lower() == 'false':
+                return False
+            else:
+                return s
+
 def parse_string_list(input_string):
     # Using regex to match elements separated by commas
     elements = re.findall(r'(\[.*?\]|".*?"|\'.*?\'|[^,\s]+)', input_string)
@@ -233,10 +247,7 @@ def parse_string_list(input_string):
             parsed_elements.append(elem)
         else:
             parsed_elem = elem.strip('"\'')
-            if parsed_elem.isnumeric():
-                parsed_elem = int(parsed_elem)
-            elif re.match(r'^-?\d+\.\d+$', parsed_elem):
-                parsed_elem = float(parsed_elem)
+            parsed_elem = safe_conversion(parsed_elem)
             parsed_elements.append(parsed_elem)
 
     return parsed_elements

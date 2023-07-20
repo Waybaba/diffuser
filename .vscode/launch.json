@@ -22,6 +22,7 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=train_diffuser",
+				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
 				// "wandb.mode=disabled",
 				// "env.name=HalfCheetah-v4",
@@ -40,6 +41,7 @@
 				// "diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-07-19_14-35-03_513054",
 				"diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
 				"diffusion.epoch=0",
+				"policy.scale_grad_by_std=true",
 				// "wandb.mode=disabled",
 			],
 		},
@@ -103,6 +105,36 @@
 				"--scale",
 				"0.1",
 			]
-		}
+		},
+		// python src/launch_amlt.py \
+		// amlt.search.job_template.sku=G1-P100 \
+		// python entry/entry.py \
+		// 	wandb.buf_dir=true \
+		// 	wandb.mode=online \
+		// 	policy.t_stopgrad=-2,1 \
+		// seed=1 \
+		// 	experiment=plan_guided \
+		// 	diffusion.dir=/mnt/storage/data/models/diffuser/2023-07-19_14-35-03_513054 \
+		// 	tags=["debug"]
+		{
+			"name": "launch_amlt",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/src/launch_amlt.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"amlt.search.job_template.sku=G1-P100",
+				"${workspaceFolder}/entry/entry.py",
+				"wandb.buf_dir=true",
+				"wandb.mode=online",
+				"policy.t_stopgrad=-2,1",
+				"seed=1",
+				"experiment=plan_guided",
+				"diffusion.dir=/mnt/storage/data/models/diffuser/2023-07-19_14-35-03_513054",
+				"tags=[\"debug\"]"
+			]
+		},
+			
 	]
 }
