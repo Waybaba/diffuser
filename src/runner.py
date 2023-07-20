@@ -162,8 +162,6 @@ class PlanGuidedRunner:
                 break
             
             observation = next_observation
-            if t > 2: 
-                break
         
         ### final log
         import os # TODO move
