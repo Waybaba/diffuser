@@ -87,7 +87,8 @@ def parse_diffusion(diffusion_dir, epoch, device):
         return latest_epoch
     if epoch == 'latest':
         epoch = get_latest_epoch(diffusion_dir)
-    print(f'\n[ utils/serialization ] Loading model epoch: {epoch}\n')
+    print(f'\n[ parse diffusion model ] Loading model epoch: {epoch}\n')
+    print(f'\n[ parse diffusion model ] Path: {diffusion_dir}\n')
     trainer.load(epoch)
 
     return trainer.ema_model, dataset, render

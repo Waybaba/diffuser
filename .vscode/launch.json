@@ -37,7 +37,9 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=plan_guided",
-				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-07-19_14-35-03_513054",
+				// "diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-07-19_14-35-03_513054",
+				"diffusion.dir=${env:UDATADIR}/models/diffusion/largemaze_on_wsl_Jul20",
+				"diffusion.epoch=0",
 				// "wandb.mode=disabled",
 			],
 		},

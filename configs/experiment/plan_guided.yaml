@@ -24,7 +24,7 @@ policy:
     _target_: diffuser.sampling.n_step_guided_p_sample
     _partial_: true
   n_guide_steps: 2
-  t_stopgrad: 2
+  t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   scale_grad_by_std: true
 
 trainer:
