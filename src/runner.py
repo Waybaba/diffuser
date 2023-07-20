@@ -117,7 +117,7 @@ class PlanGuidedRunner:
 
         total_reward = 0
         for t in range(cfg.trainer.max_episode_length):
-
+            wandb_logs = {}
             if t % 10 == 0: print(cfg.output_dir, flush=True)
 
             ## save state for rendering only
@@ -137,9 +137,15 @@ class PlanGuidedRunner:
             score = env.get_normalized_score(total_reward)
             print(
                 f't: {t} | r: {reward:.2f} |  R: {total_reward:.2f} | score: {score:.4f} | '
-                f'values: {samples.values}',
+                f'values: {samples.values[0].item()}',
                 flush=True,
             )
+            wandb_logs["rollout/reward"] = reward
+            wandb_logs["rollout/total_reward"] = total_reward
+            wandb_logs["rollout/values"] = score
+            guide_specific_metrics = guide.metrics(samples.observations)
+            for key, value in guide_specific_metrics.items():
+                wandb_logs[f"rollout/guide_{key}"] = value[0].item()
 
             ## update rollout observations
             rollout.append(next_observation.copy())
@@ -147,12 +153,32 @@ class PlanGuidedRunner:
             ## render every `cfg.trainer.vis_freq` steps
             self.log(t, samples, state, rollout, conditions)
 
+            # wandb log
+            wandb_commit = (not cfg.wandb.lazy_commits_freq) or (t % cfg.wandb.lazy_commits_freq == 0)
+            wandb.log(wandb_logs, step=t, commit=wandb_commit)
+
             if terminal:
                 break
-
+            
             observation = next_observation
-        return
-
+            if t > 2: 
+                break
+        
+        ### final log
+        import os # TODO move
+        wandb_logs = {}
+        img_rollout_sample = self.renderer.render_rollout(
+            os.path.join(self.cfg.output_dir, f'rollout_final.png'),
+            rollout,
+            conditions,
+            fps=80,
+        )
+        wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
+        wandb_logs["final/total_reward"] = total_reward
+        guide_specific_metrics = guide.metrics(np.stack(rollout)[None,:])
+        for key, value in guide_specific_metrics.items():
+            wandb_logs[f"final/guide_{key}"] = value[0].item()
+        wandb.log(wandb_logs)
 
     def log(self, t, samples, state, rollout=None, conditions=None):
         import os
@@ -167,7 +193,8 @@ class PlanGuidedRunner:
             samples.observations,
             conditions
         )
-        wandb_logs["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
+        # wandb_logs["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
+        wandb_logs["samples"] = [wandb.Image(img_samples[0])]
 
         # render video of plans
         # self.renderer.render_plan(

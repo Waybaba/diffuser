@@ -179,16 +179,16 @@ def close_wandb(wandb_dir, cfg):
 				sleep(time_to_sleep)
 
 def seed_everything(seed):
-    import random, os
-    import numpy as np
-    import torch
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    # torch.backends.cudnn.deterministic = True # this would slow down training
-    # torch.backends.cudnn.benchmark = False # this would slow down training
+	import random, os
+	import numpy as np
+	import torch
+	random.seed(seed)
+	os.environ['PYTHONHASHSEED'] = str(seed)
+	np.random.seed(seed)
+	torch.manual_seed(seed)
+	torch.cuda.manual_seed_all(seed)
+	# torch.backends.cudnn.deterministic = True # this would slow down training
+	# torch.backends.cudnn.benchmark = False # this would slow down training
 
 def save_config(cfg, path):
 	import os
@@ -197,6 +197,30 @@ def save_config(cfg, path):
 	with open(path, "w") as file:
 		yaml.dump(OmegaConf.to_container(cfg, resolve=True), file, default_flow_style=False)
 
+def link_output(cfg):
+	"""
+		link the output_dir to ./debug/latest/output/ for easier access
+		if there exists a previous link, delete it first
+		note that the parent dir could miss, so create it if necessary
+	"""
+	import os
+	from pathlib import Path
+
+	output_dir = Path(cfg.paths.output_dir)
+	root = Path.cwd()
+	latest_dir = root / "debug" / "latest" / "output"
+	
+	latest_dir.parent.mkdir(parents=True, exist_ok=True)
+
+	if latest_dir.is_symlink():
+		latest_dir.unlink()
+	
+	os.symlink(output_dir, latest_dir)
+
+	print(f"Linked output_dir to {latest_dir}")
+
+
+
 @hydra.main(version_base=None, config_path=str(root / "configs"), config_name="entry.yaml")	
 def main(cfg):
 	if not os.path.exists(root / ".env"):
@@ -204,6 +228,9 @@ def main(cfg):
 
 	# pre print
 	pre_start_check(cfg)
+
+	# link output dir for easier access
+	link_output(cfg)
 
 	print("\n\n\n### Printing Hydra config ...")
 	print_config_tree(cfg, resolve=True)

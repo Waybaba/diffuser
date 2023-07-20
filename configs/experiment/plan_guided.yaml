@@ -13,7 +13,7 @@ diffusion:
   dir: 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
   epoch: 'latest'
 guide:
-  _target_: diffuser.sampling.NoTrainGuideShort
+  _target_: diffuser.sampling.NoTrainGuideShorter
 
 policy:
   _target_: diffuser.sampling.GuidedPolicy
@@ -30,10 +30,10 @@ policy:
 trainer:
   max_episode_length: 1000
   batch_size: 10
-  verbose: true
+  verbose: false # the diffusion step progress bar
 
 
-vis_freq: 10
+vis_freq: 20
 max_render: 10
 
 

@@ -47,6 +47,7 @@ seed: null
 wandb:
   buf_dir: null # if null would just output in the $OUTPUT, would cause IO problem when mount cloud as path
   mode: online # online, offline or disabled
+  lazy_commits_freq: 0 # 0 means always commit
 
 output_dir: "${paths.output_dir}"
 
