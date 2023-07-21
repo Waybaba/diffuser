@@ -29,11 +29,12 @@ policy:
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   scale_grad_by_std: true
 
-trainer:
+trainer: # for plan guided
   max_episode_length: 1000
   batch_size: 10
   verbose: false # the diffusion step progress bar
   use_controller_act: true # use basic controller to cal action instead of the results of diffuser
+  plan_once: true # only plan once for each episode, the following action are from controller
 
 
 vis_freq: 20

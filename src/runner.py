@@ -123,21 +123,31 @@ class PlanGuidedRunner:
 
             ## save state for rendering only
             state = env.state_vector().copy()
-
-            ## (optional) goal condition
+            
+            ## make action
             conditions = {0: observation}
-            if "maze" in env.name:
+            if "maze" in env.name: 
                 conditions[diffusion.horizon-1] = np.array(env.goal_locations[0] + env.goal_locations[0])
-            action, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
-
-            ## action
+            if t == 0: 
+                actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
+                action = samples.actions[0]
+                sequence = samples.observations[0]
+            else:
+                if not cfg.trainer.plan_once:
+                    actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
+                    action = samples.actions[0]
+                    sequence = samples.observations[0]
             if cfg.trainer.use_controller_act:
-                
-
-
+                if t == diffusion.horizon - 1: 
+                    next_waypoint = sequence[-1].copy() if cfg.trainer.plan_once else sequence[1]
+                    next_waypoint[2:] = 0
+                else:
+                    next_waypoint = sequence[t+1] if cfg.trainer.plan_once else sequence[1]
+                action = next_waypoint[:2] - state[:2] + (next_waypoint[2:] - state[2:])
+            
             ## execute action in environment
             next_observation, reward, terminal, _ = env.step(action)
-
+ 
             ## print reward and score
             total_reward += reward
             score = env.get_normalized_score(total_reward)
@@ -164,6 +174,8 @@ class PlanGuidedRunner:
             wandb.log(wandb_logs, step=t, commit=wandb_commit)
 
             if terminal:
+                break
+            if cfg.trainer.plan_once and t == diffusion.horizon - 1:
                 break
             
             observation = next_observation
