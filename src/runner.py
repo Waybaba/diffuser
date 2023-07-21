@@ -130,6 +130,11 @@ class PlanGuidedRunner:
                 conditions[diffusion.horizon-1] = np.array(env.goal_locations[0] + env.goal_locations[0])
             action, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
 
+            ## action
+            if cfg.trainer.use_controller_act:
+                
+
+
             ## execute action in environment
             next_observation, reward, terminal, _ = env.step(action)
 
