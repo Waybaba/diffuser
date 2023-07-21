@@ -37,8 +37,8 @@ trainer: # for plan guided
   plan_once: true # only plan once for each episode, the following action are from controller
 
 
-vis_freq: 20
-max_render: 10
+vis_freq: 50
+max_render: 1
 
 
 # common - for all tasks (task_name, tags, output_dir, device)
