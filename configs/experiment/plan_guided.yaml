@@ -12,6 +12,8 @@ runner:
 diffusion:
   dir: 'logs/pretrained/maze2d-large-v1/diffusion/H384_T256' # ! load trained diffusion model from here
   epoch: 'latest'
+  dataset_seed: 0 # to make the start and end the same
+
 guide:
   _target_: diffuser.sampling.NoTrainGuideShorter
 

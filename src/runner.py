@@ -43,7 +43,7 @@ class TrainDiffuserRunner:
         
         print("Finished!")
 
-def parse_diffusion(diffusion_dir, epoch, device):
+def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
     """ parse diffusion model from 
     """
     import hydra
@@ -53,7 +53,7 @@ def parse_diffusion(diffusion_dir, epoch, device):
         cfg = OmegaConf.load(file)
     cfg = hydra.utils.instantiate(cfg)
     ### init	
-    dataset = cfg.dataset()
+    dataset = cfg.dataset(seed=dataset_seed)
     render = cfg.render()
     
     observation_dim = dataset.observation_dim
@@ -100,7 +100,7 @@ class PlanGuidedRunner:
     def start(self, cfg):
         self.cfg = cfg
         import numpy as np
-        diffusion, dataset, self.renderer = parse_diffusion(cfg.diffusion.dir, cfg.diffusion.epoch, cfg.device)
+        diffusion, dataset, self.renderer = parse_diffusion(cfg.diffusion.dir, cfg.diffusion.epoch, cfg.device, cfg.diffusion.dataset_seed)
 
         guide = cfg.guide
 
