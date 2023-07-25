@@ -137,6 +137,8 @@ def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
 
     return trainer.ema_model, dataset, render
 
+
+
 class PlanGuidedRunner:
     def start(self, cfg):
         self.cfg = cfg

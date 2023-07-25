@@ -304,8 +304,13 @@ class MazeRenderer:
             # conditions = {0: np.array(4), path_length-1: np.array(4)}
             if 0 in conditions:
                 plt.scatter(conditions[0][1], conditions[0][0], c='green', zorder=30, s=400, marker='o', edgecolors='black')
-            if path_length-1 in conditions:
-                plt.scatter(conditions[path_length-1][1], conditions[path_length-1][0], c='red', zorder=30, s=600, marker='*',edgecolors='black')
+            for k, v in conditions.items():
+                if k == 0: continue
+                if k < 10: continue
+                if type(k) == int:
+                    # plt.scatter(conditions[path_length-1][1], conditions[path_length-1][0], c='red', zorder=30, s=600, marker='*',edgecolors='black')
+                    plt.scatter(v[1], v[0], c='red', zorder=30, s=400, marker='*',edgecolors='black')
+                    break
         
         plt.axis('off')
         plt.title(title)
@@ -405,7 +410,7 @@ class Maze2dRenderer(MazeRenderer):
 
     def render_rollout(self, savepath, states, conditions=None, **video_kwargs):
         if type(states) is list: states = np.array(states)
-        image = self.renders(states)
+        image = self.renders(states, conditions=conditions)
         # save_video(savepath, images, **video_kwargs)
         imageio.imsave(savepath, image)
         print(f'Saved rollout to: {savepath}')

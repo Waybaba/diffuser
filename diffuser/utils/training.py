@@ -106,6 +106,7 @@ class Trainer(object):
 
         timer = Timer()
         for step in range(n_train_steps):
+            to_log = {}
             for i in range(self.gradient_accumulate_every):
                 batch = next(self.dataloader)
                 batch = batch_to_device(batch)
@@ -122,24 +123,28 @@ class Trainer(object):
 
             if self.step % self.save_freq == 0:
                 label = self.step // self.label_freq * self.label_freq
+                # TODO add eval
+                total_reward, wandb_logs = self.eval(self.model)
+                to_log.update({"save/"+key: value for key, value in wandb_logs.items()})
                 self.save(label)
 
             if self.step % self.log_freq == 0:
                 infos_str = ' | '.join([f'{key}: {val:8.4f}' for key, val in infos.items()])
-                wandb.log(infos)
+                to_log.update(infos)
                 print(f'{self.step}: {loss:8.4f} | {infos_str} | t: {timer():8.4f}', flush=True)
 
             if self.step == 0 and self.sample_freq:
                 img_ref = self.render_reference(self.n_reference)
-                wandb.log({"reference": [wandb.Image(_) for _ in img_ref]})
+                to_log["reference"] = [wandb.Image(_) for _ in img_ref]
+
 
             if self.sample_freq and self.step % self.sample_freq == 0:
             # if True:
                 img_samples = self.render_samples()
-                wandb.log({"samples": [wandb.Image(img_) for img_ in img_samples[0]]})
-
+                to_log["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
 
             self.step += 1
+            wandb.log(to_log, step=self.step, commit=True if self.step % 100 == 0 else False)
 
     def save(self, epoch):
         '''
@@ -236,3 +241,107 @@ class Trainer(object):
             savepath = os.path.join(self.logdir, f'sample-{self.step}-{i}.png')
             img_res.append(self.renderer.composite(savepath, observations))
         return img_res
+
+    def eval(self, model):
+        env = self.dataset.env
+        diffusion = model
+        observation = env.reset()
+        ## observations for rendering
+        rollout = [observation.copy()]
+        PLAN_ONCE = True
+        BATCH_SIZE = 1
+        USE_CONTROLLER_ACT = True
+        # fake policy
+        from diffuser.sampling import GuidedPolicy, n_step_guided_p_sample
+        from diffuser.sampling import NoTrainGuideShorter
+        from functools import partial
+        guide = NoTrainGuideShorter()
+        policy = GuidedPolicy(
+            guide=guide,
+            diffusion_model=diffusion,
+            normalizer=self.dataset.normalizer,
+            scale=0.0, 
+            preprocess_fns=[],
+            sample_fn=partial(n_step_guided_p_sample,
+                n_guide_steps=2, 
+                t_stopgrad=2, 
+                scale_grad_by_std=True, 
+            ),
+        )
+
+        total_reward = 0
+        # for t in range(cfg.trainer.max_episode_length):
+        for t in range(1000):
+            wandb_logs = {}
+
+            ## save state for rendering only
+            state = env.state_vector().copy()
+            
+            ## make action
+            conditions = {0: observation}
+            if "maze" in env.name: 
+                conditions[diffusion.horizon-1] = np.array(env.goal_locations[0] + env.goal_locations[0])
+            if t == 0: 
+                actions, samples = policy(conditions, batch_size=BATCH_SIZE, verbose=False)
+                action = samples.actions[0]
+                sequence = samples.observations[0]
+            else:
+                if not PLAN_ONCE:
+                    actions, samples = policy(conditions, batch_size=BATCH_SIZE, verbose=False)
+                    action = samples.actions[0]
+                    sequence = samples.observations[0]
+            if USE_CONTROLLER_ACT:
+                if t == diffusion.horizon - 1: 
+                    next_waypoint = sequence[-1].copy() if PLAN_ONCE else sequence[1]
+                    next_waypoint[2:] = 0
+                else:
+                    next_waypoint = sequence[t+1] if PLAN_ONCE else sequence[1]
+                action = next_waypoint[:2] - state[:2] + (next_waypoint[2:] - state[2:])
+            
+            ## execute action in environment
+            next_observation, reward, terminal, _ = env.step(action)
+ 
+            ## print reward and score
+            total_reward += reward
+            score = env.get_normalized_score(total_reward)
+            # print(
+            #     f't: {t} | r: {reward:.2f} |  R: {total_reward:.2f} | score: {score:.4f} | '
+            #     f'values: {samples.values[0].item()}',
+            #     flush=True,
+            # )
+            # wandb_logs["rollout/reward"] = reward
+            # wandb_logs["rollout/total_reward"] = total_reward
+            # wandb_logs["rollout/values"] = score
+            # guide_specific_metrics = guide.metrics(samples.observations)
+            # for key, value in guide_specific_metrics.items():
+            #     wandb_logs[f"rollout/guide_{key}"] = value[0].item()
+
+            ## update rollout observations
+            rollout.append(next_observation.copy())
+
+            ## render every `cfg.trainer.vis_freq` steps
+            # self.log(t, samples, state, rollout, conditions)
+
+            if terminal:
+                break
+            if PLAN_ONCE and t == diffusion.horizon - 1:
+                break
+            
+            observation = next_observation
+        
+        ### final log
+        import os # TODO move
+        wandb_logs = {}
+        img_rollout_sample = self.renderer.render_rollout(
+            os.path.join(self.logdir, f'rollout_final.png'),
+            rollout,
+            conditions,
+            fps=80,
+        )
+        wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
+        wandb_logs["final/total_reward"] = total_reward
+        guide_specific_metrics = guide.metrics(np.stack(rollout)[None,:])
+        # for key, value in guide_specific_metrics.items():
+        #     wandb_logs[f"final/guide_{key}"] = value[0].item()
+        # wandb.log(wandb_logs)
+        return total_reward, wandb_logs
