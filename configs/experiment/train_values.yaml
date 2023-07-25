@@ -1,0 +1,134 @@
+# @package _global_
+
+global_cfg: # would be passed to actor, critic1, critic2, policy, env
+  n_train_steps: 2000000
+  n_steps_per_epoch: 10000 # so n_epochs = n_train_steps / n_steps_per_epoch
+  horizon: 384
+
+runner:
+  _target_: src.runner.TrainValuesRunner
+  _partial_: true
+
+
+
+### config for trainer_diffuser (as reference)
+# dataset:
+#   _target_: diffuser.datasets.GoalDataset
+#   _partial_: true
+#   env: "maze2d-large-v1"
+#   horizon: ${global_cfg.horizon}
+#   normalizer: "LimitsNormalizer"
+#   preprocess_fns: ["maze2d_set_terminals"]
+#   use_padding: false
+#   max_path_length: 40000
+
+        # ## dataset
+        # 'loader': 'datasets.ValueDataset',
+        # 'termination_penalty': None,
+        # 'normalizer': 'LimitsNormalizer',
+        # 'preprocess_fns': ['maze2d_set_terminals'],
+        # 'clip_denoised': True,
+        # 'use_padding': False,
+        # 'max_path_length': 40000,
+
+dataset: 
+  _target_: diffuser.datasets.ValueDataset
+  _partial_: true
+  env: "maze2d-large-v1"
+  
+
+
+# render:
+#   _target_: diffuser.utils.Maze2dRenderer
+#   _partial_: true
+#   env: ${dataset.env}
+
+
+# net:
+#   _target_: diffuser.models.TemporalUnet
+#   _partial_: true
+#   horizon: ${global_cfg.horizon}
+#   dim_mults: [1, 4, 8]
+#   attention: false
+
+# model:
+#   _target_: diffuser.models.GaussianDiffusion
+#   _partial_: true
+#   horizon: ${global_cfg.horizon}
+#   n_timesteps: 256 # n_diffusion_steps in source code
+#   loss_type: "l2"
+#   clip_denoised: true
+#   predict_epsilon: false
+#   action_weight: 1
+#   loss_weights: null
+#   loss_discount: 1
+#   # TODO add config for large0maze 2 in py file
+
+
+
+# trainer:
+#   _target_: diffuser.utils.Trainer
+#   _partial_: true
+#   train_batch_size: 32
+#   train_lr: 2e-4
+#   gradient_accumulate_every: 2
+#   ema_decay: 0.995
+#   sample_freq: 100000 # for x step, render samples
+#   save_freq: 100000 # for x step, save model
+#   label_freq: 10000 # not important, just use for name. e.g. 12234 -> 12000
+#   save_parallel: false
+#   results_folder: ${output_dir} # TODO
+#   bucket: null # TODO ? what
+#   n_reference: 25 # TODO ? what
+#   n_render_samples: 5
+
+### config for this, but in old format
+        # 'model': 'models.ValueFunction',
+        # 'diffusion': 'models.ValueDiffusion',
+        # 'horizon': 256,
+        # 'n_diffusion_steps': 256,
+        # 'dim_mults': (1, 4, 8),
+        # 'renderer': 'utils.Maze2dRenderer',
+
+        # ## value-specific kwargs
+        # 'discount': 0.99,
+        # 'termination_penalty': -100,
+        # 'normed': False,
+
+        # ## dataset
+        # 'loader': 'datasets.ValueDataset',
+        # 'termination_penalty': None,
+        # 'normalizer': 'LimitsNormalizer',
+        # 'preprocess_fns': ['maze2d_set_terminals'],
+        # 'clip_denoised': True,
+        # 'use_padding': False,
+        # 'max_path_length': 40000,
+
+        # ## serialization
+        # 'logbase': 'logs',
+        # 'prefix': 'values/defaults',
+        # 'exp_name': watch(args_to_watch), # TODO should be values_to_watch
+
+        # ## training
+        # 'n_steps_per_epoch': 10000,
+        # 'loss_type': 'value_l2',
+        # 'n_train_steps': 200e3,
+        # 'batch_size': 32,
+        # 'learning_rate': 2e-4,
+        # 'gradient_accumulate_every': 2,
+        # 'ema_decay': 0.995,
+        # 'save_freq': 1000,
+        # 'sample_freq': 0,
+        # 'n_saves': 50,
+        # 'save_parallel': False,
+        # 'n_reference': 50,
+        # 'bucket': None,
+        # 'device': 'cuda',
+        # 'seed': None,
+        # 'n_render_samples': 10,
+
+
+# common - for all tasks (task_name, tags, output_dir, device)
+algorithm_name: "DefaultAlgName"
+task_name: "RL_Diffuser"
+tags: ["debug"]

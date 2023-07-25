@@ -42,10 +42,13 @@
 				"diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
 				"diffusion.epoch=0",
 				"policy.scale_grad_by_std=true",
+				"guide._target_=diffuser.sampling.NoTrainGuideShorter"
 				// "wandb.mode=disabled",
 			],
 		},
-
+		{
+			"name": "========",
+		},
 		// python scripts/train.py --dataset maze2d-umaze-v0
 		{
 			"name": "train",

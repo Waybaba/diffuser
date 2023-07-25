@@ -132,3 +132,24 @@ class NoTrainGuideRepeat(NoTrainGuide):
 		sqdist = ((point1 - point2)**2).sum(dim=-1)  # shape: (batch_size,)
 
 		return - sqdist
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			coord = x[:, :, :2]  # shape: (batch_size, trace_length, 2)
+
+			# Compute indices for 1/3 and 2/3 of the trajectory
+			idx1 = coord.shape[1] // 3
+			idx2 = 2 * idx1
+			
+			# Get the points at 1/3 and 2/3 of the trajectory
+			point1 = coord[:, idx1, :]  # shape: (batch_size, 2)
+			point2 = coord[:, idx2, :]  # shape: (batch_size, 2)
+
+			# Compute the squared Euclidean distance between point1 and point2
+			distance = ((point1 - point2)**2).sum(dim=-1)  # shape: (batch_size,)
+			
+			return {
+				"distance_repeat": distance
+			}
