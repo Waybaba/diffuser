@@ -85,6 +85,7 @@ runner:
 
 dataset: 
   _target_: diffuser.datasets.ValueDataset
+  custom_ds_path: null
   _partial_: true
   env: "maze2d-large-v1"
   horizon: ${global_cfg.horizon}
