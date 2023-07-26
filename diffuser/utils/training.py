@@ -54,8 +54,11 @@ class Trainer(object):
         results_folder='./results',
         n_reference=8,
         bucket=None,
+        task=None,
     ):
         super().__init__()
+        assert task is not None, "task must be specified"
+        self.task = task
         self.model = diffusion_model
         self.ema = EMA(ema_decay)
         self.ema_model = copy.deepcopy(self.model)
@@ -122,11 +125,11 @@ class Trainer(object):
                 self.step_ema()
 
             if self.step % self.save_freq == 0:
+                if self.task == "train_diffuser":
+                    total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
+                    to_log["eval/total_reward_mean"] = total_reward_mean
+                    to_log["eval/rollout"] = [wandb.Image(_) for _ in img_rollout_samples]
                 label = self.step // self.label_freq * self.label_freq
-                total_reward_list = []
-                total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
-                to_log["eval/total_reward_mean"] = total_reward_mean
-                to_log["eval/rollout"] = [wandb.Image(_) for _ in img_rollout_samples]
                 self.save(label)
 
             if self.step % self.log_freq == 0:
@@ -140,7 +143,6 @@ class Trainer(object):
 
 
             if self.sample_freq and self.step % self.sample_freq == 0:
-            # if True:
                 img_samples = self.render_samples()
                 to_log["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
 

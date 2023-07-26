@@ -72,8 +72,7 @@ class TrainValuesRunner:
             dataset,
             render,
         )
-
-
+        
         # save diffuser training cfg for inference reload
         
 

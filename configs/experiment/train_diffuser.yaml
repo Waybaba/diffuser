@@ -51,6 +51,7 @@ model:
 
 trainer:
   _target_: diffuser.utils.Trainer
+  task: train_diffuser
   _partial_: true
   train_batch_size: 32
   train_lr: 2e-4

@@ -49,6 +49,17 @@
 			],
 		},
 		{
+			"name": "entry - train_values",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"experiment=train_values",
+			],
+		},
+		{
 			"name": "========",
 		},
 		// python scripts/train.py --dataset maze2d-umaze-v0
