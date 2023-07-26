@@ -39,9 +39,13 @@ def load_environment(name):
     env.name = name
     return env
 
-def get_dataset(env):
-    dataset = env.get_dataset()
-
+def get_dataset(env,custom_ds_path=None):
+    if custom_ds_path is None:
+        dataset = env.get_dataset()
+    else:
+        dataset = env.get_dataset(custom_ds_path)
+        print("#####")
+        print(f"replaced dataset with {custom_ds_path}")
     if 'antmaze' in str(env).lower():
         ## the antmaze-v0 environments have a variety of bugs
         ## involving trajectory segmentation, so manually reset
@@ -52,7 +56,7 @@ def get_dataset(env):
 
     return dataset
 
-def sequence_dataset(env, preprocess_fn):
+def sequence_dataset(env, preprocess_fn,custom_ds_path=None):
     """
     Returns an iterator through trajectories.
     Args:
@@ -67,7 +71,7 @@ def sequence_dataset(env, preprocess_fn):
             rewards
             terminals
     """
-    dataset = get_dataset(env)
+    dataset = get_dataset(env,custom_ds_path=custom_ds_path)
     dataset = preprocess_fn(dataset)
 
     N = dataset['rewards'].shape[0]

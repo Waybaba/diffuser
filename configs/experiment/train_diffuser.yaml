@@ -13,6 +13,8 @@ dataset:
   _target_: diffuser.datasets.GoalDataset
   _partial_: true
   env: "maze2d-large-v1"
+  # custom_ds_path: ${paths.data_dir}/models/diffuser/maze2d-large-waybaba.hdf5
+  custom_ds_path: null
   horizon: ${global_cfg.horizon}
   normalizer: "LimitsNormalizer"
   preprocess_fns: ["maze2d_set_terminals"]

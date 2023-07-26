@@ -23,6 +23,7 @@
 			"args": [
 				"experiment=train_diffuser",
 				"trainer.save_freq=100",
+				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5"
 				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
 				// "wandb.mode=disabled",

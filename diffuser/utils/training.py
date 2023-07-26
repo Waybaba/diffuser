@@ -243,9 +243,9 @@ class Trainer(object):
         return img_res
 
     def eval(self, model):
-        env = self.dataset.env
+        env = self.dataset.env # goal and target are fixed
         diffusion = model
-        observation = env.reset()
+        # observation = env.reset()
         ## observations for rendering
         rollout = [observation.copy()]
         PLAN_ONCE = True
