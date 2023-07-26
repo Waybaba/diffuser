@@ -123,9 +123,10 @@ class Trainer(object):
 
             if self.step % self.save_freq == 0:
                 label = self.step // self.label_freq * self.label_freq
-                # TODO add eval
-                total_reward, wandb_logs = self.eval(self.model)
-                to_log.update({"save/"+key: value for key, value in wandb_logs.items()})
+                total_reward_list = []
+                total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
+                to_log["eval/total_reward_mean"] = total_reward_mean
+                to_log["eval/rollout"] = wandb.Image(img_rollout_samples)
                 self.save(label)
 
             if self.step % self.log_freq == 0:
@@ -347,4 +348,14 @@ class Trainer(object):
         # for key, value in guide_specific_metrics.items():
         #     wandb_logs[f"final/guide_{key}"] = value[0].item()
         # wandb.log(wandb_logs)
-        return total_reward, wandb_logs
+        return total_reward, img_rollout_sample
+
+    def evals(self, model, num=5):
+        for seed in range(num):
+            total_reward, img_rollout_sample = self.eval(model, seed=seed)
+            if seed == 0:
+                total_reward_list = [total_reward]
+                img_rollout_samples = [img_rollout_sample]
+            else:
+                total_reward_list.append(total_reward)
+                img_rollout_samples.append(img_rollout_sample)
