@@ -126,7 +126,7 @@ class Trainer(object):
                 total_reward_list = []
                 total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
                 to_log["eval/total_reward_mean"] = total_reward_mean
-                to_log["eval/rollout"] = wandb.Image(img_rollout_samples)
+                to_log["eval/rollout"] = [wandb.Image(_) for _ in img_rollout_samples]
                 self.save(label)
 
             if self.step % self.log_freq == 0:
@@ -308,18 +308,7 @@ class Trainer(object):
             ## print reward and score
             total_reward += reward
             score = env.get_normalized_score(total_reward)
-            # print(
-            #     f't: {t} | r: {reward:.2f} |  R: {total_reward:.2f} | score: {score:.4f} | '
-            #     f'values: {samples.values[0].item()}',
-            #     flush=True,
-            # )
-            # wandb_logs["rollout/reward"] = reward
-            # wandb_logs["rollout/total_reward"] = total_reward
-            # wandb_logs["rollout/values"] = score
-            # guide_specific_metrics = guide.metrics(samples.observations)
-            # for key, value in guide_specific_metrics.items():
-            #     wandb_logs[f"rollout/guide_{key}"] = value[0].item()
-
+            
             ## update rollout observations
             rollout.append(next_observation.copy())
 
@@ -359,3 +348,4 @@ class Trainer(object):
             else:
                 total_reward_list.append(total_reward)
                 img_rollout_samples.append(img_rollout_sample)
+        return np.mean(total_reward_list), img_rollout_samples
