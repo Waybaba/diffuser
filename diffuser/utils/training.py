@@ -242,11 +242,12 @@ class Trainer(object):
             img_res.append(self.renderer.composite(savepath, observations))
         return img_res
 
-    def eval(self, model, seed=0):
+    def eval(self, model, seed=3):
         env = self.dataset.env # goal and target are fixed
         diffusion = model
         env.seed(seed)
         observation = env.reset()
+        env.set_target()
         ## observations for rendering
         rollout = [observation.copy()]
         PLAN_ONCE = True
@@ -281,11 +282,12 @@ class Trainer(object):
             ## make action
             conditions = {0: observation}
             if "maze" in env.name: 
-                conditions[diffusion.horizon-1] = np.array(env.goal_locations[0] + env.goal_locations[0])
+                conditions[diffusion.horizon-1] = np.concatenate([env._target,[0, 0]])
             if t == 0: 
                 actions, samples = policy(conditions, batch_size=BATCH_SIZE, verbose=False)
                 action = samples.actions[0]
                 sequence = samples.observations[0]
+                first_conditions = conditions.copy()
             else:
                 if not PLAN_ONCE:
                     actions, samples = policy(conditions, batch_size=BATCH_SIZE, verbose=False)
@@ -336,7 +338,7 @@ class Trainer(object):
         img_rollout_sample = self.renderer.render_rollout(
             os.path.join(self.logdir, f'rollout_final.png'),
             rollout,
-            conditions,
+            first_conditions,
             fps=80,
         )
         wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
