@@ -242,10 +242,11 @@ class Trainer(object):
             img_res.append(self.renderer.composite(savepath, observations))
         return img_res
 
-    def eval(self, model):
+    def eval(self, model, seed=0):
         env = self.dataset.env # goal and target are fixed
         diffusion = model
-        # observation = env.reset()
+        env.seed(seed)
+        observation = env.reset()
         ## observations for rendering
         rollout = [observation.copy()]
         PLAN_ONCE = True
