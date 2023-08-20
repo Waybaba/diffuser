@@ -13,7 +13,8 @@ dataset:
   # _target_: diffuser.datasets.GoalDataset
   _target_: diffuser.datasets.WaybabaMaze2dDataset
   _partial_: true
-  env: "maze2d-large-v1"
+  # env: "maze2d-large-v1"
+  env: "maze2d-openlarge-v0"
   # custom_ds_path: ${paths.data_dir}/models/diffuser/maze2d-large-waybaba.hdf5
   custom_ds_path: null
   horizon: ${global_cfg.horizon}
@@ -59,7 +60,7 @@ trainer:
   train_lr: 2e-4
   gradient_accumulate_every: 2
   ema_decay: 0.995
-  sample_freq: 100000 # for x step, render samples
+  sample_freq: 100 # ! for x step, render generated samples, turn to 1e6 for cloud based!
   save_freq: 100000 # for x step, save model
   label_freq: 10000 # not important, just use for name. e.g. 12234 -> 12000
   save_parallel: false
