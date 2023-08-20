@@ -12,6 +12,16 @@ ENV UDATADIR=/data \
     UOUTDIR=/output \
     UDEVICEID=docker
 
+
+### China
+RUN ping -c 1 -W 5 www.google.com > /dev/null 2>&1; \
+    if [ $? -ne 0 ]; then \
+        echo "In China"; \
+        sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list; \
+        sed -i 's/security.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list; \
+        echo "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple/\ntrusted-host = pypi.tuna.tsinghua.edu.cn" > /etc/pip.conf; \
+    fi
+
 ### apt
 RUN apt-get update && apt-get install -y \
     curl \

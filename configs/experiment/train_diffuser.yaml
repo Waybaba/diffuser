@@ -10,14 +10,16 @@ runner:
   _partial_: true
 
 dataset:
-  _target_: diffuser.datasets.GoalDataset
+  # _target_: diffuser.datasets.GoalDataset
+  _target_: diffuser.datasets.WaybabaMaze2dDataset
   _partial_: true
   env: "maze2d-large-v1"
   # custom_ds_path: ${paths.data_dir}/models/diffuser/maze2d-large-waybaba.hdf5
   custom_ds_path: null
   horizon: ${global_cfg.horizon}
   normalizer: "LimitsNormalizer"
-  preprocess_fns: ["maze2d_set_terminals"]
+  preprocess_fns: ["maze2d_set_terminals"] # why need this?
+  # preprocess_fns: []
   use_padding: false
   max_path_length: 40000
 

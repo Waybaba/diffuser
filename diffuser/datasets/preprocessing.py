@@ -63,6 +63,7 @@ def maze2d_set_terminals(env):
 
     def _fn(dataset):
         xy = dataset['observations'][:,:2]
+        goal = dataset["infos/goal"] # ! waybaba: the original one does not use this
         distances = np.linalg.norm(xy - goal, axis=-1)
         at_goal = distances < threshold
         timeouts = np.zeros_like(dataset['terminals'])

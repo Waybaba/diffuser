@@ -7,7 +7,7 @@ from .preprocessing import get_preprocess_fn
 from .d4rl import load_environment, sequence_dataset
 from .normalization import DatasetNormalizer
 from .buffer import ReplayBuffer
-
+from scipy.interpolate import interp1d
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -17,7 +17,7 @@ class SequenceDataset(torch.utils.data.Dataset):
 
     def __init__(self, env='hopper-medium-replay', horizon=64,
         normalizer='LimitsNormalizer', preprocess_fns=[], max_path_length=1000,
-        max_n_episodes=10000, termination_penalty=0, use_padding=True, seed=None,custom_ds_path=None):
+        max_n_episodes=100000, termination_penalty=0, use_padding=True, seed=None,custom_ds_path=None):
         self.preprocess_fn = get_preprocess_fn(preprocess_fns, env)
         self.env = env = load_environment(env)
         self.env.seed(seed)
@@ -102,6 +102,49 @@ class GoalDataset(SequenceDataset):
             self.horizon - 1: observations[-1],
         }
 
+class WaybabaMaze2dDataset(GoalDataset):
+    def make_indices(self, path_lengths, horizon):
+        '''
+            makes indices for sampling from dataset;
+            each index maps to a datapoint
+        '''
+        indices = []
+        for i, path_length in enumerate(path_lengths):
+            if path_length > 3:
+                start = 0
+                end = path_length
+                indices.append((i, start, end))
+        indices = np.array(indices)
+        return indices
+    
+    def interpolate_data(self, data, old_time, new_time):
+        interpolated_data = np.zeros((self.horizon, data.shape[1]), dtype=data.dtype)
+        for i in range(data.shape[1]):
+            interp_func = interp1d(old_time, data[:, i], kind='linear', fill_value="extrapolate")
+            interpolated_data[:, i] = interp_func(new_time)
+        return interpolated_data
+    
+    def __getitem__(self, idx, eps=1e-4):
+        """ interpolation to make all the length is equal to horizon
+            Batch[0] is the trajectory, [self.horizon, 4]
+        """
+        path_ind, start, end = self.indices[idx]
+
+        observations = self.fields.normed_observations[path_ind, start:end] # [T, 4]
+        actions = self.fields.normed_actions[path_ind, start:end] # [T, 2]
+
+        # interpolation
+        T = observations.shape[0]
+        old_time = np.linspace(0, 1, T)
+        new_time = np.linspace(0, 1, self.horizon)
+        observations = self.interpolate_data(observations, old_time, new_time)
+        actions = self.interpolate_data(actions, old_time, new_time)
+
+
+        conditions = self.get_conditions(observations)
+        trajectories = np.concatenate([actions, observations], axis=-1)
+        batch = Batch(trajectories, conditions)
+        return batch
 
 class ValueDataset(SequenceDataset):
     '''
