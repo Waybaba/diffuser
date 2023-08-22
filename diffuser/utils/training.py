@@ -57,7 +57,6 @@ class Trainer(object):
         task=None,
     ):
         super().__init__()
-        assert task is not None, "task must be specified"
         self.task = task
         self.model = diffusion_model
         self.ema = EMA(ema_decay)
@@ -125,6 +124,7 @@ class Trainer(object):
                 self.step_ema()
 
             if self.step % self.save_freq == 0:
+                assert self.task is not None, "task must be specified"
                 if self.task == "train_diffuser":
                     total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
                     to_log["eval/total_reward_mean"] = total_reward_mean

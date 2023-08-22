@@ -34,7 +34,7 @@ class ValueGuide(Guide):
 		x.requires_grad_()
 		y = self(x, *args)
 		grad = torch.autograd.grad([y.sum()], [x])[0]
-		x.detach()
+		x.detach_()
 		return y, grad
 
 
@@ -48,14 +48,17 @@ class NoTrainGuide(Guide):
 		x.requires_grad_()
 		y = self(x, *args)
 		grad = torch.autograd.grad([y.sum()], [x])[0]
-		x.detach()
+		x.detach_()
 		return y, grad
+
+## Distance
 
 class NoTrainGuideDistance(NoTrainGuide):
 	"""
 	make the total distance of the trajectory become shorter or longer
 	"""
-	SHOTER = None
+	SHORTER = None
+	HALF = False
 
 	def forward(self, x, cond, t):
 		"""
@@ -66,8 +69,8 @@ class NoTrainGuideDistance(NoTrainGuide):
 		"""
 		total_distance = self.cal_distance(x)
 
-		if self.SHOTER is None: raise NotImplementedError("SHOTER is not defined")
-		if self.SHOTER: return -total_distance
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance
 		else: return total_distance
 	
 	def cal_distance(self, x):
@@ -80,8 +83,13 @@ class NoTrainGuideDistance(NoTrainGuide):
 		# Extract x, y coordinates
 		coord = x[:, :, :2]
 
+		# if HALF, only use the first half of the trajectory
+		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
+
 		# Compute differences between successive coordinates along the trace
-		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
+		# sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
+		# absolute distance sum
+		sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
 
 		# Compute total distance
 		total_distance = sqdist.sum(dim=-1)
@@ -96,12 +104,92 @@ class NoTrainGuideDistance(NoTrainGuide):
 				"distance": self.cal_distance(x),
 			}
 
-
 class NoTrainGuideShorter(NoTrainGuideDistance):
-	SHOTER = True
+	SHORTER = True
 
 class NoTrainGuideLonger(NoTrainGuideDistance):
-	SHOTER = False
+	SHORTER = False
+
+class NoTrainGuideHalfShorter(NoTrainGuideDistance):
+	SHORTER = True
+	HALF = True
+
+class NoTrainGuideHalfLonger(NoTrainGuideDistance):
+	SHORTER = False
+	HALF = True
+
+## Average coordinate
+
+class NoTrainGuideAvgCoordinate(NoTrainGuide):
+    """
+    Base class to make the average coordinate (x or y) lower or higher
+    """
+    LOWER = None
+    COORDINATE = None
+
+    def forward(self, x, cond, t):
+        """
+        Calculate average coordinate (x or y)
+        x: (batch_size, trace_length, 6)
+            the last dim is [x, y, vx, vy, act_x, act_y]
+            we only use x or y to calculate average coordinate
+        """
+        avg_coordinate = self.cal_average_coordinate(x)
+
+        if self.LOWER is None: raise NotImplementedError("LOWER is not defined")
+        if self.COORDINATE is None: raise NotImplementedError("COORDINATE is not defined")
+        if self.LOWER: return - avg_coordinate
+        else: return avg_coordinate
+
+    def cal_average_coordinate(self, x):
+        """
+        Calculate average coordinate (x or y)
+        x: (batch_size, trace_length, 6)
+            the last dim is [x, y, vx, vy, act_x, act_y]
+            we only use x or y to calculate average coordinate
+        """
+        # Extract x or y coordinate
+        coord = x[:, :, self.COORDINATE]
+
+        # Compute average coordinate
+        avg_coordinate = coord.mean(dim=1)
+
+        return avg_coordinate
+
+    def metrics(self, x, **kwargs):
+        """
+        Calculate average coordinate (x and y)
+        x: (batch_size, trace_length, 6)
+            the last dim is [x, y, vx, vy, act_x, act_y]
+            we use x and y to calculate average coordinates
+        """
+        # if x is numpy array, convert it to torch tensor
+        if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+        
+        avg_x = x[:, :, 0].mean(dim=1)
+        avg_y = x[:, :, 1].mean(dim=1)
+
+        return {
+            "avg_x": avg_x,
+            "avg_y": avg_y
+        }
+
+class NoTrainGuideXLower(NoTrainGuideAvgCoordinate):
+    LOWER = True
+    COORDINATE = 0
+
+class NoTrainGuideXHigher(NoTrainGuideAvgCoordinate):
+    LOWER = False
+    COORDINATE = 0
+
+class NoTrainGuideYLower(NoTrainGuideAvgCoordinate):
+    LOWER = True
+    COORDINATE = 1
+
+class NoTrainGuideYHigher(NoTrainGuideAvgCoordinate):
+    LOWER = False
+    COORDINATE = 1
+
 
 class NoTrainGuideRepeat(NoTrainGuide):
 	"""
