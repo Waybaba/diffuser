@@ -1,5 +1,5 @@
 import pyrootutils
-root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True, indicator=["configs"])
+root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True, indicator=[".devcontainer"])
 import os
 import random
 import string
