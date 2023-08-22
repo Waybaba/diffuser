@@ -164,9 +164,43 @@ def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
 
     return trainer.ema_model, dataset, render
 
-
+import numpy as np
 
 class PlanGuidedRunner:
+    CUSTOM_TARGET = {
+        "tl2br": {
+            "location": (1.0, 1.0),
+            "target": np.array([7, 10]),
+        },
+        "br2tl": {
+            "location": (7.0, 10.0),
+            "target": np.array([1, 1]),
+        },
+        "tr2bl": {
+            "location": (7.0, 1.0),
+            "target": np.array([1, 10]),
+        },
+        "bl2tr": {
+            "location": (1.0, 10.0),
+            "target": np.array([7, 1]),
+        },
+        "2wayAv1": {
+            "location": (1.0, 1.0),
+            "target": np.array([3, 4]),
+        },
+        "2wayAv2": {
+            "location": (3.0, 4.0),
+            "target": np.array([1, 1]),
+        },
+        "2wayBv1": {
+            "location": (5, 6),
+            "target": np.array([1, 10]),
+        },
+        "2wayBv2": {
+            "location": (1, 10.0),
+            "target": np.array([5, 6]),
+        },
+    }
     def start(self, cfg):
         self.cfg = cfg
         import numpy as np
@@ -181,11 +215,21 @@ class PlanGuidedRunner:
         )
 
         env = dataset.env
-        observation = env.reset()
+
+        if cfg.trainer.custom_target is not None:
+            # env.set_state(self.CUSTOM_TARGET[cfg.trainer.custom_target]["state"])
+            env.set_target(self.CUSTOM_TARGET[cfg.trainer.custom_target]["target"])
+            observation = env.reset_to_location(self.CUSTOM_TARGET[cfg.trainer.custom_target]["location"])
+            print("###")
+            print(f"use custom target ### {cfg.trainer.custom_target} ###")
+            print("state", env.state_vector())
+            print("target", env._target)
+        else:
+            observation = env.reset()
 
         ## observations for rendering
         rollout = [observation.copy()]
-
+        
         total_reward = 0
         for t in range(cfg.trainer.max_episode_length):
             wandb_logs = {}
@@ -197,11 +241,12 @@ class PlanGuidedRunner:
             ## make action
             conditions = {0: observation}
             if "maze" in env.name: 
-                conditions[diffusion.horizon-1] = np.array(env.goal_locations[0] + env.goal_locations[0])
+                conditions[diffusion.horizon-1] = np.array(list(env._target) + [0, 0])
             if t == 0: 
                 actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
                 action = samples.actions[0]
                 sequence = samples.observations[0]
+                first_step_conditions = conditions
             else:
                 if not cfg.trainer.plan_once:
                     actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
@@ -237,7 +282,7 @@ class PlanGuidedRunner:
             rollout.append(next_observation.copy())
 
             ## render every `cfg.trainer.vis_freq` steps
-            self.log(t, samples, state, rollout, conditions)
+            self.log(t, samples, state, rollout, first_step_conditions)
 
             # wandb log
             wandb_commit = (not cfg.wandb.lazy_commits_freq) or (t % cfg.wandb.lazy_commits_freq == 0)
@@ -256,7 +301,7 @@ class PlanGuidedRunner:
         img_rollout_sample = self.renderer.render_rollout(
             os.path.join(self.cfg.output_dir, f'rollout_final.png'),
             rollout,
-            conditions,
+            first_step_conditions,
             fps=80,
         )
         wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
