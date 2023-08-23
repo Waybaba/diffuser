@@ -40,6 +40,7 @@ def make_timesteps(batch_size, i, device):
     t = torch.full((batch_size,), i, device=device, dtype=torch.long)
     return t
 
+APPLY_CONDITION = False # ! for debug
 
 class GaussianDiffusion(nn.Module):
     def __init__(self, model, horizon, observation_dim, action_dim, n_timesteps=1000,
@@ -160,8 +161,9 @@ class GaussianDiffusion(nn.Module):
         device = self.betas.device
 
         batch_size = shape[0]
+        if APPLY_CONDITION == False:
+            cond = {}
         x = torch.randn(shape, device=device)
-        x = apply_conditioning(x, cond, self.action_dim)
 
         chain = [x] if return_chain else None
 
@@ -169,7 +171,6 @@ class GaussianDiffusion(nn.Module):
         for i in reversed(range(0, self.n_timesteps)):
             t = make_timesteps(batch_size, i, device)
             x, values = sample_fn(self, x, cond, t, **sample_kwargs)
-            x = apply_conditioning(x, cond, self.action_dim)
 
             progress.update({'t': i, 'vmin': values.min().item(), 'vmax': values.max().item()})
 
@@ -208,6 +209,8 @@ class GaussianDiffusion(nn.Module):
 
     def p_losses(self, x_start, cond, t):
         noise = torch.randn_like(x_start)
+        if APPLY_CONDITION == False:
+            cond = {} # ! for debug
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         x_noisy = apply_conditioning(x_noisy, cond, self.action_dim)

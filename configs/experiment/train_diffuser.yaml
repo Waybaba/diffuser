@@ -67,7 +67,7 @@ trainer:
   results_folder: ${output_dir} # TODO
   bucket: null # TODO ? what
   n_reference: 25 # TODO ? what
-  n_render_samples: 5
+  n_render_samples: 4
 
 
 

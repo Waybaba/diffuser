@@ -59,3 +59,11 @@ class GuidedPolicy:
             'd -> repeat d', repeat=batch_size,
         )
         return conditions
+
+class NoGuidedPolicy(GuidedPolicy):
+    """
+    TODO not used yet
+    """
+    def __call__(self, conditions, batch_size=1, verbose=True):
+        conditions = {}
+        return super().__call__(conditions, batch_size, verbose)
