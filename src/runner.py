@@ -325,7 +325,7 @@ class PlanGuidedRunner:
             conditions
         )
         # wandb_logs["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
-        wandb_logs["samples"] = [wandb.Image(img_samples[0])]
+        wandb_logs["samples"] = [wandb.Image(img_sample) for img_sample in img_samples]
 
         # render video of plans
         # self.renderer.render_plan(

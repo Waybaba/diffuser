@@ -20,7 +20,7 @@ guide:
 policy:
   _target_: diffuser.sampling.GuidedPolicy
   _partial_: true
-  scale: 0.1
+  scale: 1000
   preprocess_fns: []
   sample_fn: 
     _target_: diffuser.sampling.n_step_guided_p_sample

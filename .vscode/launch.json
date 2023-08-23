@@ -27,6 +27,7 @@
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-open-v0_1e7.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/latest.hdf5",
 				"dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000.hdf5",
+				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000-onlytwo.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-large-v1-1000.hdf5",
 				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
@@ -44,12 +45,13 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=plan_guided",
-				// "diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-07-19_14-35-03_513054",
-				"diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
-				"diffusion.epoch=0",
+				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-08-23_09-23-55_722588",
+				// "diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
+				"diffusion.epoch=latest",
 				"policy.scale_grad_by_std=true",
-				"guide._target_=diffuser.sampling.NoTrainGuideShorter",
-				"trainer.custom_target=2wayAv1"
+				// "guide._target_=diffuser.sampling.NoTrainGuideShorter",
+				"guide._target_=diffuser.sampling.NoTrainGuideYLower",
+				"trainer.custom_target=bl2tr"
 				// "wandb.mode=disabled",
 			],
 		},
