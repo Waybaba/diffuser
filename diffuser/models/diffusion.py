@@ -233,6 +233,7 @@ class GaussianDiffusion(nn.Module):
         return self.conditional_sample(cond, *args, **kwargs)
 
 
+
 class ValueDiffusion(GaussianDiffusion):
 
     def p_losses(self, x_start, cond, target, t):

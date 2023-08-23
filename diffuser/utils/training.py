@@ -147,7 +147,7 @@ class Trainer(object):
                 to_log["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
 
             self.step += 1
-            wandb.log(to_log, step=self.step, commit=True if self.step % 100 == 0 else False)
+            wandb.log(to_log, step=self.step, commit=True if self.step % 1000 == 0 else False)
 
     def save(self, epoch):
         '''
@@ -203,7 +203,7 @@ class Trainer(object):
         savepath = os.path.join(self.logdir, f'_sample-reference.png')
         return self.renderer.composite(savepath, observations)
 
-    def render_samples(self, batch_size=2):
+    def render_samples(self, batch_size=5):
         '''
             renders samples from (ema) diffusion model
         '''

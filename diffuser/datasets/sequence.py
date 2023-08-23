@@ -189,3 +189,24 @@ class ValueDataset(SequenceDataset):
         value = np.array([value], dtype=np.float32)
         value_batch = ValueBatch(*batch, value)
         return value_batch
+
+
+class AvgCoordinateDataset(SequenceDataset):
+    '''
+        adds a value field to the datapoints for training the value function
+    '''
+    COORDINATE = None # 0 for x, 1 for y
+    LOWER = None # True for lower, False for higher
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from diffuser.sampling.guides import NoTrainGuideAvgCoordinate
+        self.guide = NoTrainGuideAvgCoordinate()
+        self.guide.LOWER = self.LOWER
+        self.guide.COORDINATE = self.COORDINATE
+    
+    def __getitem__(self, idx):
+        batch = super().__getitem__(idx)
+        value = self.guide.cal_average_coordinate(batch.trajectories)
+        value = np.array([value], dtype=np.float32)
+        value_batch = ValueBatch(*batch, value)
+        return value_batch
