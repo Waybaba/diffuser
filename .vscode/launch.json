@@ -17,14 +17,14 @@
 			"name": "planning",
 			"type": "python",
 			"request": "launch",
-			"program": "${workspaceFolder}/scripts/plan_guided.py",
+			"program": "${workspaceFolder}/scripts/train.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
 				"--dataset",
 				"halfcheetah-medium-expert-v2",
-				"--logbase",
-				"logs/pretrained"
+				// "--logbase",
+				// "logs/pretrained"
 			]
 		}
 	]
