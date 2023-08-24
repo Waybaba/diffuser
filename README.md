@@ -29,33 +29,30 @@ If you prefer to use Docker, you can find the `Dockerfile` in the `.devcontainer
 ### **For `entry - train_diffuser`**
 
 ```bash
-python entry/entry.py \\
-  --experiment=train_diffuser \\
-  --trainer.save_freq=100 \\
-  --dataset.custom_ds_path="/path/to/data/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000.hdf5"
+python entry/entry.py \
+  experiment=train_diffuser \
+  trainer.save_freq=100
 
 ```
 
 ### **For `entry - plan_guided`**
 
 ```bash
-python entry/entry.py \\
-  --experiment=plan_guided \\
-  --diffusion.dir="/path/to/outdir/hydra_log/RL_Diffuser/runs/2023-08-23_11-19-12_292485" \\
-  --diffusion.epoch=latest \\
-  --policy.scale_grad_by_std=true \\
-  --guide._target_=diffuser.sampling.NoTrainGuideLonger \\
-  --trainer.custom_target=bl2tr \\
-  --policy.scale=0.1
+python entry/entry.py \
+  experiment=plan_guided \
+  diffusion.epoch=latest \
+  policy.scale_grad_by_std=true \
+  guide._target_=diffuser.sampling.NoTrainGuideLonger \
+  trainer.custom_target=bl2tr \
+  policy.scale=0.1
 
 ```
 
 ### **For `entry - train_values`**
 
 ```bash
-python entry/entry.py \\
-  --experiment=train_values \\
-  --trainer.save_freq=100 \\
-  --dataset.custom_ds_path="/path/to/data/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5"
+python entry/entry.py \
+  experiment=train_values \
+  trainer.save_freq=100
 
 ```
