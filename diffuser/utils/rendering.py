@@ -1,18 +1,11 @@
-import os
 import numpy as np
-import einops
 import imageio
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 import gym
 import mujoco_py as mjc
 import warnings
-import pdb
 
 from .arrays import to_np
 from .video import save_video, save_videos
-
-from diffuser.datasets.d4rl import load_environment
 
 #-----------------------------------------------------------------------------#
 #------------------------------- helper structs ------------------------------#
@@ -177,7 +170,6 @@ class MuJoCoRenderer:
         if type(states) is list: states = np.array(states)
         images = self._renders(states, partial=True)
         save_video(savepath, images, **video_kwargs)
-        return images
 
     def render_plan(self, savepath, actions, observations_pred, state, fps=30):
         ## [ batch_size x horizon x observation_dim ]
@@ -201,6 +193,7 @@ class MuJoCoRenderer:
         ## [ batch_size x horizon x H x W x C ]
         images = np.concatenate([images_pred, images_real], axis=-2)
         save_videos(savepath, *images)
+        return images[0]
 
     def render_diffusion(self, savepath, diffusion_path, **video_kwargs):
         '''
@@ -272,7 +265,3 @@ def rollout_from_state(env, state, actions):
         ## if terminated early, pad with zeros
         observations.append( np.zeros(obs.size) )
     return np.stack(observations)
-
-
-
-
