@@ -45,13 +45,16 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=plan_guided",
-				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-08-23_09-23-55_722588",
+				// "diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-08-23_09-23-55_722588",
+				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-08-23_11-19-12_292485",
 				// "diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
 				"diffusion.epoch=latest",
 				"policy.scale_grad_by_std=true",
 				// "guide._target_=diffuser.sampling.NoTrainGuideShorter",
-				"guide._target_=diffuser.sampling.NoTrainGuideYLower",
-				"trainer.custom_target=bl2tr"
+				// "guide._target_=diffuser.sampling.NoTrainGuideYLower",
+				"guide._target_=diffuser.sampling.NoTrainGuideLonger",
+				"trainer.custom_target=bl2tr",
+				"policy.scale=0.1"
 				// "wandb.mode=disabled",
 			],
 		},

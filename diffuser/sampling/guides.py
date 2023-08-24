@@ -190,7 +190,6 @@ class NoTrainGuideYHigher(NoTrainGuideAvgCoordinate):
     LOWER = False
     COORDINATE = 1
 
-
 class NoTrainGuideRepeat(NoTrainGuide):
 	"""
 	Make two middle points become the same, so that it will go back
