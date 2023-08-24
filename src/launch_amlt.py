@@ -338,6 +338,8 @@ class AmltLauncher:
         self.config_file_dict["search"]["params"] = params
         
         # write config file
+        if not os.path.exists(os.path.dirname(CONFIG_OUTPUT_PATH)):
+            os.makedirs(os.path.dirname(CONFIG_OUTPUT_PATH))
         with open(CONFIG_OUTPUT_PATH, "w") as f:
             yaml.dump(self.config_file_dict, f)
         
