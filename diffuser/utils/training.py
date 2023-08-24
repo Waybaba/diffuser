@@ -331,7 +331,6 @@ class Trainer(object):
         img_rollout_sample = self.renderer.render_rollout(
             os.path.join(self.logdir, f'rollout_final.png'),
             rollout,
-            first_conditions,
             fps=80,
         )
         wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
