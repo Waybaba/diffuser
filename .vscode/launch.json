@@ -14,7 +14,7 @@
 		},
 		// python scripts/plan_guided.py --dataset halfcheetah-medium-expert-v2 --logbase logs/pretrained
 		{
-			"name": "planning",
+			"name": "training",
 			"type": "python",
 			"request": "launch",
 			"program": "${workspaceFolder}/scripts/train.py",
