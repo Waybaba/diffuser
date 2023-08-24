@@ -25,3 +25,4 @@ net:
 
 render:
   _target_: diffuser.utils.rendering.MuJoCoRenderer
+  env: ${dataset.env}

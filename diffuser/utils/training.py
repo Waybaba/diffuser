@@ -138,13 +138,13 @@ class Trainer(object):
                 print(f'{self.step}: {loss:8.4f} | {infos_str} | t: {timer():8.4f}', flush=True)
 
             if self.step == 0 and self.sample_freq:
-                img_ref = self.render_reference(self.n_reference)
+                img_ref = self.render_reference(self.n_reference) # plot source data
                 to_log["reference"] = [wandb.Image(_) for _ in img_ref]
 
 
             if self.sample_freq and self.step % self.sample_freq == 0:
-                img_samples = self.render_samples()
-                to_log["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
+                img_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
+                to_log["samples"] = [wandb.Image(img_) for img_ in img_samples]
 
             self.step += 1
             wandb.log(to_log, step=self.step, commit=True if self.step % 1000 == 0 else False)
@@ -184,7 +184,7 @@ class Trainer(object):
         '''
             renders training points
         '''
-
+        assert self.n_render_samples == 4, "please use 4, since we plot 4x1 for mujoco and 2x2 for maze"
         ## get a temporary dataloader to load a single batch
         dataloader_tmp = cycle(torch.utils.data.DataLoader(
             self.dataset, batch_size=batch_size, num_workers=0, shuffle=True, pin_memory=True
@@ -201,12 +201,13 @@ class Trainer(object):
         observations = self.dataset.normalizer.unnormalize(normed_observations, 'observations')
 
         savepath = os.path.join(self.logdir, f'_sample-reference.png')
-        return self.renderer.composite(savepath, observations)
+        return self.renderer.composite(savepath, observations[:self.self.n_render_samples])
 
-    def render_samples(self, batch_size=2):
+    def render_samples(self, batch_size=4):
         '''
             renders samples from (ema) diffusion model
         '''
+        assert self.n_render_samples == 4, "please use 4, since we plot 4x1 for mujoco and 2x2 for maze"
         n_samples = self.n_render_samples
         img_res = []
         for i in range(batch_size):
