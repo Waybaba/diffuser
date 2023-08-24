@@ -170,6 +170,7 @@ class MuJoCoRenderer:
         if type(states) is list: states = np.array(states)
         images = self._renders(states, partial=True)
         save_video(savepath, images, **video_kwargs)
+        return images[0]
 
     def render_plan(self, savepath, actions, observations_pred, state, fps=30):
         ## [ batch_size x horizon x observation_dim ]
