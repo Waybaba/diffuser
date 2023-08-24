@@ -1,0 +1,27 @@
+# @package _global_
+
+defaults:
+  - train_diffuser.yaml
+
+
+dataset:
+  _target_: diffuser.datasets.SequenceDataset
+  env: "halfcheetah-medium-expert-v2"
+  normalizer: GaussianNormalizer
+  preprocess_fns: []
+  use_padding: true
+  max_path_length: 1000
+
+global_cfg:
+  horizon: 32
+
+model:
+  n_timesteps: 20
+  action_weight: 10
+  clip_denoised: false # !
+
+net: 
+  dim_mults: [1, 4, 8]
+
+render:
+  _target_: diffuser.utils.MuJoCoRenderer

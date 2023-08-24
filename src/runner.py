@@ -36,7 +36,7 @@ class TrainDiffuserRunner:
 
         ### init	
         dataset = cfg.dataset()
-        render = cfg.render()
+        render = cfg.render(dataset.env)
         
         observation_dim = dataset.observation_dim
         action_dim = dataset.action_dim

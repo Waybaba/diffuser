@@ -250,12 +250,13 @@ class Trainer(object):
         diffusion = model
         env.seed(seed)
         observation = env.reset()
-        env.set_target()
+        if "maze" in env.name: env.set_target()
         ## observations for rendering
         rollout = [observation.copy()]
         PLAN_ONCE = True
         BATCH_SIZE = 1
         USE_CONTROLLER_ACT = True
+        USE_CONTROLLER_ACT = False if "maze" not in env.name else USE_CONTROLLER_ACT
         # fake policy
         from diffuser.sampling import GuidedPolicy, n_step_guided_p_sample
         from diffuser.sampling import NoTrainGuideShorter
@@ -288,13 +289,13 @@ class Trainer(object):
                 conditions[diffusion.horizon-1] = np.concatenate([env._target,[0, 0]])
             if t == 0: 
                 actions, samples = policy(conditions, batch_size=BATCH_SIZE, verbose=False)
-                action = samples.actions[0]
+                action = samples.actions[0][0]
                 sequence = samples.observations[0]
                 first_conditions = conditions.copy()
             else:
                 if not PLAN_ONCE:
                     actions, samples = policy(conditions, batch_size=BATCH_SIZE, verbose=False)
-                    action = samples.actions[0]
+                    action = samples.actions[0][0]
                     sequence = samples.observations[0]
             if USE_CONTROLLER_ACT:
                 if t == diffusion.horizon - 1: 

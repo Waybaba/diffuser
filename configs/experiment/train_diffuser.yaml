@@ -13,7 +13,6 @@ dataset:
   # _target_: diffuser.datasets.GoalDataset
   _target_: diffuser.datasets.WaybabaMaze2dDataset
   _partial_: true
-  # env: "maze2d-large-v1"
   env: "maze2d-openlarge-v0"
   # custom_ds_path: ${paths.data_dir}/models/diffuser/maze2d-large-waybaba.hdf5
   custom_ds_path: null
@@ -27,7 +26,7 @@ dataset:
 render:
   _target_: diffuser.utils.Maze2dRenderer
   _partial_: true
-  env: ${dataset.env}
+  # env: ${dataset.env}
 
 
 net:
@@ -43,7 +42,7 @@ model:
   horizon: ${global_cfg.horizon}
   n_timesteps: 256 # n_diffusion_steps in source code
   loss_type: "l2"
-  clip_denoised: true
+  clip_denoised: true # ! ?
   predict_epsilon: false
   action_weight: 1
   loss_weights: null
