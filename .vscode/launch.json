@@ -49,7 +49,7 @@
 				// "diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
 				"diffusion.epoch=latest",
 				"policy.scale_grad_by_std=true",
-				"policy.scale=1000.0",
+				"policy.scale=100.0",
 				// "trainer.custom_target=bl2tr",
 				// "wandb.mode=disabled",
 
@@ -65,7 +65,7 @@
 				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-24_12-49-31_504043/0",
 				"trainer.use_controller_act=false",
 				"trainer.custom_target=null",
-				"guide._target_=diffuser.sampling.NoTrainGuideCloser",
+				"guide._target_=diffuser.sampling.NoTrainGuideHigher",
 			],
 		},
 		{

@@ -246,7 +246,7 @@ class NoTrainGuideOffset(NoTrainGuide):
 	"""
 	make the total distance of the trajectory become shorter or longer
 	"""
-	SHORTER = None
+	LOWER = None
 	HALF = False
 
 	def forward(self, x, cond, t):
@@ -256,13 +256,13 @@ class NoTrainGuideOffset(NoTrainGuide):
 			the last dim is [x, y, vx, vy, act_x, act_y]
 			we only use x, y to calculate distance
 		"""
-		total_distance = self.cal_movement(x)
+		total_distance = self.cal_value(x)
 
-		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
-		if self.SHORTER: return -total_distance
+		if self.LOWER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.LOWER: return -total_distance
 		else: return total_distance
 	
-	def cal_movement(self, x):
+	def cal_value(self, x):
 		"""
 		cal total distance
 		x: (batch_size, trace_length, 6)
@@ -271,41 +271,10 @@ class NoTrainGuideOffset(NoTrainGuide):
 		"""
 		# Extract x, y coordinates
 		ACT_DIM = 6
-		coord_z = x[:, :, ACT_DIM+0]
-		coord_x = x[:, :, ACT_DIM+8]
-		coord_y = x[:, :, ACT_DIM+9]
-		coord = torch.stack([coord_x, coord_y, coord_z], dim=-1) # (batch_size, trace_length, 3)
-		# plot each dim of x in figure for debug
-		import matplotlib.pyplot as plt
-		path="./debug/trace.png"
-		plt.figure()
-		x_ = x[:,:,:5]
-		coord_0 = x_[0]
-		T = coord_0.shape[0]
-		for dim in range(coord_0.shape[1]):
-			plt.plot(np.arange(T), coord_0[:, dim].cpu().detach().numpy())
-		plt.savefig(path)
-
-		# plot coord in figure for debug
-		import matplotlib.pyplot as plt
-		path="./debug/trace.png"
-		plt.figure()
-		plt.plot(coord[0, :, 0].cpu().detach().numpy(), coord[0, :, 1].cpu().detach().numpy())
-		plt.savefig(path)
-
-		# if HALF, only use the first half of the trajectory
-		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
-
-		# Compute differences between successive coordinates along the trace
-		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1).sqrt()
-		sq_distance = sqdist.sum(dim=-1)
-
-		# only first and last
-		start_end_distance = ((coord[:, -1, :] - coord[:, 0, :])**2).sum(dim=-1).sqrt()
-
-		# Compute total distance
-		total_distance = sq_distance
-
+		z = x[:, :, ACT_DIM+0] # height
+		vx = x[:, :, ACT_DIM+8] # v horizontal
+		vz = x[:, :, ACT_DIM+9] # v vertical/height
+		total_distance = vx.mean(dim=1)
 		return total_distance
 	
 	def metrics(self, x, **kwargs):
@@ -313,11 +282,61 @@ class NoTrainGuideOffset(NoTrainGuide):
 		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
 		with torch.no_grad():
 			return {
-				"distance": self.cal_movement(x),
+				"offset": self.cal_value(x),
 			}
 
 class NoTrainGuideCloser(NoTrainGuideOffset):
-	SHORTER = True
+	LOWER = True
 
 class NoTrainGuideFarther(NoTrainGuideOffset):
-	SHORTER = False
+	LOWER = False
+
+## Mujoco Height
+class NoTrainGuideHeight(NoTrainGuide):
+	"""
+	make the total distance of the trajectory become shorter or longer
+	"""
+	LOWER = None
+	HALF = False
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		total_distance = self.cal_value(x)
+
+		if self.LOWER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.LOWER: return -total_distance
+		else: return total_distance
+	
+	def cal_value(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		ACT_DIM = 6
+		z = x[:, :, ACT_DIM+0] # height
+		vx = x[:, :, ACT_DIM+8] # v horizontal
+		vz = x[:, :, ACT_DIM+9] # v vertical/height
+		total_distance = z.mean(dim=1)
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"offset": self.cal_value(x),
+			}
+
+class NoTrainGuideLower(NoTrainGuideOffset):
+	LOWER = True
+
+class NoTrainGuideHigher(NoTrainGuideOffset):
+	LOWER = False

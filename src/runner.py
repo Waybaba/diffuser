@@ -250,6 +250,22 @@ class PlanGuidedRunner:
                 action = samples.actions[0][0] # (B, horizon, a_dim)
                 sequence = samples.observations[0]
                 first_step_conditions = conditions
+
+                # import matplotlib.pyplot as plt
+                # import torch
+                # path="./debug/trace.png"
+                # plt.figure()
+                # x_ = samples.observations[:,:,[6,14,15]]
+                # turn to cpu numpy
+                # if isinstance(x_, torch.Tensor):
+                #     if x_.is_cuda:
+                #         x_ = x_.cpu()
+                #     x_ = x_.detach().numpy()
+                # coord_0 = x_[0]
+                # T = coord_0.shape[0]
+                # for dim in range(coord_0.shape[1]):
+                # 	plt.plot(np.arange(T), coord_0[:, dim])
+                # plt.savefig(path)
             else:
                 if not cfg.trainer.plan_once:
                     actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
