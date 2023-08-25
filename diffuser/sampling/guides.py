@@ -77,7 +77,7 @@ class NoTrainGuideDistance(NoTrainGuide):
 		"""
 		cal total distance
 		x: (batch_size, trace_length, 6)
-			the last dim is [x, y, vx, vy, act_x, act_y]
+			the last dim is [act_x, act_y, x, y, vx, vy]
 			we only use x, y to calculate distance
 		"""
 		# Extract x, y coordinates
@@ -247,6 +247,7 @@ class NoTrainGuideOffset(NoTrainGuide):
 	make the total distance of the trajectory become shorter or longer
 	"""
 	SHORTER = None
+	HALF = False
 
 	def forward(self, x, cond, t):
 		"""
@@ -265,22 +266,45 @@ class NoTrainGuideOffset(NoTrainGuide):
 		"""
 		cal total distance
 		x: (batch_size, trace_length, 6)
-			the last dim is [act_x, act_y, x, y, vx, vy]
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
 			we only use x, y to calculate distance
 		"""
 		# Extract x, y coordinates
-		coord = x[:, :, :2]
+		ACT_DIM = 6
+		coord_z = x[:, :, ACT_DIM+0]
+		coord_x = x[:, :, ACT_DIM+8]
+		coord_y = x[:, :, ACT_DIM+9]
+		coord = torch.stack([coord_x, coord_y, coord_z], dim=-1) # (batch_size, trace_length, 3)
+		# plot each dim of x in figure for debug
+		import matplotlib.pyplot as plt
+		path="./debug/trace.png"
+		plt.figure()
+		x_ = x[:,:,:5]
+		coord_0 = x_[0]
+		T = coord_0.shape[0]
+		for dim in range(coord_0.shape[1]):
+			plt.plot(np.arange(T), coord_0[:, dim].cpu().detach().numpy())
+		plt.savefig(path)
+
+		# plot coord in figure for debug
+		import matplotlib.pyplot as plt
+		path="./debug/trace.png"
+		plt.figure()
+		plt.plot(coord[0, :, 0].cpu().detach().numpy(), coord[0, :, 1].cpu().detach().numpy())
+		plt.savefig(path)
 
 		# if HALF, only use the first half of the trajectory
 		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
 
 		# Compute differences between successive coordinates along the trace
-		# sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
-		# absolute distance sum
-		sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
+		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1).sqrt()
+		sq_distance = sqdist.sum(dim=-1)
+
+		# only first and last
+		start_end_distance = ((coord[:, -1, :] - coord[:, 0, :])**2).sum(dim=-1).sqrt()
 
 		# Compute total distance
-		total_distance = sqdist.sum(dim=-1)
+		total_distance = sq_distance
 
 		return total_distance
 	
@@ -289,7 +313,7 @@ class NoTrainGuideOffset(NoTrainGuide):
 		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
 		with torch.no_grad():
 			return {
-				"distance": self.cal_distance(x),
+				"distance": self.cal_movement(x),
 			}
 
 class NoTrainGuideCloser(NoTrainGuideOffset):

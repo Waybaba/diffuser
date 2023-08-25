@@ -322,13 +322,13 @@ class PlanGuidedRunner:
             return
 
         ## render image of plans
-        img_samples = self.renderer.composite(
+        img_sample = self.renderer.composite(
             os.path.join(self.cfg.output_dir, f'{t}.png'),
             samples.observations[:4],
             conditions
         )
         # wandb_logs["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]
-        wandb_logs["samples"] = [wandb.Image(img_sample) for img_sample in img_samples]
+        wandb_logs["samples"] = [wandb.Image(img_sample)]
 
         # render video of plans
         # self.renderer.render_plan(
