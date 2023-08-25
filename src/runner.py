@@ -36,7 +36,7 @@ class TrainDiffuserRunner:
 
         ### init	
         dataset = cfg.dataset()
-        render = cfg.render()
+        render = cfg.render(dataset.env.name)
         
         observation_dim = dataset.observation_dim
         action_dim = dataset.action_dim
@@ -215,7 +215,10 @@ class PlanGuidedRunner:
         )
 
         env = dataset.env
-
+        if "maze" not in env.name:
+            assert cfg.trainer.custom_target is None, "Only maze environments need targets, so the cfg.trainer.custom_target should be None"
+            assert cfg.trainer.use_controller_act is False, "Only maze environments can use controller, so the cfg.trainer.use_controller_act should be False"
+        
         if cfg.trainer.custom_target is not None:
             # env.set_state(self.CUSTOM_TARGET[cfg.trainer.custom_target]["state"])
             env.set_target(self.CUSTOM_TARGET[cfg.trainer.custom_target]["target"])
@@ -244,13 +247,13 @@ class PlanGuidedRunner:
                 conditions[diffusion.horizon-1] = np.array(list(env._target) + [0, 0])
             if t == 0: 
                 actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
-                action = samples.actions[0]
+                action = samples.actions[0][0] # (B, horizon, a_dim)
                 sequence = samples.observations[0]
                 first_step_conditions = conditions
             else:
                 if not cfg.trainer.plan_once:
                     actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
-                    action = samples.actions[0]
+                    action = samples.actions[0][0]
                     sequence = samples.observations[0]
             if cfg.trainer.use_controller_act:
                 if t == diffusion.horizon - 1: 
@@ -321,7 +324,7 @@ class PlanGuidedRunner:
         ## render image of plans
         img_samples = self.renderer.composite(
             os.path.join(self.cfg.output_dir, f'{t}.png'),
-            samples.observations,
+            samples.observations[:4],
             conditions
         )
         # wandb_logs["samples"] = [wandb.Image(img_) for img_ in img_samples[0]]

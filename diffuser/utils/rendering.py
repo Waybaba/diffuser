@@ -144,7 +144,7 @@ class MuJoCoRenderer:
 
         return composite
 
-    def composite(self, savepath, paths, dim=(1024, 256), **kwargs):
+    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), **kwargs):
 
         render_kwargs = {
             'trackbodyid': 2,
@@ -166,7 +166,7 @@ class MuJoCoRenderer:
 
         return images
 
-    def render_rollout(self, savepath, states, **video_kwargs):
+    def render_rollout(self, savepath, states, conditions={}, **video_kwargs):
         if type(states) is list: states = np.array(states)
         images = self._renders(states, partial=True)
         save_video(savepath, images, **video_kwargs)

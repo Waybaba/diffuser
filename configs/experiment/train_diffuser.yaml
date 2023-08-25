@@ -26,7 +26,6 @@ dataset:
 render:
   _target_: diffuser.utils.Maze2dRenderer
   _partial_: true
-  # env: ${dataset.env}
 
 
 net:
