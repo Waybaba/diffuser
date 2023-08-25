@@ -81,7 +81,7 @@ class NoTrainGuideDistance(NoTrainGuide):
 			we only use x, y to calculate distance
 		"""
 		# Extract x, y coordinates
-		coord = x[:, :, :2]
+		coord = x[:, :, 2:4]
 
 		# if HALF, only use the first half of the trajectory
 		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
@@ -131,7 +131,7 @@ class NoTrainGuideAvgCoordinate(NoTrainGuide):
         """
         Calculate average coordinate (x or y)
         x: (batch_size, trace_length, 6)
-            the last dim is [x, y, vx, vy, act_x, act_y]
+            the last dim is [act_x, act_y, x, y, vx, vy]
             we only use x or y to calculate average coordinate
         """
         avg_coordinate = self.cal_average_coordinate(x)
@@ -145,11 +145,11 @@ class NoTrainGuideAvgCoordinate(NoTrainGuide):
         """
         Calculate average coordinate (x or y)
         x: (batch_size, trace_length, 6)
-            the last dim is [x, y, vx, vy, act_x, act_y]
+            the last dim is [act_x, act_y, x, y, vx, vy]
             we only use x or y to calculate average coordinate
         """
         # Extract x or y coordinate
-        coord = x[:, :, self.COORDINATE]
+        coord = x[:, :, self.COORDINATE+2]
 
         # Compute average coordinate
         avg_coordinate = coord.mean(dim=1)
@@ -240,3 +240,60 @@ class NoTrainGuideRepeat(NoTrainGuide):
 			return {
 				"distance_repeat": distance
 			}
+
+## Mujoco Distance
+class NoTrainGuideOffset(NoTrainGuide):
+	"""
+	make the total distance of the trajectory become shorter or longer
+	"""
+	SHORTER = None
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		total_distance = self.cal_movement(x)
+
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance
+		else: return total_distance
+	
+	def cal_movement(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		coord = x[:, :, :2]
+
+		# if HALF, only use the first half of the trajectory
+		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
+
+		# Compute differences between successive coordinates along the trace
+		# sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
+		# absolute distance sum
+		sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
+
+		# Compute total distance
+		total_distance = sqdist.sum(dim=-1)
+
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"distance": self.cal_distance(x),
+			}
+
+class NoTrainGuideCloser(NoTrainGuideOffset):
+	SHORTER = True
+
+class NoTrainGuideFarther(NoTrainGuideOffset):
+	SHORTER = False
