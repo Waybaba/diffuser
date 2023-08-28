@@ -463,7 +463,8 @@ class FillActModelModule(DefaultModule):
         for k, v in metrics.items():
             self.log(f"val/{k}", v, on_epoch=True, prog_bar=True)
         # render
-        img = self.render_composite(episodes_rollout[:4], self.dynamic_cfg["renderer"], path=None)
+        observations = np.stack([each["s"] for each in episodes_rollout], axis=0)
+        img = self.render_composite(observations[:4], self.dynamic_cfg["renderer"]())
         self.wandb.log({"val/render": self.wandb.Image(img)})
     
     def get_ref_episodes(self, env, ep_num=10):

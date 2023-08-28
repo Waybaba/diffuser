@@ -28,13 +28,22 @@ register(
     }
 )
 
+import logging
+log = logging.getLogger(__name__)
+logger: List[LightningLoggerBase] = []
+from omegaconf import DictConfig
+from pytorch_lightning.loggers import LightningLoggerBase
+import hydra
+from typing import List
+
+
 class TrainDiffuserRunner:
     
     def start(self, cfg):
         print("Running default runner")
         self.cfg = cfg
 
-        ### init	
+        ### init
         dataset = cfg.dataset()
         render = cfg.render(dataset.env.name)
         
@@ -79,17 +88,20 @@ class TrainControllerRunner:
 
         self.datamodule = cfg.datamodule()
         self.modelmodule = cfg.modelmodule(
-            dataset_info=self.datamodule.info
+            dataset_info=self.datamodule.info,
         )
-        trainer = cfg.trainer()
+        trainer = cfg.trainer(
+            callbacks=[v for k,v in cfg.callbacks.items()],
+            logger=cfg.logger,
+        )
         trainer.fit(
             model=self.modelmodule,
+            datamodule=self.datamodule,
         )
-
-        render = cfg.render(dataset.env.name)
 
         ### init	
         dataset = cfg.dataset()
+        render = cfg.render(dataset.env.name)
         
         observation_dim = dataset.observation_dim
         action_dim = dataset.action_dim
