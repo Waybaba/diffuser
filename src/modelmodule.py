@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import numpy as np
+import wandb 
 
 """functions"""
 def collect_parameters(model, set="all"):
@@ -158,15 +159,15 @@ class FillActWrapper(ModelWrapperBase):
         self.torch_module_init()
         in_dim = dynamic_cfg["obs_dim"] * 2
         out_dim = dynamic_cfg["act_dim"]
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(in_dim, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, out_dim),
-        )
+        self.net = kwargs["net"]
+        self.net[0] = self.net[0](in_features=in_dim)
+        self.net[-1] = self.net[-1](out_features=out_dim)
+        self.net = torch.nn.Sequential(*self.net)
     
     def forward(self, x):
+        if len(x.shape) == 1: 
+            x = x.unsqueeze(0)
+            return self.net(x).squeeze(0)
         return self.net(x)
 
     def select_param_group(self, name):
@@ -452,6 +453,8 @@ class FillActModelModule(DefaultModule):
         return res_batch
 
     def validation_epoch_end(self, outputs):
+        assert self.net.training == False, "net should be in eval mode"
+        LOG_PREFIX = "val_ep_end"
         super().validation_epoch_end(outputs)
         ### render a plot
         # get ref episode from dataset (T, obs_dim)
@@ -461,11 +464,16 @@ class FillActModelModule(DefaultModule):
         # metric
         metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
         for k, v in metrics.items():
-            self.log(f"val/{k}", v, on_epoch=True, prog_bar=True)
+            self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
         # render
-        observations = np.stack([each["s"] for each in episodes_rollout], axis=0)
-        img = self.render_composite(observations[:4], self.dynamic_cfg["renderer"]())
-        self.wandb.log({"val/render": self.wandb.Image(img)})
+        states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
+        states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
+        self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
+            self.render_composite(states_ref[:4], self.dynamic_cfg["renderer"](),steps=80)
+        )])
+        self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
+            self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
+        )])
     
     def get_ref_episodes(self, env, ep_num=10):
         """ get reference episodes from dataset
@@ -486,6 +494,9 @@ class FillActModelModule(DefaultModule):
                 "s": dataset["observations"][start:end],
                 "act": dataset["actions"][start:end],
                 "s_": dataset["observations"][start+1:end+1],
+                "r": dataset["rewards"][start:end],
+                "qpos": dataset["infos/qpos"][start:end],
+                "qvel": dataset["infos/qvel"][start:end], # TODO ! only support mujoco now
             })
         return episodes_ref
     
@@ -498,20 +509,35 @@ class FillActModelModule(DefaultModule):
             act = model(obs_cur, obs_next)
             then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
         """
-        s = env.reset()
+        # reset env with qpos, qvel
+        init_qpos = ep_ref["qpos"][0]
+        init_qvel = ep_ref["qvel"][0]
+        env.reset()
+        env.set_state(init_qpos, init_qvel)
+        s = ep_ref["s"][0]
+        # s_ref = ep_ref["s_"][0]
+        # s_, _, _, _ = env.step(ep_ref["act"][0])
+        # print(s_)
+        # print(s_ref)
+
+        # run
         ep_s = []
         ep_a = []
+        ep_r = []
         for env_i in tqdm(range(len(ep_ref["s"]))):
             device = next(self.net.parameters()).device
-            act = self.net(torch.cat([torch.tensor(s), torch.tensor(ep_ref["s_"][env_i])], dim=-1).float().to(device))
+            act = model(torch.cat([torch.tensor(s), torch.tensor(ep_ref["s_"][env_i])], dim=-1).float().to(device))
             act = act.detach().cpu().numpy()
-            s, _, done, info = env.step(act)
+            s_, r, done, info = env.step(act)
             ep_s.append(s)
             ep_a.append(act)
+            ep_r.append(r)
+            s = s_
             if done: break
         return {
             "s": np.stack(ep_s),
             "act": np.stack(ep_a),
+            "r": np.stack(ep_r),
         }
     
     def cal_ref_rollout_metrics(self, episodes_ref, episodes_rollout):
@@ -521,12 +547,42 @@ class FillActModelModule(DefaultModule):
             return a dict of metrics
         """
         return {
-            "mean_l1_shift": np.mean([
+            "mean_l1_shift_total": np.mean([
                 L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"]), torch.tensor(episodes_rollout[i]["s"])) \
                     for i in range(len(episodes_ref))
-            ])
+            ]),
+            "mean_l1_shift_20steps": np.mean([
+                L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"][:20]), torch.tensor(episodes_rollout[i]["s"][:20])) \
+                    for i in range(len(episodes_ref))
+            ]),
+            "mean_l1_shift_80steps": np.mean([
+                L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"][:80]), torch.tensor(episodes_rollout[i]["s"][:80])) \
+                    for i in range(len(episodes_ref))
+            ]),
+            "sum_reward_total": np.mean([
+                np.sum(episodes_rollout[i]["r"]) \
+                for i in range(len(episodes_ref))
+            ]),
+            "sum_reward_20steps": np.mean([
+                np.sum(episodes_rollout[i]["r"][:20]) \
+                for i in range(len(episodes_ref))
+            ]),
+            "sum_reward_80steps": np.mean([
+                np.sum(episodes_rollout[i]["r"][:80]) \
+                for i in range(len(episodes_ref))
+            ]),
         }
 
-    def render_composite(self, states, renderer, path=None):
-        img = renderer.composite(path, states)
+    def render_composite(self, states, renderer, path=None,steps=40):
+        """
+        steps controls the number of steps in the animation
+            int: the first steps frames are rendered
+            float: (<1) select the intervals of i*steps*len(states)
+        states: (B, T, obs_dim)
+        """
+        # TODO controller, the lenght could be different
+        if isinstance(steps, int): steps = np.arange(steps)
+        elif isinstance(steps, float): steps = np.arange(int(len(states) * steps))
+        else: raise ValueError(f"steps should be int or float, but got {steps}")
+        img = renderer.composite(path, states[:, steps])
         return img

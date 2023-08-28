@@ -28,13 +28,6 @@ register(
     }
 )
 
-import logging
-log = logging.getLogger(__name__)
-logger: List[LightningLoggerBase] = []
-from omegaconf import DictConfig
-from pytorch_lightning.loggers import LightningLoggerBase
-import hydra
-from typing import List
 
 
 class TrainDiffuserRunner:
@@ -92,47 +85,12 @@ class TrainControllerRunner:
         )
         trainer = cfg.trainer(
             callbacks=[v for k,v in cfg.callbacks.items()],
-            logger=cfg.logger,
+            logger=[v for k,v in cfg.logger.items()],
         )
         trainer.fit(
             model=self.modelmodule,
             datamodule=self.datamodule,
         )
-
-        ### init	
-        dataset = cfg.dataset()
-        render = cfg.render(dataset.env.name)
-        
-        observation_dim = dataset.observation_dim
-        action_dim = dataset.action_dim
-
-        net = cfg.net(
-            transition_dim=observation_dim + action_dim,
-            cond_dim=observation_dim
-        ).to(cfg.device)
-        
-        model = cfg.model(
-            net,
-            observation_dim=observation_dim,
-            action_dim=action_dim,
-        ).to(cfg.device)
-
-        trainer = cfg.trainer(
-            model,
-            dataset,
-            render,
-        )
-
-
-        # save diffuser training cfg for inference reload
-        
-
-        ### train
-
-        n_epochs = int(cfg.global_cfg.n_train_steps // cfg.global_cfg.n_steps_per_epoch)
-        for epoch in range(n_epochs):
-            print(f'Epoch {epoch} / {n_epochs} | {cfg.output_dir}')
-            trainer.train(n_train_steps=cfg.global_cfg.n_steps_per_epoch)
         
         print("Finished!")
 

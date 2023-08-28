@@ -21,6 +21,26 @@ modelmodule:
   net: 
     _target_: src.modelmodule.FillActWrapper
     _partial_: true
+    net:
+      - _target_: torch.nn.Linear
+        _partial_: true
+        out_features: 128
+      - _target_: torch.nn.BatchNorm1d
+        num_features: 128
+      - _target_: torch.nn.ReLU
+      - _target_: torch.nn.Dropout
+        p: 0.2
+      - _target_: torch.nn.Linear
+        in_features: 128
+        out_features: 64
+      - _target_: torch.nn.BatchNorm1d
+        num_features: 64
+      - _target_: torch.nn.ReLU
+      - _target_: torch.nn.Dropout
+        p: 0.1
+      - _target_: torch.nn.Linear
+        _partial_: true
+        in_features: 64
   metric_func:
     _target_: src.modelmodule.L1DistanceMetric
     _partial_: true
@@ -66,26 +86,6 @@ datamodule:
     env: ${datamodule.env}
 
 
-net:
-  _target_: diffuser.models.TemporalUnet
-  _partial_: true
-  horizon: ${global_cfg.horizon}
-  dim_mults: [1, 4, 8]
-  attention: false
-
-model:
-  _target_: diffuser.models.GaussianDiffusion
-  _partial_: true
-  horizon: ${global_cfg.horizon}
-  n_timesteps: 256 # n_diffusion_steps in source code
-  loss_type: "l2"
-  clip_denoised: true # ! ?
-  predict_epsilon: false
-  action_weight: 1
-  loss_weights: null
-  loss_discount: 1
-
-
 trainer:
     _target_: "pytorch_lightning.Trainer"
     _partial_: true
@@ -102,26 +102,6 @@ trainer:
     log_every_n_steps: 100
     num_sanity_val_steps: 2
     check_val_every_n_epoch: 1
-    # val_check_interval: 10000
-
-# trainer:
-#   _target_: diffuser.utils.Trainer
-#   task: train_diffuser
-#   _partial_: true
-#   train_batch_size: 32
-#   train_lr: 2e-4
-#   gradient_accumulate_every: 2
-#   ema_decay: 0.995
-#   sample_freq: 100 # ! for x step, render generated samples, turn to 1e6 for cloud based!
-#   save_freq: 100000 # for x step, save model
-#   label_freq: 10000 # not important, just use for name. e.g. 12234 -> 12000
-#   save_parallel: false
-#   results_folder: ${output_dir} # TODO
-#   bucket: null # TODO ? what
-#   n_reference: 25 # TODO ? what
-#   n_render_samples: 4
-
-
 
 
 # common - for all tasks (task_name, tags, output_dir, device)
