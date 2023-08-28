@@ -12,20 +12,20 @@ modelmodule:
     net:
       - _target_: torch.nn.Linear
         _partial_: true
-        out_features: 128
+        out_features: 1024
       - _target_: torch.nn.BatchNorm1d
-        num_features: 128
+        num_features: 1024
       - _target_: torch.nn.ReLU
       - _target_: torch.nn.Dropout
         p: 0.2
       - _target_: torch.nn.Linear
-        in_features: 128
-        out_features: 64
+        in_features: 1024
+        out_features: 512
       - _target_: torch.nn.BatchNorm1d
-        num_features: 64
+        num_features: 512
       - _target_: torch.nn.ReLU
       - _target_: torch.nn.Dropout
         p: 0.1
       - _target_: torch.nn.Linear
         _partial_: true
-        in_features: 64
+        in_features: 512

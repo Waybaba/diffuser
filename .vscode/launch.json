@@ -92,6 +92,7 @@
 			"args": [
 				"experiment=train_controller",
 				// "wandb.mode=disabled",
+				// "+trainer.fast_dev_run=5",
 			],
 		},
 		// train_envmodel
@@ -105,6 +106,8 @@
 			"args": [
 				"experiment=train_envmodel",
 				// "wandb.mode=disabled",
+				"callbacks.model_checkpoint.every_n_epochs=1",
+				// "+trainer.fast_dev_run=5",
 			],
 		},
 		{

@@ -544,7 +544,7 @@ class FillActModelModule(DefaultModule):
         ep_a = []
         ep_r = []
         for env_i in tqdm(range(len(ep_ref["s"]))):
-            device = next(self.net.parameters()).device
+            device = next(model.parameters()).device
             act = model(torch.cat([torch.tensor(s), torch.tensor(ep_ref["s_"][env_i])], dim=-1).float().to(device))
             act = act.detach().cpu().numpy()
             s_, r, done, info = env.step(act)
@@ -606,7 +606,7 @@ class FillActModelModule(DefaultModule):
         img = renderer.composite(path, states[:, steps])
         return img
 
-class EnvModelModule(DefaultModule):
+class EnvModelModule(FillActModelModule):
     def step(self, batch: Any):
         """ process the batch from dataloader and return the res_batch
         input: `batch dict` from dataloader
@@ -629,5 +629,58 @@ class EnvModelModule(DefaultModule):
         return res_batch
 
     def validation_epoch_end(self, outputs):
-        return
-    
+        assert self.net.training == False, "net should be in eval mode"
+        LOG_PREFIX = "val_ep_end"
+        super().validation_epoch_end(outputs)
+        ### render a plot
+        # get ref episode from dataset (T, obs_dim)
+        episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=10)
+        # rollout to get [(T, obs_dim)]
+        episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net) for ep_ref in episodes_ref]
+        # metric
+        metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
+        for k, v in metrics.items():
+            self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
+        # render
+        states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
+        states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
+        self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
+            self.render_composite(states_ref[:4], self.dynamic_cfg["renderer"](),steps=80)
+        )])
+        self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
+            self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
+        )])
+
+    def rollout_ref(self, env, ep_ref, model):
+        SAMPLE_STEPS, STEP_SIZE, MOMENTUM = 10, 0.1, 0.9
+        env.reset()
+        env.set_state(ep_ref["qpos"][0], ep_ref["qvel"][0])
+        s = ep_ref["s"][0]
+        ep_s, ep_a, ep_r = [], [], []
+        device = next(model.parameters()).device
+        model = model.to(device)
+
+        for env_i in tqdm(range(len(ep_ref["s"]))):
+            s, s_target = torch.tensor(s).float().to(device), torch.tensor(ep_ref["s_"][env_i]).float().to(device)
+            act = torch.tensor(env.action_space.sample()).float().to(device)
+            velocity = 0  # Initialize momentum term
+            
+            with torch.enable_grad():
+                for _ in range(SAMPLE_STEPS):
+                    act.requires_grad_(True)
+                    loss = torch.norm(model(torch.cat([s, act], dim=-1)) - s_target)
+                    loss.backward()
+                    # Momentum update
+                    velocity = MOMENTUM * velocity + STEP_SIZE * act.grad
+                    act = (act - velocity).detach()
+
+            act_np = act.cpu().numpy()
+            s_, r, done, _ = env.step(act_np)
+            ep_s.append(s.cpu().numpy())
+            ep_a.append(act_np)
+            ep_r.append(r)
+            s = s_
+
+            if done: break
+
+        return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
