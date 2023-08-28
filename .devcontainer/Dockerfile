@@ -54,8 +54,8 @@ RUN conda install -y --name base -c conda-forge \
 RUN pip install \
     opencv-python \
     pytorch-lightning==1.7.7 \
-    # hydra-joblib-launcher \
-    hydra-core \
+    protobuf==3.20.1 \
+    hydra-core==1.2.0 \
     hydra-colorlog \
     hydra-optuna-sweeper \
     torchmetrics \
@@ -82,6 +82,8 @@ RUN pip install \
     tianshou==0.4.11 \
     ftfy \
     regex
+
+# RUN pip install pytorch-lightning==1.8.6
 
 ## Non-root user creation and enter
 ARG USER_UID=1000

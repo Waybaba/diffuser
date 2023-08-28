@@ -71,6 +71,60 @@ class TrainDiffuserRunner:
         
         print("Finished!")
 
+class TrainControllerRunner:
+    
+    def start(self, cfg):
+        print("Running default runner")
+        self.cfg = cfg
+
+        self.datamodule = cfg.datamodule()
+        self.modelmodule = cfg.modelmodule(
+            dataset_info=self.datamodule.info
+        )
+        trainer = cfg.trainer()
+        trainer.fit(
+            model=self.modelmodule,
+        )
+
+        render = cfg.render(dataset.env.name)
+
+        ### init	
+        dataset = cfg.dataset()
+        
+        observation_dim = dataset.observation_dim
+        action_dim = dataset.action_dim
+
+        net = cfg.net(
+            transition_dim=observation_dim + action_dim,
+            cond_dim=observation_dim
+        ).to(cfg.device)
+        
+        model = cfg.model(
+            net,
+            observation_dim=observation_dim,
+            action_dim=action_dim,
+        ).to(cfg.device)
+
+        trainer = cfg.trainer(
+            model,
+            dataset,
+            render,
+        )
+
+
+        # save diffuser training cfg for inference reload
+        
+
+        ### train
+
+        n_epochs = int(cfg.global_cfg.n_train_steps // cfg.global_cfg.n_steps_per_epoch)
+        for epoch in range(n_epochs):
+            print(f'Epoch {epoch} / {n_epochs} | {cfg.output_dir}')
+            trainer.train(n_train_steps=cfg.global_cfg.n_steps_per_epoch)
+        
+        print("Finished!")
+
+
 class TrainValuesRunner:
     
     def start(self, cfg):

@@ -14,7 +14,7 @@
 		},
 		// entry.py
 		{
-			"name": "entry - train_diffuser",
+			"name": "train_diffuser",
 			"type": "python",
 			"request": "launch",
 			"program": "${workspaceFolder}/entry/entry.py",
@@ -37,7 +37,7 @@
 			],
 		},
 		{
-			"name": "entry - plan_guided",
+			"name": "plan_guided",
 			"type": "python",
 			"request": "launch",
 			"program": "${workspaceFolder}/entry/entry.py",
@@ -69,7 +69,7 @@
 			],
 		},
 		{
-			"name": "entry - train_values",
+			"name": "train_values",
 			"type": "python",
 			"request": "launch",
 			"program": "${workspaceFolder}/entry/entry.py",
@@ -79,6 +79,20 @@
 				"experiment=train_values",
 				"trainer.save_freq=100",
 				"dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
+			],
+		},
+		// Train controller TODO control
+		{
+			"name": "train_controller",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"experiment=train_controller",
+				// "trainer.save_freq=100",
+				"wandb.mode=disabled",
 			],
 		},
 		{
