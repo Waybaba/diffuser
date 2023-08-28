@@ -5,15 +5,11 @@ defaults:
   - /logger: wandb.yaml
 
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
-  n_train_steps: 2000000
-  n_steps_per_epoch: 10000 # so n_epochs = n_train_steps / n_steps_per_epoch
-  horizon: 384
+  null
 
 runner:
   _target_: src.runner.TrainControllerRunner
   _partial_: true
-
-
 
 modelmodule:
   _target_: src.modelmodule.FillActModelModule
@@ -68,7 +64,6 @@ modelmodule:
       #   interval: step
       #   frequency: 1
   optimization_first: ${modelmodule.optimizations.0} # for wandb log
-
 
 
 datamodule: 

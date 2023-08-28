@@ -173,6 +173,25 @@ class FillActWrapper(ModelWrapperBase):
     def select_param_group(self, name):
         raise NotImplementedError
 
+class EnvModelWrapper(ModelWrapperBase):
+    def __init__(self, dynamic_cfg, **kwargs):
+        self.torch_module_init()
+        in_dim = dynamic_cfg["obs_dim"] + dynamic_cfg["act_dim"]
+        out_dim = dynamic_cfg["obs_dim"]
+        self.net = kwargs["net"]
+        self.net[0] = self.net[0](in_features=in_dim)
+        self.net[-1] = self.net[-1](out_features=out_dim)
+        self.net = torch.nn.Sequential(*self.net)
+    
+    def forward(self, x):
+        if len(x.shape) == 1: 
+            x = x.unsqueeze(0)
+            return self.net(x).squeeze(0)
+        return self.net(x)
+
+    def select_param_group(self, name):
+        raise NotImplementedError
+
 """plightning modelmodule"""
 
 class DefaultModule(LightningModule):
@@ -586,3 +605,29 @@ class FillActModelModule(DefaultModule):
         else: raise ValueError(f"steps should be int or float, but got {steps}")
         img = renderer.composite(path, states[:, steps])
         return img
+
+class EnvModelModule(DefaultModule):
+    def step(self, batch: Any):
+        """ process the batch from dataloader and return the res_batch
+        input: `batch dict` from dataloader
+        output: `res_batch` dict with "x", "y", "info", "outputs", "preds", "loss"
+        ps. note that the calcultion of "outputs", "preds", "loss" could
+            be task-specific, so we need to implement it in the subclass
+        """
+        # s, s_, act
+        outputs = self.net(torch.cat([batch.s, batch.act], dim=-1))
+        res_batch = {
+            "s": batch.s,
+            "s_": batch.s_,
+            "act": batch.act,
+            # "info": batch["info"],
+            "outputs": outputs,
+            "preds": outputs,
+            "loss": self.hparams.loss_func()(outputs, batch.s_),
+            "y": batch.s_,
+        }
+        return res_batch
+
+    def validation_epoch_end(self, outputs):
+        return
+    

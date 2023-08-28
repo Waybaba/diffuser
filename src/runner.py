@@ -91,9 +91,8 @@ class TrainControllerRunner:
             model=self.modelmodule,
             datamodule=self.datamodule,
         )
-        
-        print("Finished!")
 
+        print("Finished!")
 
 class TrainValuesRunner:
     

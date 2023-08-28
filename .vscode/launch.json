@@ -81,7 +81,7 @@
 				"dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
 			],
 		},
-		// Train controller TODO control
+		// train_controller
 		{
 			"name": "train_controller",
 			"type": "python",
@@ -91,7 +91,19 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=train_controller",
-				// "trainer.save_freq=100",
+				// "wandb.mode=disabled",
+			],
+		},
+		// train_envmodel
+		{
+			"name": "train_envmodel",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"experiment=train_envmodel",
 				// "wandb.mode=disabled",
 			],
 		},
