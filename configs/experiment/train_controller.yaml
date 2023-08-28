@@ -1,5 +1,9 @@
 # @package _global_
 
+defaults:
+  - /callbacks: default.yaml
+  - /logger: wandb.yaml
+
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
   n_train_steps: 2000000
   n_steps_per_epoch: 10000 # so n_epochs = n_train_steps / n_steps_per_epoch
@@ -56,7 +60,6 @@ datamodule:
   pin_memory: false
   num_workers: ${oc.decode:${oc.env:NUM_WORKERS}}
   train_val_test_split: [0.9,0.05,0.05]
-  # TODO add config for large0maze 2 in py file
   renderer: 
     _target_: diffuser.utils.rendering.MuJoCoRenderer
     _partial_: true
@@ -87,6 +90,8 @@ trainer:
     _target_: "pytorch_lightning.Trainer"
     _partial_: true
     default_root_dir: ${output_dir}
+    # callbacks: ${callbacks}
+    # logger: ${logger}
     min_epochs: null
     max_epochs: 10
     accelerator: "gpu"
@@ -98,8 +103,6 @@ trainer:
     num_sanity_val_steps: 2
     check_val_every_n_epoch: 1
     # val_check_interval: 10000
-    callbacks: 
-      - _target_: pytorch_lightning.callbacks.RichProgressBar
 
 # trainer:
 #   _target_: diffuser.utils.Trainer
