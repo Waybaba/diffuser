@@ -107,6 +107,7 @@ class Trainer(object):
     def train(self, n_train_steps):
 
         timer = Timer()
+
         for step in range(n_train_steps):
             to_log = {}
             for i in range(self.gradient_accumulate_every):
@@ -120,32 +121,38 @@ class Trainer(object):
             self.optimizer.step()
             self.optimizer.zero_grad()
 
+            ### update ema
             if self.step % self.update_ema_every == 0:
                 self.step_ema()
 
+            ### render reference
+            if self.step == 0 and self.sample_freq:
+                img_ref = self.render_reference(self.n_reference) # plot source data
+                to_log["reference"] = [wandb.Image(img_ref)]
+                
+            ### save model
             if self.step % self.save_freq == 0:
                 assert self.task is not None, "task must be specified"
-                if self.task == "train_diffuser":
-                    total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
-                    to_log["eval/total_reward_mean"] = total_reward_mean
-                    to_log["eval/rollout"] = [wandb.Image(_) for _ in img_rollout_samples]
                 label = self.step // self.label_freq * self.label_freq
                 self.save(label)
-
+            
+            ### log
             if self.step % self.log_freq == 0:
                 infos_str = ' | '.join([f'{key}: {val:8.4f}' for key, val in infos.items()])
                 to_log.update(infos)
                 print(f'{self.step}: {loss:8.4f} | {infos_str} | t: {timer():8.4f}', flush=True)
 
-            if self.step == 0 and self.sample_freq:
-                img_ref = self.render_reference(self.n_reference) # plot source data
-                to_log["reference"] = [wandb.Image(_) for _ in img_ref]
-
-
+            ### render samples (generate samples, rollout samples)
             if self.sample_freq and self.step % self.sample_freq == 0:
+                assert self.task is not None, "task must be specified"
                 img_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
                 to_log["samples"] = [wandb.Image(img_) for img_ in img_samples]
+                if self.task == "train_diffuser":
+                    total_reward_mean, img_rollout_samples = self.evals(self.model, num=5)
+                    to_log["eval/total_reward_mean"] = total_reward_mean
+                    to_log["eval/rollout"] = [wandb.Image(_) for _ in img_rollout_samples]
 
+            ### end
             self.step += 1
             wandb.log(to_log, step=self.step, commit=True if self.step % 1000 == 0 else False)
 
@@ -206,6 +213,16 @@ class Trainer(object):
     def render_samples(self, batch_size=4):
         '''
             renders samples from (ema) diffusion model
+            we sample batch_size conditions, 
+            for each one in conditions,
+            we generate n_samples trajectories with the same initial condition
+            then plot them in a grid (2x2 for maze, 4x1 for mujoco)
+            then we get batch_size images
+            then would be save as:
+                $UOURDIR/xxx/sample-{learning_step}-0.png
+                $UOURDIR/xxx/sample-{learning_step}-1.png
+                ...
+                $UOURDIR/xxx/sample-{learning_step}-{batch_size-1}.png
         '''
         assert self.n_render_samples == 4, "please use 4, since we plot 4x1 for mujoco and 2x2 for maze"
         n_samples = self.n_render_samples
