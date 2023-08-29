@@ -31,5 +31,8 @@ def n_step_guided_p_sample(
     # no noise when t == 0
     noise = torch.randn_like(x)
     noise[t == 0] = 0
-
+    
+    # ! DEBUG # add this would make the first and target step have no gradient
+    model_mean = apply_conditioning(model_mean, cond, model.action_dim)
+    # ! DEBUG
     return model_mean + model_std * noise, y

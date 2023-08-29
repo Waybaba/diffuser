@@ -344,7 +344,7 @@ class MazeRenderer:
         # Save to file
         ani.save(savepath, writer='pillow')
 
-    def composite(self, savepath, paths, conditions=None, ncol=1, **kwargs):
+    def composite(self, savepath, paths, conditions=None, ncol=2, **kwargs):
         '''
             savepath : str
             observations : [ n_paths x horizon x 2 ]
@@ -365,7 +365,7 @@ class MazeRenderer:
 
         # render only first sample to gif
         # self.render_to_gif(paths[0], savepath[:-4] + '.gif')
-        return images_res
+        return images
         
 
 class Maze2dRenderer(MazeRenderer):

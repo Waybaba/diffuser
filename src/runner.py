@@ -91,7 +91,6 @@ class TrainControllerRunner:
             model=self.modelmodule,
             datamodule=self.datamodule,
         )
-
         print("Finished!")
 
 class TrainValuesRunner:
@@ -148,7 +147,7 @@ def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
     cfg = hydra.utils.instantiate(cfg)
     ### init	
     dataset = cfg.dataset(seed=dataset_seed)
-    render = cfg.render()
+    render = cfg.render(dataset.env.name)
     
     observation_dim = dataset.observation_dim
     action_dim = dataset.action_dim
@@ -250,6 +249,7 @@ class PlanGuidedRunner:
             print(f"use custom target ### {cfg.trainer.custom_target} ###")
             print("state", env.state_vector())
             print("target", env._target)
+            print()
         else:
             observation = env.reset()
 

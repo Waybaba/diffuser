@@ -25,6 +25,9 @@ def default_sample_fn(model, x, cond, t):
     noise = torch.randn_like(x)
     noise[t == 0] = 0
 
+    # ! DEBUG set start (and end) to target
+    model_mean = apply_conditioning(model_mean, cond, model.action_dim)
+
     values = torch.zeros(len(x), device=x.device)
     return model_mean + model_std * noise, values
 
@@ -40,7 +43,7 @@ def make_timesteps(batch_size, i, device):
     t = torch.full((batch_size,), i, device=device, dtype=torch.long)
     return t
 
-APPLY_CONDITION = False # ! for debug
+APPLY_CONDITION = True # ! for debug
 
 class GaussianDiffusion(nn.Module):
     def __init__(self, model, horizon, observation_dim, action_dim, n_timesteps=1000,

@@ -8,7 +8,8 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import numpy as np
-import wandb 
+import wandb
+from torch.optim import RMSprop
 
 """functions"""
 def collect_parameters(model, set="all"):
@@ -71,12 +72,17 @@ class L1DistanceMetric(Metric):
         self.add_state("count", default=torch.tensor(0.0), dist_reduce_fx="sum")
         
     def update(self, preds: torch.Tensor, target: torch.Tensor):
-        """Receives the output of the model and the target."""
+        """
+            Receives the output of the model and the target.
+            return mean l1 distance of a dimmension
+        """
+        assert preds.shape == target.shape, "preds and target should have the same shape"
+        assert len(preds.shape) == 2, "preds and target should be 2D"
         with torch.no_grad():
             l1_distance = torch.abs(preds - target).sum()
             self.sum += l1_distance
             self.count += target.numel()
-        return l1_distance
+        return l1_distance / target.numel()
     
     def compute(self):
         """Compute the metric."""
@@ -547,6 +553,7 @@ class FillActModelModule(DefaultModule):
             device = next(model.parameters()).device
             act = model(torch.cat([torch.tensor(s), torch.tensor(ep_ref["s_"][env_i])], dim=-1).float().to(device))
             act = act.detach().cpu().numpy()
+            # act = ep_ref["act"][env_i] # ! DEBUG
             s_, r, done, info = env.step(act)
             ep_s.append(s)
             ep_a.append(act)
@@ -652,7 +659,7 @@ class EnvModelModule(FillActModelModule):
         )])
 
     def rollout_ref(self, env, ep_ref, model):
-        SAMPLE_STEPS, STEP_SIZE, MOMENTUM = 10, 0.1, 0.9
+        SAMPLE_STEPS = 100
         env.reset()
         env.set_state(ep_ref["qpos"][0], ep_ref["qvel"][0])
         s = ep_ref["s"][0]
@@ -662,19 +669,18 @@ class EnvModelModule(FillActModelModule):
 
         for env_i in tqdm(range(len(ep_ref["s"]))):
             s, s_target = torch.tensor(s).float().to(device), torch.tensor(ep_ref["s_"][env_i]).float().to(device)
-            act = torch.tensor(env.action_space.sample()).float().to(device)
-            velocity = 0  # Initialize momentum term
-            
+            act = torch.tensor(env.action_space.sample()).float().to(device).requires_grad_(True)
+
+            optimizer = RMSprop([act], lr=1e-2, alpha=0.9)  # Assuming learning rate is 1e-2, adjust as needed
+
             with torch.enable_grad():
                 for _ in range(SAMPLE_STEPS):
-                    act.requires_grad_(True)
+                    optimizer.zero_grad()
                     loss = torch.norm(model(torch.cat([s, act], dim=-1)) - s_target)
                     loss.backward()
-                    # Momentum update
-                    velocity = MOMENTUM * velocity + STEP_SIZE * act.grad
-                    act = (act - velocity).detach()
+                    optimizer.step()
 
-            act_np = act.cpu().numpy()
+            act_np = act.detach().cpu().numpy()
             s_, r, done, _ = env.step(act_np)
             ep_s.append(s.cpu().numpy())
             ep_a.append(act_np)

@@ -21,13 +21,14 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				// "experiment=train_diffuser",
-				"experiment=train_diffuser_locomotion",
-				"trainer.save_freq=100",
+				"experiment=train_diffuser",
+				// "experiment=train_diffuser_locomotion",
+				"trainer.save_freq=10000", // save model and rollout
+				"trainer.sample_freq=1000", // sample and redering
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-open-v0_1e7.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/latest.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000.hdf5",
+				"dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000-onlytwo.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-large-v1-1000.hdf5",
 				// "policy.scale_grad_by_std=true",
@@ -49,23 +50,25 @@
 				// "diffusion.dir=${env:UDATADIR}/models/diffuser/largemaze_on_wsl_Jul20",
 				"diffusion.epoch=latest",
 				"policy.scale_grad_by_std=true",
-				"policy.scale=100.0",
-				// "trainer.custom_target=bl2tr",
-				// "wandb.mode=disabled",
+				"policy.scale=0.0",
+				"wandb.mode=disabled",
 
 				// ###### maze
 				// "diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-08-23_11-19-12_292485",
-				// "trainer.use_controller_act=true",
-				// "trainer.custom_target=tr2bl",
-				// "guide._target_=diffuser.sampling.NoTrainGuideYHigher",
+				// xxx open maze tr2bl target
+				// 2023-08-29_09-50-53_742160 open maze random target
+				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-08-29_07-06-56_406380",
+				"trainer.use_controller_act=true",
+				"trainer.custom_target=null", // tr2bl,2wayAv1
+				"guide._target_=diffuser.sampling.NoTrainGuideYHigher",
 				// "guide._target_=diffuser.sampling.NoTrainGuideLonger",
 				// "guide._target_=diffuser.sampling.NoTrainGuideShorter",
 
 				// ###### mujoco
-				"diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-24_12-49-31_504043/0",
-				"trainer.use_controller_act=false",
-				"trainer.custom_target=null",
-				"guide._target_=diffuser.sampling.NoTrainGuideHigher",
+				// "diffusion.dir=${env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-24_12-49-31_504043/0",
+				// "trainer.use_controller_act=false",
+				// "trainer.custom_target=null", // ! no for mujoco
+				// "guide._target_=diffuser.sampling.NoTrainGuideHigher",
 			],
 		},
 		{
@@ -91,7 +94,7 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=train_controller",
-				// "wandb.mode=disabled",
+				"wandb.mode=disabled",
 				// "+trainer.fast_dev_run=5",
 			],
 		},
