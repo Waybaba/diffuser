@@ -42,8 +42,14 @@ class SequenceDataset(torch.utils.data.Dataset):
 		
 		print("\n### add path to buffer ...")
 		for i, episode in tqdm(enumerate(itr),total=n_episodes):
+			# ! DEBUG set start and end to nearest int
+			if len(episode["rewards"]) == 0: continue
+			episode["observations"][0] = np.round(episode["observations"][0])
+			episode["observations"][-1] = np.round(episode["observations"][-1])
+			# !
 			fields.add_path(episode)
 		fields.finalize()
+
 
 		self.normalizer = DatasetNormalizer(fields, normalizer, path_lengths=fields['path_lengths'])
 		self.indices = self.make_indices(fields.path_lengths, horizon)
