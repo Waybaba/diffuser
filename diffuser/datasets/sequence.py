@@ -135,13 +135,24 @@ class FillActDataset(SequenceDataset):
 		- np.array
 		  A NumPy array containing valid index pairs.
 		  indices: (N*multi_step, 2)
+		  	[start, end) does not include any dones==True
 		"""
 		num_data = len(dataset["observations"])
 		dones = dataset.get("terminals", np.zeros(num_data, dtype=bool))
 		if "timeouts" in dataset: dones |= dataset["timeouts"]
 
 		valid_indices = np.where(dones == 0)[0]
-		pairs = [(i, i+j) for i in valid_indices for j in range(1, multi_step + 1) if i + j < num_data and dones[i + j] == 0]
+		
+		pairs = []
+		print("making indices ...")
+		for i in tqdm(valid_indices):
+			for j in range(1, multi_step + 1):
+				end_idx = i + j
+				if dones[end_idx]: 
+					pairs.append([i, end_idx])
+					break
+				if end_idx >= num_data: break
+				pairs.append([i, end_idx])
 		
 		return np.array(pairs)
 	
@@ -149,7 +160,7 @@ class FillActDataset(SequenceDataset):
 		start, end = self.indices[idx]
 		s = self.dataset["observations"][start]
 		s_ = self.dataset["observations"][end]
-		act = self.dataset["actions"][idx]
+		act = self.dataset["actions"][start]
 		return FillActBatch(s, s_, act)
 
 	def __len__(self):
@@ -349,7 +360,7 @@ class FillActDataModule(LightningDataModule):
 		# load and split datasets only if not loaded already
 		if not self.data_train and not self.data_val and not self.data_test:
 			assert type(list(self.hparams.train_val_test_split)) == list, "train_val_test_split should be a list"
-			self.dataset = FillActDataset(self.hparams.env, self.hparams.custom_ds_path)
+			self.dataset = FillActDataset(self.hparams.env, self.hparams.custom_ds_path, self.hparams.multi_step)
 			train_val_test_split = self.hparams.train_val_test_split \
 				if type(self.hparams.train_val_test_split[0]) != float else \
 				[int(len(self.dataset) * split) for split in self.hparams.train_val_test_split]

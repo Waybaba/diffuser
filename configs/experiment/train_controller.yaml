@@ -65,7 +65,8 @@ modelmodule:
 datamodule: 
   _target_: diffuser.datasets.FillActDataModule
   _partial_: true
-  env: "halfcheetah-medium-expert-v2"
+  env: "halfcheetah-expert-v2"
+  multi_step: 1
   custom_ds_path: null
   batch_size: 1024
   pin_memory: false

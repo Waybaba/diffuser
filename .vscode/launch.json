@@ -97,6 +97,7 @@
 			"args": [
 				"experiment=train_controller",
 				"wandb.mode=disabled",
+				"datamodule.multi_step=5",
 				// "+trainer.fast_dev_run=5",
 			],
 		},
