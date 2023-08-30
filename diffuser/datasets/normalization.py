@@ -8,6 +8,10 @@ POINTMASS_KEYS = ['observations', 'actions', 'next_observations', 'deltas']
 #--------------------------- multi-field normalizer --------------------------#
 #-----------------------------------------------------------------------------#
 
+def get_normalizer(normalizer):
+    if type(normalizer) == str: normalizer = eval(normalizer)
+    return normalizer
+
 class DatasetNormalizer:
 
     def __init__(self, dataset, normalizer, path_lengths=None):

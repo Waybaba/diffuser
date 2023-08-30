@@ -1,20 +1,135 @@
 from collections import namedtuple
 import numpy as np
 import torch
-import pdb
 from tqdm import tqdm
-
 from .preprocessing import get_preprocess_fn
 from .d4rl import load_environment, sequence_dataset
 from .normalization import DatasetNormalizer
 from .buffer import ReplayBuffer
 from scipy.interpolate import interp1d
+import gym
+import d4rl
+from torch.nn import functional as F 
+from pytorch_lightning import LightningDataModule
+from typing import Any, Dict, Optional, Tuple
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
+from torchvision.transforms import transforms
+
+
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 FillActBatch = namedtuple('FillActBatch', 's s_ act')
 
 ### dataset
+
+@torch.no_grad()
+class SequenceGPUDataset:
+	"""
+		TODO Now, we use all episode then interpolation to fixed length
+		env:
+		horizon:
+		only_start_end_episode: false for HER
+		horizon: length of the trajectory
+		normalizer: 'LimitsNormalizer' or 'StandardNormalizer'
+			LimitsNormalizer: normalize to [-1, 1]
+		preprocess_fns: []
+		seed: None
+		custom_ds_path: ""
+	"""
+	def __init__(self, env, horizon, preprocess_fns=[], only_start_end_episode=False, normalizer='LimitsNormalizer', seed=None, custom_ds_path=None):
+		assert type(env) == str, "env should be a string"
+		assert "maze" in env, "maze envs not supported, since d4rl does not provide terminal"
+		assert normalizer == "LimitsNormalizer", "only support LimitsNormalizer"
+		assert only_start_end_episode, "only support only_start_end_episode"
+
+		self.horizon = horizon
+		self.env_name = env
+		
+		### get dataset		
+		self.env = env = load_environment(env) # ! DEBUG can not use gym.make ?
+		if custom_ds_path: self.dataset = env.get_dataset(custom_ds_path)
+		else: self.dataset = env.get_dataset()
+		# self.dataset = d4rl.qlearning_dataset(env)
+		# self.dataset.update(env.get_dataset())
+
+		### pre_process
+		assert not preprocess_fns or preprocess_fns[0] == "maze2d_set_terminals"
+		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name)
+		self.dataset = self.preprocess_fn(self.dataset)
+		
+		### remove keys
+		KEYS_NEED = ["observations", "actions", "rewards", "terminals"]
+		keys_to_delete = [k for k in self.dataset.keys() if k not in KEYS_NEED]
+		for k in keys_to_delete: del self.dataset[k]
+		
+		### normalize
+		self.observation_dim = self.dataset['observations'].shape[1]
+		self.action_dim = self.dataset['actions'].shape[1]
+		from diffuser.datasets.normalization import get_normalizer
+		normalizer = get_normalizer(normalizer)
+		for k in ["observations", "actions"]:
+			self.dataset[k] = normalizer(self.dataset[k])(self.dataset[k])
+
+		### put into GPU
+		for k in self.dataset.keys():
+			self.dataset[k] = torch.tensor(self.dataset[k]).cuda()
+
+		### make indexes (all that both terminals and timeouts)
+		self.indices = self.make_indices(self.dataset)
+	
+	def make_indices(self, dataset):
+		"""
+			makes indices for sampling from dataset;
+			each index maps to a datapoint
+			(N, 2)
+			each element is (start, end)
+		"""
+		dones = dataset["terminals"]
+		starts = (~dones) & torch.cat((torch.tensor([1]).cuda(),dones[:-1])) # 0 and the previous is 1
+		ends = dones & (~torch.cat((torch.tensor([1]).cuda(),dones[:-1]))) # 1 and the previous is 0
+		starts = torch.where(starts)[0]
+		ends = torch.where(ends)[0]
+		starts = starts[:-1]
+		assert len(starts) == len(ends), "starts and ends should have the same length"
+		indices = torch.stack([starts, ends], dim=1)
+		return indices
+
+	def get_conditions(self, observations):
+		'''
+			condition on both the current observation and the last observation in the plan
+		'''
+		assert "maze" in self.env_name, "use only 0 if not maze"
+		return {
+			0: observations[0],
+			self.horizon - 1: observations[-1],
+		}
+	
+	def __getitem__(self, idx):
+		""" TODO 
+		"""
+		start, end = self.indices[idx]
+
+		observations = self.dataset["observations"][start:end]
+		actions = self.dataset["actions"][start:end]
+
+		### interpolation
+		observations = observations.T.unsqueeze(0)
+		actions = actions.T.unsqueeze(0)
+		observations = F.interpolate(observations, size=(self.horizon), mode='linear', align_corners=False)
+		actions = F.interpolate(actions, size=(self.horizon), mode='linear', align_corners=False)
+		observations = observations.squeeze(0).T
+		actions = actions.squeeze(0).T
+
+		conditions = self.get_conditions(observations)
+		trajectories = torch.cat([actions, observations], axis=-1)
+		batch = Batch(trajectories, conditions)
+		return batch
+
+	def __len__(self):
+		return len(self.indices)
+
+
 
 class SequenceDataset(torch.utils.data.Dataset):
 
@@ -44,8 +159,10 @@ class SequenceDataset(torch.utils.data.Dataset):
 		for i, episode in tqdm(enumerate(itr),total=n_episodes):
 			# ! DEBUG set start and end to nearest int
 			if len(episode["rewards"]) == 0: continue
-			episode["observations"][0] = np.round(episode["observations"][0])
-			episode["observations"][-1] = np.round(episode["observations"][-1])
+			# episode["observations"][0] = np.round(episode["observations"][0])
+			# episode["observations"][-1] = np.round(episode["observations"][-1])
+			episode["observations"][0] = 0.0
+			episode["observations"][-1] = 0.0
 			# !
 			fields.add_path(episode)
 		fields.finalize()
@@ -116,8 +233,6 @@ class FillActDataset(SequenceDataset):
 		multi_step: how many steps to skip, 1 for only the p(a|s,s'), >1 would be random sample
 		"""
 		# Create the environment
-		import gym
-		import d4rl
 		assert type(env) == str, "env should be a string"
 		assert "maze" not in env, "maze envs not supported, since d4rl does not provide terminal"
 		self.env = env = gym.make(env)
@@ -294,13 +409,6 @@ class AvgCoordinateDataset(SequenceDataset):
 
 
 ### datamodule
-from pytorch_lightning import LightningDataModule
-from typing import Any, Dict, Optional, Tuple
-import torch
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
-from torchvision.datasets import MNIST
-from torchvision.transforms import transforms
-
 
 class FillActDataModule(LightningDataModule):
 	def __init__(self, **kwargs) -> None:

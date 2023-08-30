@@ -217,7 +217,7 @@ class GaussianDiffusion(nn.Module):
     def p_losses(self, x_start, cond, t):
         noise = torch.randn_like(x_start)
         if APPLY_CONDITION == False:
-            cond = {} # ! for debug
+            cond = {} # ! DEBUG
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         x_noisy = apply_conditioning(x_noisy, cond, self.action_dim)
