@@ -3,7 +3,7 @@
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
   n_train_steps: 2000000
   n_steps_per_epoch: 10000 # so n_epochs = n_train_steps / n_steps_per_epoch
-  horizon: 384
+  horizon: 64 # ! DEBUG to 64 for efficiency
 
 runner:
   _target_: src.runner.TrainDiffuserRunner
@@ -43,9 +43,10 @@ model:
   loss_type: "l2"
   clip_denoised: true # ! ?
   predict_epsilon: false
-  action_weight: 1
-  loss_weights: null
-  loss_discount: 1
+  action_weight: 1 # ! only affect first step action
+  loss_weights: null # 
+  loss_discount: 1 # may need less weight for future steps
+  ignore_action: true # if true, only apply loss on observations
   # TODO add config for large0maze 2 in py file
 
 
@@ -66,6 +67,7 @@ trainer:
   bucket: null # TODO ? what
   n_reference: 25 # TODO ? what
   n_render_samples: 4
+  condition_noise: 0.02 # apply a small noise to condition during training to avoid overfitting
 
 
 

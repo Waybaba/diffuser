@@ -2,6 +2,7 @@ from collections import namedtuple
 import numpy as np
 import torch
 import pdb
+from tqdm import tqdm
 
 from .preprocessing import get_preprocess_fn
 from .d4rl import load_environment, sequence_dataset
@@ -19,17 +20,28 @@ class SequenceDataset(torch.utils.data.Dataset):
 
 	def __init__(self, env='hopper-medium-replay', horizon=64,
 		normalizer='LimitsNormalizer', preprocess_fns=[], max_path_length=1000,
-		max_n_episodes=100000, termination_penalty=0, use_padding=True, seed=None,custom_ds_path=None):
+		max_n_episodes=10000, termination_penalty=0, use_padding=True, seed=None,custom_ds_path=None):
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, env)
 		self.env = env = load_environment(env)
 		self.env.seed(seed)
 		self.horizon = horizon
-		self.max_path_length = max_path_length
 		self.use_padding = use_padding
 		itr = sequence_dataset(env, self.preprocess_fn, custom_ds_path=custom_ds_path)
 
-		fields = ReplayBuffer(max_n_episodes, max_path_length, termination_penalty)
-		for i, episode in enumerate(itr):
+		# ! DEBUG adjust buffer size by need
+		dataset = env.get_dataset(custom_ds_path)
+		lengths = np.where(dataset["terminals"])[0]
+		lengths = lengths - np.concatenate([[0], lengths[:-1]])
+		print(f'[ datasets ] Dataset size: {len(lengths)}')
+		print(f'[ datasets ] Episode length_max: {np.max(lengths)}')
+		n_episodes = len(lengths)
+		self.max_path_length = max_path_length = np.max(lengths)
+		# ! DEBUG
+
+		fields = ReplayBuffer(n_episodes, max_path_length, termination_penalty)
+		
+		print("\n### add path to buffer ...")
+		for i, episode in tqdm(enumerate(itr),total=n_episodes):
 			fields.add_path(episode)
 		fields.finalize()
 
@@ -93,7 +105,10 @@ class SequenceDataset(torch.utils.data.Dataset):
 		return batch
 
 class FillActDataset(SequenceDataset):
-	def __init__(self, env, custom_ds_path=None):
+	def __init__(self, env, custom_ds_path=None, multi_step=1):
+		"""
+		multi_step: how many steps to skip, 1 for only the p(a|s,s'), >1 would be random sample
+		"""
 		# Create the environment
 		import gym
 		import d4rl
@@ -104,14 +119,36 @@ class FillActDataset(SequenceDataset):
 		self.dataset.update(env.get_dataset())
 
 		### make indexes (all that both terminals and timeouts)
-		dones = self.dataset["terminals"]
-		if "timeouts" in self.dataset: dones = dones | self.dataset["timeouts"]
-		self.indices = np.argwhere(~dones).flatten()
+		self.indices = self.make_indices(self.dataset, multi_step)
+
+	def make_indices(self, dataset, multi_step):
+		"""
+		Generate indices for sampling.
+		
+		Parameters:
+		- dataset: dict
+		  The dataset containing 'observations' and 'terminals'.
+		- multi_step: int
+		  The step size for sampling.
+
+		Returns:
+		- np.array
+		  A NumPy array containing valid index pairs.
+		  indices: (N*multi_step, 2)
+		"""
+		num_data = len(dataset["observations"])
+		dones = dataset.get("terminals", np.zeros(num_data, dtype=bool))
+		if "timeouts" in dataset: dones |= dataset["timeouts"]
+
+		valid_indices = np.where(dones == 0)[0]
+		pairs = [(i, i+j) for i in valid_indices for j in range(1, multi_step + 1) if i + j < num_data and dones[i + j] == 0]
+		
+		return np.array(pairs)
 	
 	def __getitem__(self, idx):
-		idx = self.indices[idx]
-		s = self.dataset["observations"][idx]
-		s_ = self.dataset["next_observations"][idx]
+		start, end = self.indices[idx]
+		s = self.dataset["observations"][start]
+		s_ = self.dataset["observations"][end]
 		act = self.dataset["actions"][idx]
 		return FillActBatch(s, s_, act)
 

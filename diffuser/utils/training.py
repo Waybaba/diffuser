@@ -55,6 +55,7 @@ class Trainer(object):
         n_reference=8,
         bucket=None,
         task=None,
+        condition_noise=0.0,
     ):
         super().__init__()
         self.task = task
@@ -70,6 +71,7 @@ class Trainer(object):
         self.label_freq = label_freq
         self.save_parallel = save_parallel
         self.n_render_samples = n_render_samples
+        self.condition_noise = condition_noise
 
         self.batch_size = train_batch_size
         self.gradient_accumulate_every = gradient_accumulate_every
@@ -113,6 +115,19 @@ class Trainer(object):
             for i in range(self.gradient_accumulate_every):
                 batch = next(self.dataloader)
                 batch = batch_to_device(batch)
+                ### ! DEBUG apply noise to conditions
+                # batch.conditions[0]: B,obs_dim
+                # batch.conditions[1]: B,obs_dim
+                # batch.trajectories: [B,T,act_dim+obs_dim]
+                # applying shift to conditions and trajctories
+                # set all actions to 0
+                shift = torch.randn_like(batch.conditions[0]) * self.condition_noise
+                for cond_k, cond_v in batch.conditions.items():
+                    if cond_k == 0: continue
+                    batch.conditions[cond_k] = batch.conditions[cond_k] + shift
+                batch.trajectories[:,:,self.dataset.action_dim:] = batch.trajectories[:,:,self.dataset.action_dim:] + shift[:,None,:]
+                batch.trajectories[:,:,:self.dataset.action_dim] = 0.0
+                ### !
 
                 loss, infos = self.model.loss(*batch)
                 loss = loss / self.gradient_accumulate_every
@@ -232,6 +247,20 @@ class Trainer(object):
             ## get a single datapoint
             batch = self.dataloader_vis.__next__()
             conditions = to_device(batch.conditions, 'cuda:0')
+
+            ### ! DEBUG apply noise to conditions
+            # batch.conditions[0]: B,obs_dim
+            # batch.conditions[1]: B,obs_dim
+            # batch.trajectories: [B,T,act_dim+obs_dim]
+            # applying shift to conditions and trajctories
+            # set all actions to 0
+            shift = torch.randn_like(batch.conditions[0]) * self.condition_noise
+            for cond_k, cond_v in batch.conditions.items():
+                if cond_k == 0: continue
+                batch.conditions[cond_k] = batch.conditions[cond_k] + shift
+            batch.trajectories[:,:,self.dataset.action_dim:] = batch.trajectories[:,:,self.dataset.action_dim:] + shift[:,None,:]
+            batch.trajectories[:,:,:self.dataset.action_dim] = 0.0
+            ### !
 
             ## repeat each item in conditions `n_samples` times
             conditions = apply_dict(

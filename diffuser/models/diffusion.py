@@ -18,6 +18,7 @@ Sample = namedtuple('Sample', 'trajectories values chains')
 
 @torch.no_grad()
 def default_sample_fn(model, x, cond, t):
+    x = apply_conditioning(x, cond, model.action_dim) # ! DEBUG set start (and end) to target
     model_mean, _, model_log_variance = model.p_mean_variance(x=x, cond=cond, t=t)
     model_std = torch.exp(0.5 * model_log_variance)
 
@@ -48,7 +49,7 @@ APPLY_CONDITION = True # ! for debug
 class GaussianDiffusion(nn.Module):
     def __init__(self, model, horizon, observation_dim, action_dim, n_timesteps=1000,
         loss_type='l1', clip_denoised=False, predict_epsilon=True,
-        action_weight=1.0, loss_discount=1.0, loss_weights=None,
+        action_weight=1.0, loss_discount=1.0, loss_weights=None, ignore_action=None
     ):
         super().__init__()
         self.horizon = horizon
@@ -91,10 +92,11 @@ class GaussianDiffusion(nn.Module):
             (1. - alphas_cumprod_prev) * np.sqrt(alphas) / (1. - alphas_cumprod))
 
         ## get loss coefficients and initialize objective
-        loss_weights = self.get_loss_weights(action_weight, loss_discount, loss_weights)
+        assert ignore_action is not None, "ignore_action must be set"
+        loss_weights = self.get_loss_weights(action_weight, loss_discount, loss_weights, ignore_action)
         self.loss_fn = Losses[loss_type](loss_weights, self.action_dim)
 
-    def get_loss_weights(self, action_weight, discount, weights_dict):
+    def get_loss_weights(self, action_weight, discount, weights_dict, ignore_action):
         '''
             sets loss coefficients for trajectory
 
@@ -121,6 +123,8 @@ class GaussianDiffusion(nn.Module):
 
         ## manually set a0 weight
         loss_weights[0, :self.action_dim] = action_weight
+        if ignore_action:
+            loss_weights[:, :self.action_dim] = 0.0
         return loss_weights
 
     #------------------------------------------ sampling ------------------------------------------#
