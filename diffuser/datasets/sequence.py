@@ -136,6 +136,10 @@ class SequenceGPUDataset:
 		observations = observations.squeeze(0).T
 		actions = actions.squeeze(0).T
 
+		###  ! DEBUG random flip observation to make two way
+		if np.random.rand() > 0.5:
+			observations = self.flip_trajectory(observations)
+
 		conditions = self.get_conditions(observations)
 		trajectories = torch.cat([actions, observations], axis=-1)
 		batch = Batch(trajectories, conditions)
@@ -143,6 +147,22 @@ class SequenceGPUDataset:
 
 	def __len__(self):
 		return len(self.indices)
+
+	def flip_trajectory(self, observations):
+		""" make another way to observations
+		observatios: T,2
+		"""
+		start = observations[0]
+		end = observations[-1]
+		mid = (start + end) / 2
+		# find the mirror point by mid
+		observations = 2 * mid - observations
+		# reverse
+		observations = observations[::-1]
+		return observations
+
+
+
 
 
 class SequenceDataset(torch.utils.data.Dataset):
@@ -172,11 +192,11 @@ class SequenceDataset(torch.utils.data.Dataset):
 		print("\n### add path to buffer ...")
 		for i, episode in tqdm(enumerate(itr),total=n_episodes):
 			# ! DEBUG set start and end to nearest int
-			if len(episode["rewards"]) == 0: continue
-			# episode["observations"][0] = np.round(episode["observations"][0])
-			# episode["observations"][-1] = np.round(episode["observations"][-1])
-			episode["observations"][0] = 0.0
-			episode["observations"][-1] = 0.0
+			# if len(episode["rewards"]) == 0: continue
+			# # episode["observations"][0] = np.round(episode["observations"][0])
+			# # episode["observations"][-1] = np.round(episode["observations"][-1])
+			# episode["observations"][0] = 0.0
+			# episode["observations"][-1] = 0.0
 			# !
 			fields.add_path(episode)
 		fields.finalize()
