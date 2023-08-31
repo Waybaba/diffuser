@@ -14,6 +14,7 @@ from pytorch_lightning import LightningDataModule
 from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
+from diffuser.datasets.normalization import get_normalizer
 
 
 
@@ -22,6 +23,21 @@ ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 FillActBatch = namedtuple('FillActBatch', 's s_ act')
 
 ### dataset
+
+class DatasetNormalizerW:
+	def __init__(self, dataset, normalizer):
+		normalizer = get_normalizer(normalizer)
+		# self.norm_keys = list(dataset.keys())
+		self.normalizers = {}
+		for k, v in dataset.items():
+			self.normalizers[k] = normalizer(v)
+		
+	def normalize(self, x, key):
+		return self.normalizers[key].normalize(x)
+
+	def unnormalize(self, x, key):
+		return self.normalizers[key].unnormalize(x)
+		
 
 @torch.no_grad()
 class SequenceGPUDataset:
@@ -66,10 +82,9 @@ class SequenceGPUDataset:
 		### normalize
 		self.observation_dim = self.dataset['observations'].shape[1]
 		self.action_dim = self.dataset['actions'].shape[1]
-		from diffuser.datasets.normalization import get_normalizer
-		normalizer = get_normalizer(normalizer)
+		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
 		for k in ["observations", "actions"]:
-			self.dataset[k] = normalizer(self.dataset[k])(self.dataset[k])
+			self.dataset[k] = self.normalizer.normalize(self.dataset[k], k)
 
 		### put into GPU
 		for k in self.dataset.keys():
@@ -128,7 +143,6 @@ class SequenceGPUDataset:
 
 	def __len__(self):
 		return len(self.indices)
-
 
 
 class SequenceDataset(torch.utils.data.Dataset):

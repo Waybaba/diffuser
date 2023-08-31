@@ -18,7 +18,7 @@ Sample = namedtuple('Sample', 'trajectories values chains')
 
 @torch.no_grad()
 def default_sample_fn(model, x, cond, t):
-    x = apply_conditioning(x, cond, model.action_dim) # ! DEBUG set start (and end) to target
+    # x = apply_conditioning(x, cond, model.action_dim) # ! DEBUG set start (and end) to target
     model_mean, _, model_log_variance = model.p_mean_variance(x=x, cond=cond, t=t)
     model_std = torch.exp(0.5 * model_log_variance)
 
@@ -27,7 +27,7 @@ def default_sample_fn(model, x, cond, t):
     noise[t == 0] = 0
 
     # ! DEBUG set start (and end) to target
-    model_mean = apply_conditioning(model_mean, cond, model.action_dim)
+    # model_mean = apply_conditioning(model_mean, cond, model.action_dim)
 
     values = torch.zeros(len(x), device=x.device)
     return model_mean + model_std * noise, values
