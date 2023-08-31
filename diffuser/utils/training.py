@@ -122,12 +122,12 @@ class Trainer(object):
 				# batch.trajectories: [B,T,act_dim+obs_dim]
 				# applying shift to conditions and trajctories
 				# set all actions to 0
-				# shift = torch.randn_like(batch.conditions[0]) * self.condition_noise
-				# for cond_k, cond_v in batch.conditions.items():
-				#     if cond_k == 0: continue
-				#     batch.conditions[cond_k] = batch.conditions[cond_k] + shift
-				# batch.trajectories[:,:,self.dataset.action_dim:] = batch.trajectories[:,:,self.dataset.action_dim:] + shift[:,None,:]
-				# batch.trajectories[:,:,:self.dataset.action_dim] = 0.0
+				shift = torch.randn_like(batch.conditions[0]) * self.condition_noise
+				for cond_k, cond_v in batch.conditions.items():
+					if cond_k == 0: continue
+					batch.conditions[cond_k] = batch.conditions[cond_k] + shift
+				batch.trajectories[:,:,self.dataset.action_dim:] = batch.trajectories[:,:,self.dataset.action_dim:] + shift[:,None,:]
+				batch.trajectories[:,:,:self.dataset.action_dim] = 0.0
 				### !
 
 				loss, infos = self.model.loss(*batch)

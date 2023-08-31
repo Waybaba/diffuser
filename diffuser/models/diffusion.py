@@ -48,7 +48,7 @@ APPLY_CONDITION = True # ! for debug
 
 class GaussianDiffusion(nn.Module):
     def __init__(self, model, horizon, observation_dim, action_dim, n_timesteps=1000,
-        loss_type='l1', clip_denoised=False, predict_epsilon=True,
+        loss_type='l1', clip_denoised=False, predict_epsilon=True, loss_beta_weight=False,
         action_weight=1.0, loss_discount=1.0, loss_weights=None, ignore_action=None
     ):
         super().__init__()
@@ -57,6 +57,7 @@ class GaussianDiffusion(nn.Module):
         self.action_dim = action_dim
         self.transition_dim = observation_dim + action_dim
         self.model = model
+        self.loss_beta_weight = loss_beta_weight
 
         betas = cosine_beta_schedule(n_timesteps)
         alphas = 1. - betas
@@ -171,7 +172,7 @@ class GaussianDiffusion(nn.Module):
         if APPLY_CONDITION == False:
             cond = {}
         x = torch.randn(shape, device=device)
-        x = apply_conditioning(x, cond, self.action_dim) # ! DEBUG used in paper but acci deleted
+        x = apply_conditioning(x, cond, self.action_dim) # ! DEBUG used in paper but accidently deleted
 
         chain = [x] if return_chain else None
 
@@ -179,7 +180,7 @@ class GaussianDiffusion(nn.Module):
         for i in reversed(range(0, self.n_timesteps)):
             t = make_timesteps(batch_size, i, device)
             x, values = sample_fn(self, x, cond, t, **sample_kwargs)
-            x = apply_conditioning(x, cond, self.action_dim)
+            x = apply_conditioning(x, cond, self.action_dim) # ! DEBUG used in paper but accidently deleted
 
             progress.update({'t': i, 'vmin': values.min().item(), 'vmax': values.max().item()})
 
@@ -229,10 +230,18 @@ class GaussianDiffusion(nn.Module):
 
         assert noise.shape == x_recon.shape
 
-        if self.predict_epsilon:
-            loss, info = self.loss_fn(x_recon, noise)
+
+        # ! DEBUG
+        if self.loss_beta_weight: 
+            weight = extract(self.sqrt_one_minus_alphas_cumprod, t, [1]).to(x_start.device)
         else:
-            loss, info = self.loss_fn(x_recon, x_start)
+            weight = None
+        # ! DEBUG
+
+        if self.predict_epsilon:
+            loss, info = self.loss_fn(x_recon, noise, weight)
+        else:
+            loss, info = self.loss_fn(x_recon, x_start, weight)
 
         return loss, info
 

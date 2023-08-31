@@ -62,6 +62,7 @@ model:
   loss_weights: null # 
   loss_discount: 1 # may need less weight for future steps
   ignore_action: true # if true, only apply loss on observations
+  loss_beta_weight: false
   # TODO add config for large0maze 2 in py file
 
 
