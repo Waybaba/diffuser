@@ -171,6 +171,7 @@ class GaussianDiffusion(nn.Module):
         if APPLY_CONDITION == False:
             cond = {}
         x = torch.randn(shape, device=device)
+        x = apply_conditioning(x, cond, self.action_dim) # ! DEBUG used in paper but acci deleted
 
         chain = [x] if return_chain else None
 

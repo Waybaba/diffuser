@@ -85,6 +85,7 @@ class SequenceGPUDataset:
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
 		for k in ["observations", "actions"]:
 			self.dataset[k] = self.normalizer.normalize(self.dataset[k], k)
+			
 
 		### put into GPU
 		for k in self.dataset.keys():
@@ -139,6 +140,7 @@ class SequenceGPUDataset:
 		###  ! DEBUG random flip observation to make two way
 		if np.random.rand() > 0.5:
 			observations = self.flip_trajectory(observations)
+			actions = self.flip_trajectory(actions)
 
 		conditions = self.get_conditions(observations)
 		trajectories = torch.cat([actions, observations], axis=-1)
@@ -158,7 +160,7 @@ class SequenceGPUDataset:
 		# find the mirror point by mid
 		observations = 2 * mid - observations
 		# reverse
-		observations = observations[::-1]
+		observations = observations.flip(0)
 		return observations
 
 
