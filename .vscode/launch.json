@@ -22,13 +22,13 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=train_diffuser",
+				"datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// "experiment=train_diffuser_locomotion",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-open-v0_1e7.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/latest.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-100000.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000-onlytwo.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-large-v1-1000.hdf5",

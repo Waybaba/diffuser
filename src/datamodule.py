@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
 
-DEBUG = False
+DEBUG = True
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -136,13 +136,17 @@ class EnvEpisodeDataset(EnvDataset):
 			(N, 2)
 			each element is (start, end)
 		"""
-		dones = dataset["terminals"] | dataset["timeouts"]
+		dones = dataset["terminals"]
+		if "timeouts" in dataset: dones |= dataset["timeouts"]
 		dones_idxes = torch.where(dones)[0]
 		indices = []
 		start = 0
-		for i in range(len(dones_idxes)):
+		print("making indexes ...")
+		for i in tqdm(range(len(dones_idxes))):
 			if dones_idxes[i] > start: 
-				indices.append([start, dones_idxes[i]])
+				if dones_idxes[i] - start >= self.horizon:
+					indices.append([start, dones_idxes[i]])
+					if DEBUG and len(indices) > 1000: return torch.tensor(indices)
 				start = dones_idxes[i] + 1
 		indices = torch.tensor(indices)
 		return indices
