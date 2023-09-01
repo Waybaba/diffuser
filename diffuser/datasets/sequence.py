@@ -55,8 +55,8 @@ class SequenceGPUDataset:
 	"""
 	def __init__(self, env, horizon, preprocess_fns=[], only_start_end_episode=False, normalizer='LimitsNormalizer', seed=None, custom_ds_path=None):
 		assert type(env) == str, "env should be a string"
-		assert "maze" in env, "maze envs not supported, since d4rl does not provide terminal"
-		assert normalizer == "LimitsNormalizer", "only support LimitsNormalizer"
+		assert "maze" in env or "cheetah" in env, "maze envs not supported, since d4rl does not provide terminal"
+		assert normalizer in ["LimitsNormalizer", "GaussianNormalizer"], "only support LimitsNormalizer"
 		assert only_start_end_episode, "only support only_start_end_episode"
 
 		self.horizon = horizon
@@ -75,7 +75,7 @@ class SequenceGPUDataset:
 		self.dataset = self.preprocess_fn(self.dataset)
 		
 		### remove keys
-		KEYS_NEED = ["observations", "actions", "rewards", "terminals"]
+		KEYS_NEED = ["observations", "actions", "rewards", "terminals", "timeouts"]
 		keys_to_delete = [k for k in self.dataset.keys() if k not in KEYS_NEED]
 		for k in keys_to_delete: del self.dataset[k]
 		
@@ -85,8 +85,7 @@ class SequenceGPUDataset:
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
 		for k in ["observations", "actions"]:
 			self.dataset[k] = self.normalizer.normalize(self.dataset[k], k)
-			
-
+		
 		### put into GPU
 		for k in self.dataset.keys():
 			self.dataset[k] = torch.tensor(self.dataset[k]).cuda()
@@ -101,46 +100,54 @@ class SequenceGPUDataset:
 			(N, 2)
 			each element is (start, end)
 		"""
-		dones = dataset["terminals"]
-		starts = (~dones) & torch.cat((torch.tensor([1]).cuda(),dones[:-1])) # 0 and the previous is 1
-		ends = dones & (~torch.cat((torch.tensor([1]).cuda(),dones[:-1]))) # 1 and the previous is 0
-		starts = torch.where(starts)[0]
-		ends = torch.where(ends)[0]
-		starts = starts[:-1]
-		assert len(starts) == len(ends), "starts and ends should have the same length"
-		indices = torch.stack([starts, ends], dim=1)
+		dones = dataset["terminals"] | dataset["timeouts"]
+		dones_idxes = torch.where(dones)[0]
+		indices = []
+		start = 0
+		for i in range(len(dones_idxes)):
+			if dones_idxes[i] > start: 
+				indices.append([start, dones_idxes[i]])
+				start = dones_idxes[i] + 1
+		indices = torch.tensor(indices)
 		return indices
 
 	def get_conditions(self, observations):
 		'''
 			condition on both the current observation and the last observation in the plan
 		'''
-		assert "maze" in self.env_name, "use only 0 if not maze"
-		return {
-			0: observations[0],
-			self.horizon - 1: observations[-1],
-		}
+		cond = {0: observations[0]}
+		if "maze" in self.env_name:
+			cond.update({
+				self.horizon - 1: observations[-1],
+			})
+		return cond
 	
 	def __getitem__(self, idx):
-		""" TODO 
+		""" 
 		"""
 		start, end = self.indices[idx]
 
+
+		### A interpolation
+		# observations = self.dataset["observations"][start:end]
+		# actions = self.dataset["actions"][start:end]
+		# observations = observations.T.unsqueeze(0)
+		# actions = actions.T.unsqueeze(0)
+		# observations = F.interpolate(observations, size=(self.horizon), mode='linear', align_corners=False)
+		# actions = F.interpolate(actions, size=(self.horizon), mode='linear', align_corners=False)
+		# observations = observations.squeeze(0).T
+		# actions = actions.squeeze(0).T
+
+		### B random slice
+		start = np.random.randint(start, end - self.horizon + 1)
+		end = start + self.horizon
 		observations = self.dataset["observations"][start:end]
 		actions = self.dataset["actions"][start:end]
 
-		### interpolation
-		observations = observations.T.unsqueeze(0)
-		actions = actions.T.unsqueeze(0)
-		observations = F.interpolate(observations, size=(self.horizon), mode='linear', align_corners=False)
-		actions = F.interpolate(actions, size=(self.horizon), mode='linear', align_corners=False)
-		observations = observations.squeeze(0).T
-		actions = actions.squeeze(0).T
-
 		###  ! DEBUG random flip observation to make two way
-		if np.random.rand() > 0.5:
-			observations = self.flip_trajectory(observations)
-			actions = self.flip_trajectory(actions)
+		# if np.random.rand() > 0.5:
+		# 	observations = self.flip_trajectory(observations)
+		# 	actions = self.flip_trajectory(actions)
 
 		conditions = self.get_conditions(observations)
 		trajectories = torch.cat([actions, observations], axis=-1)

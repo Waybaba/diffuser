@@ -5,20 +5,18 @@ defaults:
 
 
 dataset:
-  _target_: diffuser.datasets.SequenceDataset
+  _target_: diffuser.datasets.SequenceGPUDataset
   env: "halfcheetah-medium-expert-v2"
   normalizer: GaussianNormalizer
   preprocess_fns: []
-  use_padding: true
-  max_path_length: 1000
+  # use_padding: true # ! this is removed in my implementation but is set true in the original code, may need implementation
 
 global_cfg:
   horizon: 32
 
 model:
   n_timesteps: 20
-  action_weight: 10
-  clip_denoised: false # !
+  clip_denoised: false # ! different from maze in original paper
 
 net: 
   dim_mults: [1, 4, 8]

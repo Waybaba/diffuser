@@ -88,6 +88,36 @@ class L1DistanceMetric(Metric):
         """Compute the metric."""
         return self.sum / self.count
 
+class Controller:
+    """ Include a series of controlle which can be init then give actions
+    mode:
+        str which indicate the controller type
+        1. random: random action
+        2. ss2a###{controller_run_dir}:
+            predict P(a|s,s')
+        3. mpc###{contoller_run_dir}
+            use a P(s'|s,a) model and MPC algorithm to act
+    act:
+        would take all kinds of input for all usages
+    """
+    def __init__(self, mode, *args, **kwargs):
+        self.args, self.kwargs = args, kwargs
+        self.mode = mode
+        if self.mode == "random":
+            assert "act_dim" in kwargs, "act_dim should be in kwargs"
+        else:
+            raise ValueError(f"mode {mode} not supported")
+
+    def act(self, *args, **kwargs):
+        if self.mode == "random":
+            return torch.random.randint(0, self.kwargs["act_dim"], size=(1,))
+        else:
+            raise ValueError(f"mode {self.mode} not supported")
+        
+
+
+
+
 """model wrapper"""
 class ModelWrapperBase(nn.Module):
     """ 

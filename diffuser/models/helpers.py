@@ -164,7 +164,7 @@ class WeightedLoss(nn.Module):
         loss = self._loss(pred, targ)
         # ! DEBUG add beta weight adjust
         if weight is not None:
-            loss = weight.unsqueeze(-1) * loss
+            loss = torch.einsum('i, i... -> i...', weight, loss)
         #
         weighted_loss = (loss * self.weights).mean()
         a0_loss = (loss[:, 0, :self.action_dim] / self.weights[0, :self.action_dim]).mean()

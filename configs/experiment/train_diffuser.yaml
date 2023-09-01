@@ -62,7 +62,7 @@ model:
   loss_weights: null # 
   loss_discount: 1 # may need less weight for future steps
   ignore_action: true # if true, only apply loss on observations
-  loss_beta_weight: false
+  loss_beta_weight: true
   # TODO add config for large0maze 2 in py file
 
 
@@ -84,7 +84,7 @@ trainer:
   n_reference: 25 # TODO ? what
   n_render_samples: 4
   condition_noise: 0.02 # apply a small noise to condition during training to avoid overfitting
-
+  eval_controller_dir: null # TODO
 
 
 
