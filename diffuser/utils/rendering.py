@@ -231,6 +231,62 @@ class MuJoCoRenderer:
     def __call__(self, *args, **kwargs):
         return self.renders(*args, **kwargs)
 
+    def episode2img(self, episodes, cols=1, path=None):
+        """ rendering episode to img
+        if multiple, render in grid format
+        # Args:
+            episode: (B, T, obs_dim) or (T, obs_dim)
+            cols: used when rendering multiple episodes
+        # Returns:
+            img: (H, W, C)
+        """
+        assert path is None, "path is not None"
+        if len(episodes.shape) == 3: 
+            return self.composite(path, episodes, conditions={}, dim=(1024, 256))
+        elif len(episodes.shape) == 2:
+            render_kwargs = {
+                'trackbodyid': 2,
+                'distance': 10,
+                'lookat': [5, 2, 0.5],
+                'elevation': 0
+            }
+            return self.renders(to_np(path), dim=(1024, 256), partial=True, qvel=True, render_kwargs=render_kwargs)
+        else:
+            raise ValueError("episode2img: episodes should be 2 or 3 dim")
+
+    def chain2video(self, chains, cols=1, path=None):
+        """
+        # Args:
+            chains: (B, diff_T, T, obs_dim) or (diff_T, T, obs_dim)
+            cols: used when rendering multiple chains
+        # Implementation:
+            call episode2img then make gif
+        # Returns:
+            video: (T, H, W, C)
+        """
+        assert path is None, "path is not None"
+        INTERVAL = 0.1
+        chain_res = []
+        for bt_idx in range(chains.shape[0]):
+            chain_b = []
+            if isinstance(INTERVAL, float): INTERVAL = int(INTERVAL*len(chains[0]))
+            for t in range(0, len(chains[0]), INTERVAL):
+                chain_b.append(self.episode2img(None, chains[:,t]))
+            chain_b = np.stack(chain_b, axis=0) # (T_n, H, W, 3)
+            chain_b = chain_b.transpose(0,3,1,2)
+            chain_res.append(chain_b)
+            T, Ch, H, W = chain_b.shape
+            # savepath = os.path.join(self.logdir, f'sample-{self.step}-{i}.gif')
+            frames = []
+            for t in range(T):
+                frame = chain_b[t].transpose(1, 2, 0)
+                frames.append(frame)
+            # if path: imageio.mimsave(path, frames, 'GIF', duration=2.0/len(frames))
+        return chain_res
+        
+
+
+
 #-----------------------------------------------------------------------------#
 #---------------------------------- rollouts ---------------------------------#
 #-----------------------------------------------------------------------------#

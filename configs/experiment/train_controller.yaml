@@ -63,19 +63,23 @@ modelmodule:
 
 
 datamodule: 
-  _target_: diffuser.datasets.FillActDataModule
+  _target_: src.datamodule.EnvDatamodule
   _partial_: true
-  env: "halfcheetah-expert-v2"
-  multi_step: 1
-  custom_ds_path: null
   batch_size: 1024
   pin_memory: false
   num_workers: ${oc.decode:${oc.env:NUM_WORKERS}}
   train_val_test_split: [0.9,0.05,0.05]
-  renderer: 
-    _target_: diffuser.utils.rendering.MuJoCoRenderer
+  dataset:
+    _target_: src.datamodule.EnvTransitionDataset
     _partial_: true
-    env: ${datamodule.env}
+    env: "halfcheetah-expert-v2"
+    multi_step: 5 # for transition
+    custom_ds_path: null
+    preprocess_fns: []
+    normalizer: LimitsNormalizer
+    gpu: true
+    seed: ${seed}
+
 
 
 trainer:

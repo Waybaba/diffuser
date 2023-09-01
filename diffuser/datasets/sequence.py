@@ -21,8 +21,7 @@ from diffuser.datasets.normalization import get_normalizer
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 FillActBatch = namedtuple('FillActBatch', 's s_ act')
-
-### dataset
+### functions
 
 class DatasetNormalizerW:
 	def __init__(self, dataset, normalizer):
@@ -39,7 +38,8 @@ class DatasetNormalizerW:
 		return self.normalizers[key].unnormalize(x)
 		
 
-@torch.no_grad()
+### dataset
+
 class SequenceGPUDataset:
 	"""
 		TODO Now, we use all episode then interpolation to fixed length
@@ -169,10 +169,6 @@ class SequenceGPUDataset:
 		# reverse
 		observations = observations.flip(0)
 		return observations
-
-
-
-
 
 class SequenceDataset(torch.utils.data.Dataset):
 

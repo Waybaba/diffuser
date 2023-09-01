@@ -10,6 +10,7 @@ from tqdm import tqdm
 import numpy as np
 import wandb
 from torch.optim import RMSprop
+import inspect 
 
 """functions"""
 def collect_parameters(model, set="all"):
@@ -115,7 +116,7 @@ class Controller:
             raise ValueError(f"mode {self.mode} not supported")
         
 
-
+import functools
 
 
 """model wrapper"""
@@ -228,6 +229,34 @@ class EnvModelWrapper(ModelWrapperBase):
     def select_param_group(self, name):
         raise NotImplementedError
 
+class DiffusionWrapper(ModelWrapperBase):
+    def __init__(self, dynamic_cfg, **kwargs):
+        self.torch_module_init()
+        self.net = kwargs["net"](
+            transition_dim=dynamic_cfg["obs_dim"] + dynamic_cfg["act_dim"],
+            cond_dim=dynamic_cfg["obs_dim"],
+        )
+        self.diffusion = kwargs["diffusion"](
+            model=self.net,
+            observation_dim=dynamic_cfg["obs_dim"],
+            action_dim=dynamic_cfg["act_dim"],
+        )
+    
+    # def forward(self, x):
+    #     if len(x.shape) == 1: 
+    #         x = x.unsqueeze(0)
+    #         return self.diffusion(x).squeeze(0)
+    #     return self.diffusion(x)
+
+    def forward(self, *args, **kwargs):
+        self.diffusion.loss(*args, **kwargs)
+    
+    def loss(self, *args, **kwargs):
+        self.diffusion.loss(*args, **kwargs)
+
+    def select_param_group(self, name):
+        raise NotImplementedError
+
 """plightning modelmodule"""
 
 class DefaultModule(LightningModule):
@@ -253,23 +282,21 @@ class DefaultModule(LightningModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False)
-
-       
+        self.save_hyperparameters(logger=False, ignore=["dataset_info"])
 
         # setup dynamic config
-        self.dynamic_cfg = dynamic_cfg = self.init_dynamic_cfg(self.hparams.dataset_info)
+        self.dynamic_cfg = dynamic_cfg = self.init_dynamic_cfg(kwargs["dataset_info"])
         self.net = self.hparams.net(dynamic_cfg = dynamic_cfg)
         assert isinstance(self.net, ModelWrapperBase), "net should always be a ModelWrapperBase, check src.models.default_model.ModelWrapperBase"
 
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
         self.train_acc = self.hparams.metric_func().cpu()
-        self.val_acc = nn.ModuleList([self.hparams.metric_func().cpu() for _ in self.hparams.dataset_info["data_val"]])
-        self.test_acc = nn.ModuleList([self.hparams.metric_func().cpu() for _ in self.hparams.dataset_info["data_test"]])
+        self.val_acc = nn.ModuleList([self.hparams.metric_func().cpu() for _ in dynamic_cfg["data_val"]])
+        self.test_acc = nn.ModuleList([self.hparams.metric_func().cpu() for _ in dynamic_cfg["data_test"]])
         
         # for logging best so far validation accuracy
-        self.val_acc_best = nn.ModuleList([MinMetric()for _ in self.hparams.dataset_info["data_val"]])
+        self.val_acc_best = nn.ModuleList([MinMetric()for _ in dynamic_cfg["data_val"]])
         self.val_acc_best_mean = MinMetric()
 
     def on_train_start(self):
@@ -510,24 +537,25 @@ class FillActModelModule(DefaultModule):
     def validation_epoch_end(self, outputs):
         assert self.net.training == False, "net should be in eval mode"
         LOG_PREFIX = "val_ep_end"
+        STEPS = 40
         super().validation_epoch_end(outputs)
-        ### render a plot
-        # get ref episode from dataset (T, obs_dim)
-        episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=10)
-        # rollout to get [(T, obs_dim)]
+        
+        ### rollout -> [(T, obs_dim)]
+        episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=4)
         episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net) for ep_ref in episodes_ref]
-        # metric
+        
+        ### cals metric
         metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
-        for k, v in metrics.items():
-            self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
-        # render
+        for k, v in metrics.items(): self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
+        
+        ### render
         states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
         states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
         self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
-            self.render_composite(states_ref[:4], self.dynamic_cfg["renderer"](),steps=80)
+            self.dynamic_cfg["renderer"].episode2img(states_ref[:4,np.arange(STEPS)])
         )])
         self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
-            self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
+            self.dynamic_cfg["renderer"].episode2img(states_rollout[:4,np.arange(STEPS)])
         )])
     
     def get_ref_episodes(self, env, ep_num=10):
@@ -720,3 +748,48 @@ class EnvModelModule(FillActModelModule):
             if done: break
 
         return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
+
+
+class DiffuserModule(DefaultModule):
+    def step(self, batch: Any):
+        """ process the batch from dataloader and return the res_batch
+        input: `batch dict` from dataloader
+        output: `res_batch` dict with "x", "y", "info", "outputs", "preds", "loss"
+        ps. note that the calcultion of "outputs", "preds", "loss" could
+            be task-specific, so we need to implement it in the subclass
+        """
+        # s, s_, act
+        loss = self.net(torch.cat([batch.s, batch.act], dim=-1))
+        # ! TODO
+        res_batch = {
+            "outputs": batch.trajectories, # TODO
+            "preds": batch.trajectories, # TODO
+            "y": batch.trajectories, # TODO
+            "loss": None # TODO
+        }
+        return res_batch
+
+    def validation_epoch_end(self, outputs):
+        assert self.net.training == False, "net should be in eval mode"
+        LOG_PREFIX = "val_ep_end"
+        super().validation_epoch_end(outputs)
+        # ! TODO generate and log
+
+        ### render a plot
+        # # get ref episode from dataset (T, obs_dim)
+        # episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=10)
+        # # rollout to get [(T, obs_dim)]
+        # episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net) for ep_ref in episodes_ref]
+        # # metric
+        # metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
+        # for k, v in metrics.items():
+        #     self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
+        # # render
+        # states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
+        # states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
+        # self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
+        #     self.render_composite(states_ref[:4], self.dynamic_cfg["renderer"](),steps=80)
+        # )])
+        # self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
+        #     self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
+        # )])

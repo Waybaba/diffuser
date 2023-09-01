@@ -36,7 +36,23 @@ class TrainDiffuserRunner:
         print("Running default runner")
         self.cfg = cfg
 
-        ### init
+        self.datamodule = cfg.datamodule()
+        self.modelmodule = cfg.modelmodule(
+            dataset_info=self.datamodule.info,
+        )
+        trainer = cfg.trainer(
+            callbacks=[v for k,v in cfg.callbacks.items()],
+            logger=[v for k,v in cfg.logger.items()],
+        )
+        trainer.fit(
+            model=self.modelmodule,
+            datamodule=self.datamodule,
+        )
+        print("Finished!")
+        exit()
+
+
+        ### ! TODO remove
         dataset = cfg.dataset()
         render = cfg.render(dataset.env.name)
         

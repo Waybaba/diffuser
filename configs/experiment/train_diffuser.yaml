@@ -1,4 +1,8 @@
 # @package _global_
+defaults:
+  - /callbacks: default.yaml
+  - /logger: wandb.yaml
+
 
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
   n_train_steps: 2000000
@@ -8,6 +12,83 @@ global_cfg: # would be passed to actor, critic1, critic2, policy, env
 runner:
   _target_: src.runner.TrainDiffuserRunner
   _partial_: true
+
+
+modelmodule:
+  _target_: src.modelmodule.DiffuserModule
+  _partial_: true
+  net:
+    _target_: src.modelmodule.DiffusionWrapper
+    _partial_: true
+    diffusion:
+      _target_: diffuser.models.GaussianDiffusion
+      _partial_: true
+      horizon: ${global_cfg.horizon}
+      n_timesteps: 256 # n_diffusion_steps in source code
+      loss_type: "l2"
+      clip_denoised: true # ! ?
+      predict_epsilon: false
+      action_weight: 1 # ! only affect first step action
+      loss_weights: null # 
+      loss_discount: 1 # may need less weight for future steps
+      ignore_action: true # if true, only apply loss on observations
+      loss_beta_weight: true
+      # observation_dim:
+      # action_dim:
+    net: 
+      # _target_: src.modelmodule.TemporalUnetWrapper # TODO need what params
+      # _partial_: true
+      # net:
+      _target_: diffuser.models.temporal.TemporalUnet
+      _partial_: true
+      horizon: ${global_cfg.horizon}
+      # transition_dim: 
+      # cond_dim: 
+      dim: 32
+      dim_mults: [1, 4, 8]
+      attention: false
+  metric_func:
+    _target_: src.modelmodule.L1DistanceMetric
+    _partial_: true
+  loss_func:
+    _target_: torch.nn.L1Loss
+    _partial_: true
+  optimizations:
+    - param_target: all
+      optimizer: 
+        _target_: torch.optim.Adam
+        _partial_: true
+        lr: 0.001
+        weight_decay: 0.0
+        betas: [0.9, 0.999] 
+      lr_scheduler_config:
+        scheduler:
+          _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+          _partial_: true
+          T_max: ${trainer.max_epochs}
+          eta_min: 1e-5
+        interval: epoch
+        frequency: 1
+  optimization_first: ${modelmodule.optimizations.0} # for wandb log
+
+
+datamodule: 
+  _target_: src.datamodule.EnvDatamodule
+  _partial_: true
+  batch_size: 1024
+  pin_memory: false
+  num_workers: ${oc.decode:${oc.env:NUM_WORKERS}}
+  train_val_test_split: [0.9,0.05,0.05]
+  dataset:
+    _target_: src.datamodule.EnvEpisodeDataset
+    _partial_: true
+    env: "halfcheetah-expert-v2"
+    multi_step: 5 # for transition
+    custom_ds_path: null
+    preprocess_fns: []
+    normalizer: LimitsNormalizer
+    gpu: true
+    seed: ${seed}
 
 dataset:
   _target_: diffuser.datasets.SequenceGPUDataset
@@ -67,26 +148,41 @@ model:
 
 
 
+# trainer:
+#   _target_: diffuser.utils.Trainer
+#   task: train_diffuser
+#   _partial_: true
+#   train_batch_size: 32
+#   train_lr: 2e-4
+#   gradient_accumulate_every: 2
+#   ema_decay: 0.995
+#   sample_freq: 1000 # ! for x step, render generated samples, turn to 1e5 for cloud based!
+#   save_freq: 100000 # for x step, save model
+#   label_freq: 10000 # not important, just use for name. e.g. 12234 -> 12000
+#   save_parallel: false
+#   results_folder: ${output_dir} # TODO
+#   bucket: null # TODO ? what
+#   n_reference: 25 # TODO ? what
+#   n_render_samples: 4
+#   condition_noise: 0.02 # apply a small noise to condition during training to avoid overfitting
+#   eval_controller_dir: null # TODO
+
 trainer:
-  _target_: diffuser.utils.Trainer
-  task: train_diffuser
-  _partial_: true
-  train_batch_size: 32
-  train_lr: 2e-4
-  gradient_accumulate_every: 2
-  ema_decay: 0.995
-  sample_freq: 1000 # ! for x step, render generated samples, turn to 1e5 for cloud based!
-  save_freq: 100000 # for x step, save model
-  label_freq: 10000 # not important, just use for name. e.g. 12234 -> 12000
-  save_parallel: false
-  results_folder: ${output_dir} # TODO
-  bucket: null # TODO ? what
-  n_reference: 25 # TODO ? what
-  n_render_samples: 4
-  condition_noise: 0.02 # apply a small noise to condition during training to avoid overfitting
-  eval_controller_dir: null # TODO
-
-
+    _target_: "pytorch_lightning.Trainer"
+    _partial_: true
+    default_root_dir: ${output_dir}
+    # callbacks: ${callbacks}
+    # logger: ${logger}
+    min_epochs: null
+    max_epochs: 10
+    accelerator: "gpu"
+    # devices: 1
+    # move_metrics_to_cpu: true
+    deterministic: false
+    # max_steps: 40000.0
+    log_every_n_steps: 100
+    num_sanity_val_steps: 2
+    check_val_every_n_epoch: 1
 
 # common - for all tasks (task_name, tags, output_dir, device)
 algorithm_name: "DefaultAlgName"

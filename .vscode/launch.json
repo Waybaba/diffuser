@@ -21,10 +21,10 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				// "experiment=train_diffuser",
-				"experiment=train_diffuser_locomotion",
-				"trainer.save_freq=10000", // save model and rollout
-				"trainer.sample_freq=1000", // sample and redering
+				"experiment=train_diffuser",
+				// "experiment=train_diffuser_locomotion",
+				// "trainer.save_freq=10000", // save model and rollout
+				// "trainer.sample_freq=1000", // sample and redering
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-open-v0_1e7.hdf5",
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/latest.hdf5",
@@ -97,7 +97,7 @@
 			"args": [
 				"experiment=train_controller",
 				"wandb.mode=disabled",
-				"datamodule.multi_step=5",
+				"datamodule.dataset.multi_step=5",
 				// "+trainer.fast_dev_run=5",
 			],
 		},
