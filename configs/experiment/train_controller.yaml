@@ -76,7 +76,7 @@ datamodule:
     multi_step: 5 # for transition
     custom_ds_path: null
     preprocess_fns: []
-    normalizer: LimitsNormalizer
+    normalizer: LimitsNormalizer # # ! TODO change for mujoco
     gpu: true
     seed: ${seed}
 

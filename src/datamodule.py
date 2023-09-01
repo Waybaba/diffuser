@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
 
-DEBUG = True
+DEBUG = False
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -126,6 +126,7 @@ class EnvEpisodeDataset(EnvDataset):
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
+		self.horizon = kwargs["horizon"]
 		self.indices = self.make_indices(self.dataset)
 
 	def make_indices(self, dataset):
@@ -186,7 +187,7 @@ class EnvEpisodeDataset(EnvDataset):
 
 		conditions = self.get_conditions(observations)
 		trajectories = torch.cat([actions, observations], axis=-1)
-		batch = TransitionBatch(trajectories, conditions)
+		batch = EpisodeBatch(trajectories, conditions)
 		return batch
 
 	def flip_trajectory(self, observations):

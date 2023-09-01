@@ -83,10 +83,10 @@ datamodule:
     _target_: src.datamodule.EnvEpisodeDataset
     _partial_: true
     env: "halfcheetah-expert-v2"
-    multi_step: 5 # for transition
+    horizon: ${global_cfg.horizon}
     custom_ds_path: null
     preprocess_fns: []
-    normalizer: LimitsNormalizer
+    normalizer: LimitsNormalizer # ! TODO change
     gpu: true
     seed: ${seed}
 
