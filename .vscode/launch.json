@@ -22,7 +22,7 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=train_diffuser",
-				"datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
+				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// "experiment=train_diffuser_locomotion",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
@@ -34,7 +34,7 @@
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-large-v1-1000.hdf5",
 				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
-				"wandb.mode=disabled",
+				// "wandb.mode=disabled",
 				// "env.delay=0",
 
 			],

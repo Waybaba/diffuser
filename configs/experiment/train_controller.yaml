@@ -68,15 +68,15 @@ datamodule:
   batch_size: 1024
   pin_memory: false
   num_workers: ${oc.decode:${oc.env:NUM_WORKERS}}
-  train_val_test_split: [0.9,0.05,0.05]
+  train_val_test_split: [0.95,0.025,0.025]
   dataset:
     _target_: src.datamodule.EnvTransitionDataset
     _partial_: true
     env: "halfcheetah-expert-v2"
-    multi_step: 5 # for transition
+    multi_step: 5 # ! only for transition dataset
     custom_ds_path: null
-    preprocess_fns: []
-    normalizer: LimitsNormalizer # # ! TODO change for mujoco
+    preprocess_fns: by_env
+    normalizer: by_env
     gpu: true
     seed: ${seed}
 

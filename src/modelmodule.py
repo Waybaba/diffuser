@@ -15,6 +15,7 @@ import inspect
 import einops
 from diffuser.utils.arrays import batch_to_device, to_np, to_device, apply_dict
 from src.datamodule import EpisodeBatch
+import random
 
 
 """functions"""
@@ -454,7 +455,7 @@ class DefaultModule(LightningModule):
 
 	@property
 	def wandb(self):
-		for lg in self.loggers: 
+		for lg in self.loggers:
 			if "wandb" in lg.__module__:
 				return lg
 		raise ValueError("No wandb logger found")
@@ -557,10 +558,10 @@ class FillActModelModule(DefaultModule):
 		states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
 		self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
-			self.dynamic_cfg["renderer"].episode2img(states_ref[:4,np.arange(STEPS)])
+			self.dynamic_cfg["renderer"].episodes2img(states_ref[:4,np.arange(STEPS)])
 		)])
 		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
-			self.dynamic_cfg["renderer"].episode2img(states_rollout[:4,np.arange(STEPS)])
+			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,np.arange(STEPS)])
 		)])
 	
 	def get_ref_episodes(self, env, ep_num=10):
@@ -754,7 +755,6 @@ class EnvModelModule(FillActModelModule):
 
 		return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
 
-
 class DiffuserModule(DefaultModule):
 	def step(self, batch: Any):
 		""" process the batch from dataloader and return the res_batch
@@ -776,13 +776,17 @@ class DiffuserModule(DefaultModule):
 	def validation_epoch_end(self, outputs):
 		assert self.net.training == False, "net should be in eval mode"
 		LOG_PREFIX = "val_ep_end"
-		### render a plot
+		### get render data # TODO spilt well
 		img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
+
+		### log
 		to_log = {}
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb.Video(_) for _ in chain_samples]
-		to_log["samples"] = [wandb.Image(img_) for img_ in img_samples]
-		self.log(to_log, on_epoch=True, prog_bar=True)
+		to_log["samples"] = [wandb.Image(_) for _ in img_samples]
+		wandb.log({
+			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
+		}, commit=False)
 		super().validation_epoch_end(outputs)
 
 	def render_samples(self):
@@ -799,8 +803,8 @@ class DiffuserModule(DefaultModule):
 				...
 				$UOURDIR/xxx/sample-{learning_step}-{batch_size-1}.png
 		'''
-		N_SAMPLES = 4
-		batch_size = 2
+		batch_size = 1
+		N_SAMPLES = 4 # would have same condition, rendered in one img
 		img_res = []
 		chain_res = []
 		dataset = self.dynamic_cfg["data_val"][0]
@@ -819,7 +823,7 @@ class DiffuserModule(DefaultModule):
 		for i in range(batch_size):
 			
 			## get a single datapoint
-			batch = [dataset[i*N_SAMPLES+s_i] for s_i in range(N_SAMPLES)]
+			batch = [dataset[random.randint(0, len(dataset)-1)]]
 			# stack
 			batch = recursive_collate(batch)
 			batch = EpisodeBatch(*batch)
@@ -850,11 +854,11 @@ class DiffuserModule(DefaultModule):
 			## [ n_samples x horizon x (action_dim + observation_dim) ]
 			samples = self.net(conditions, return_chain=True) # ! ADD EMA in paper
 			trajectories = to_np(samples.trajectories) # (n_samples, T, act_dim+obs_dim)
-			chains = to_np(samples.chains) # (n_samples, horizon, T, act_dim+obs_dim)
+			chains = to_np(samples.chains) # (n_samples, diffusion_T, T, act_dim+obs_dim)
 
 			## [ n_samples x horizon x observation_dim ]
-			normed_observations = trajectories[:, :, self.dataset.action_dim:] # (n_samples, T, obs_dim)
-			normed_chains = chains[:, :, :, self.dataset.action_dim:] # (n_samples, horizon, T, obs_dim)
+			normed_observations = trajectories[:, :, self.dynamic_cfg["act_dim"]:] # (n_samples, T, obs_dim)
+			normed_chains = chains[:, :, :, self.dynamic_cfg["act_dim"]:] # (n_samples, horizon, T, obs_dim)
 
 			# [ 1 x 1 x observation_dim ]
 			normed_conditions = to_np(batch.conditions[0])[:,None]
@@ -865,14 +869,17 @@ class DiffuserModule(DefaultModule):
 				normed_observations
 			], axis=1)
 
-			## [ n_samples x (horizon + 1) x observation_dim ]
-			observations = dataset.normalizer.unnormalize(normed_observations, 'observations')
-			chains = dataset.normalizer.unnormalize(normed_chains, 'observations')
+			## [ n_samples x (diffusion_T) x horizon + 1 x observation_dim ]
+			observations = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_observations, 'observations') # [ n_samples x horizon x observation_dim ]
+			chains = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_chains, 'observations') # [ n_samples x (diffusion_T) x horizon x observation_dim ]
 
 			## render sample
-			img_res.append(self.renderer.episodes2img(observations))
+			img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations))
 
 			## render chains
-			chain_res.append(self.renderer.chains2video(chain_res))
+			chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains))
 
 		return img_res, None if len(chain_res) == 0 else chain_res
+
+	def forward(self, cond=None):
+		raise NotImplementedError("forward is not implemented in DiffuserModule")

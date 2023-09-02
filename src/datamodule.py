@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
 
-DEBUG = True
+DEBUG = False
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -38,6 +38,7 @@ class DatasetNormalizerW:
 
 class EnvDataset:
 	""" A common dr4l dataset API
+		! TODO use padding
 		Common process:
 			normalization
 			into GPU
@@ -77,7 +78,7 @@ class EnvDataset:
 		):
 		assert type(env) == str, "env should be a string"
 		assert "maze" in env or "cheetah" in env, "maze envs not supported, since d4rl does not provide terminal"
-		assert normalizer in ["LimitsNormalizer", "GaussianNormalizer"], "only support LimitsNormalizer"
+		# assert normalizer in ["LimitsNormalizer", "GaussianNormalizer"], "only support LimitsNormalizer"
 
 		### get dataset
 		self.env_name = env
@@ -89,6 +90,9 @@ class EnvDataset:
 		# self.dataset.update(env.get_dataset())
 
 		### pre_process
+		assert preprocess_fns == "by_env", "only support by_env"
+		if "maze" in self.env_name: preprocess_fns = ["maze2d_set_terminals"]
+		elif "cheetah" in self.env_name: preprocess_fns = []
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name) # TOODO do not use original function
 		self.dataset = self.preprocess_fn(self.dataset)
 		
@@ -98,6 +102,9 @@ class EnvDataset:
 		for k in keys_to_delete: del self.dataset[k]
 		
 		### normalize
+		assert normalizer == "by_env", "only support by_env"
+		if "maze" in self.env_name: normalizer = "LimitsNormalizer"
+		elif "cheetah" in self.env_name: normalizer = "GaussianNormalizer"
 		self.observation_dim = self.dataset['observations'].shape[1]
 		self.action_dim = self.dataset['actions'].shape[1]
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
@@ -111,7 +118,7 @@ class EnvDataset:
 		
 		### set renderer
 		from diffuser.utils.rendering import MuJoCoRenderer
-		from diffuser.utils.rendering_maze2d import Maze2dRenderer
+		from diffuser.utils.rendering import Maze2dRenderer
 		if "maze" in self.env_name:
 			self.renderer = Maze2dRenderer(self.env_name)
 		elif "cheetah" in self.env_name:
