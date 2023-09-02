@@ -134,6 +134,7 @@ class EnvEpisodeDataset(EnvDataset):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.horizon = kwargs["horizon"]
+		self.kwargs = kwargs
 		self.indices = self.make_indices(self.dataset)
 
 	def make_indices(self, dataset):
@@ -143,20 +144,45 @@ class EnvEpisodeDataset(EnvDataset):
 			(N, 2)
 			each element is (start, end)
 		"""
-		dones = dataset["terminals"]
-		if "timeouts" in dataset: dones |= dataset["timeouts"]
-		dones_idxes = torch.where(dones)[0]
-		indices = []
-		start = 0
-		print("making indexes ...")
-		for i in tqdm(range(len(dones_idxes))):
-			if dones_idxes[i] > start: 
-				if dones_idxes[i] - start >= self.horizon:
-					indices.append([start, dones_idxes[i]])
-					if DEBUG and len(indices) > 1000: return torch.tensor(indices)
-				start = dones_idxes[i] + 1
-		indices = torch.tensor(indices)
-		return indices
+		if self.kwargs["mode"] == "default":
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			indices = []
+			start = 0
+			print("making indexes ...")
+			for i in tqdm(range(len(dones_idxes))):
+				if dones_idxes[i] > start: 
+					if dones_idxes[i] - start >= self.horizon:
+						indices.append([start, dones_idxes[i]])
+						if DEBUG and len(indices) > 1000: return torch.tensor(indices)
+					start = dones_idxes[i] + 1
+			indices = torch.tensor(indices)
+			return indices
+		elif self.kwargs["mode"].startswith("multi_step"):
+			""" make indices with different values of interval
+			for each episode, 
+			[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			samples the ones 
+			indices: [(start, interval)]
+				e.g. [(0, 2)] means sequence [0, 2, 4, 6, ..., 2*(horizon-1)]
+			ps. need to make sure intervals are balanced
+			"""
+			indices = []
+			mode, multi_step = self.kwargs["mode"].split("#")
+			multi_step = int(multi_step)
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			start = 0
+			max_gap = multi_step * self.horizon
+			for start in tqdm(range(0, len(dones) - max_gap)):
+				for inter in range(1, int(multi_step) + 1):
+					indices.append([start, start + self.horizon * inter, inter])
+			indices = torch.tensor(indices)
+			return indices
+		else:
+			raise NotImplementedError("mode not supported")
 
 	def get_conditions(self, observations):
 		'''
@@ -172,33 +198,30 @@ class EnvEpisodeDataset(EnvDataset):
 	def __getitem__(self, idx):
 		""" 
 		"""
-		start, end = self.indices[idx]
+		if self.kwargs["mode"] == "default":
+			### B random slice
+			start, end = self.indices[idx]
+			start = np.random.randint(start, end - self.horizon + 1)
+			end = start + self.horizon
+			observations = self.dataset["observations"][start:end]
+			actions = self.dataset["actions"][start:end]
 
+			###  ! DEBUG random flip observation to make two way
+			# if np.random.rand() > 0.5:
+			# 	observations = self.flip_trajectory(observations)
+			# 	actions = self.flip_trajectory(actions)
 
-		### A interpolation
-		# observations = self.dataset["observations"][start:end]
-		# actions = self.dataset["actions"][start:end]
-		# observations = observations.T.unsqueeze(0)
-		# actions = actions.T.unsqueeze(0)
-		# observations = F.interpolate(observations, size=(self.horizon), mode='linear', align_corners=False)
-		# actions = F.interpolate(actions, size=(self.horizon), mode='linear', align_corners=False)
-		# observations = observations.squeeze(0).T
-		# actions = actions.squeeze(0).T
+			conditions = self.get_conditions(observations)
+			trajectories = torch.cat([actions, observations], axis=-1)
+			batch = EpisodeBatch(trajectories, conditions)
+		elif self.kwargs["mode"].startswith("multi_step"):
+			start, end, inter = self.indices[idx]
+			observations = self.dataset["observations"][start:end:inter]
+			actions = self.dataset["actions"][start:end:inter]
+			conditions = self.get_conditions(observations)
+			trajectories = torch.cat([actions, observations], axis=-1)
+			batch = EpisodeBatch(trajectories, conditions)
 
-		### B random slice
-		start = np.random.randint(start, end - self.horizon + 1)
-		end = start + self.horizon
-		observations = self.dataset["observations"][start:end]
-		actions = self.dataset["actions"][start:end]
-
-		###  ! DEBUG random flip observation to make two way
-		# if np.random.rand() > 0.5:
-		# 	observations = self.flip_trajectory(observations)
-		# 	actions = self.flip_trajectory(actions)
-
-		conditions = self.get_conditions(observations)
-		trajectories = torch.cat([actions, observations], axis=-1)
-		batch = EpisodeBatch(trajectories, conditions)
 		return batch
 
 	def flip_trajectory(self, observations):

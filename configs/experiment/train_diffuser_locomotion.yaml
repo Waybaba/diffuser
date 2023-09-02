@@ -3,23 +3,18 @@
 defaults:
   - train_diffuser.yaml
 
-
-dataset:
-  _target_: diffuser.datasets.SequenceGPUDataset
-  env: "halfcheetah-medium-expert-v2"
-  normalizer: GaussianNormalizer
-  preprocess_fns: []
-  # use_padding: true # ! this is removed in my implementation but is set true in the original code, may need implementation
-
 global_cfg:
   horizon: 32
 
-model:
-  n_timesteps: 20
-  clip_denoised: false # ! different from maze in original paper
+datamodule:
+  dataset:
+    env: halfcheetah-medium-expert-v2
+    mode: default # ! multi_step#{step_num}, default
 
-net: 
-  dim_mults: [1, 4, 8]
-
-render:
-  _target_: diffuser.utils.rendering.MuJoCoRenderer
+modelmodule:
+  net:
+    diffusion:
+      n_timesteps: 20
+      # clip_denoised: true # ! different from maze in original paper
+    net: 
+      dim_mults: [1, 2, 4, 8]

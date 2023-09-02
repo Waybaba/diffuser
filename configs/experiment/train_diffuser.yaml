@@ -7,7 +7,8 @@ defaults:
 global_cfg: # would be passed to actor, critic1, critic2, policy, env
   # n_train_steps: 2000000
   # n_steps_per_epoch: 10000 # so n_epochs = n_train_steps / n_steps_per_epoch
-  horizon: 256 # ! DEBUG to 64 for efficiency
+  horizon: 384 # ! DEBUG to 64 for efficiency
+  # horizon: 200
 
 modelmodule:
   _target_: src.modelmodule.DiffuserModule
@@ -50,31 +51,29 @@ modelmodule:
       optimizer: 
         _target_: torch.optim.Adam
         _partial_: true
-        lr: 0.001
-        weight_decay: 0.0
-        betas: [0.9, 0.999] 
-      lr_scheduler_config:
-        scheduler:
-          _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-          _partial_: true
-          T_max: ${trainer.max_epochs}
-          eta_min: 1e-5
-        interval: epoch
-        frequency: 1
+        lr: 2e-4
+        # weight_decay: 0.0
+        # betas: [0.9, 0.999] 
+      # lr_scheduler_config:
+      #   scheduler:
+      #     _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+      #     _partial_: true
+      #     T_max: ${trainer.max_epochs}
+      #     eta_min: 1e-5
+      #   interval: epoch
+      #   frequency: 1
   optimization_first: ${modelmodule.optimizations.0} # for wandb log
 
 datamodule: 
   _target_: src.datamodule.EnvDatamodule
   _partial_: true
-  batch_size: 128
+  batch_size: 32
   pin_memory: false
   num_workers: ${oc.decode:${oc.env:NUM_WORKERS}}
   train_val_test_split: [0.95,0.025,0.025]
   dataset:
     _target_: src.datamodule.EnvEpisodeDataset
     _partial_: true
-    # env: "halfcheetah-expert-v2"
-    # env: "maze2d-openlarge-v0"
     env: maze2d-large-v1
     horizon: ${global_cfg.horizon}
     custom_ds_path: null
@@ -82,7 +81,9 @@ datamodule:
     normalizer: by_env
     gpu: true
     seed: ${seed}
-
+    clip_denoised: false # ! removed but in paper # maze:true mujoco:true
+    use_padding: true # ! removed but in paper # maze:false mujoco:true
+    mode: multi_step#5 # ! multi_step#{step_num}, default
 runner:
   _target_: src.runner.TrainDiffuserRunner
   _partial_: true

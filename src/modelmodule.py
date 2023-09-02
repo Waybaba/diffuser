@@ -781,6 +781,7 @@ class DiffuserModule(DefaultModule):
 
 		### log
 		to_log = {}
+		to_log["ref"] = [wandb.Image(_) for _ in img_samples]
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb.Video(_) for _ in chain_samples]
 		to_log["samples"] = [wandb.Image(_) for _ in img_samples]
