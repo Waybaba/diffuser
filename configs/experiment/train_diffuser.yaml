@@ -107,7 +107,7 @@ trainer:
     log_every_n_steps: 100
     num_sanity_val_steps: 2
 callbacks:
-  checkpoint:
+  model_checkpoint:
     every_n_steps: 10
 
 # dataset:
