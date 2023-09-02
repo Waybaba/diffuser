@@ -10,8 +10,8 @@ from pytorch_lightning import LightningDataModule
 from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
+import os
 
-DEBUG = False
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -155,10 +155,9 @@ class EnvEpisodeDataset(EnvDataset):
 				if dones_idxes[i] > start: 
 					if dones_idxes[i] - start >= self.horizon:
 						indices.append([start, dones_idxes[i]])
-						if DEBUG and len(indices) > 1000: return torch.tensor(indices)
+						if os.environ.get("DEBUG", False) and len(indices) > 1000: return torch.tensor(indices)
 					start = dones_idxes[i] + 1
 			indices = torch.tensor(indices)
-			return indices
 		elif self.kwargs["mode"].startswith("multi_step"):
 			""" make indices with different values of interval
 			for each episode, 
@@ -169,7 +168,7 @@ class EnvEpisodeDataset(EnvDataset):
 			ps. need to make sure intervals are balanced
 			"""
 			indices = []
-			mode, multi_step = self.kwargs["mode"].split("#")
+			mode, multi_step = self.kwargs["mode"].split("%")
 			multi_step = int(multi_step)
 			dones = dataset["terminals"]
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
@@ -179,10 +178,14 @@ class EnvEpisodeDataset(EnvDataset):
 			for start in tqdm(range(0, len(dones) - max_gap)):
 				for inter in range(1, int(multi_step) + 1):
 					indices.append([start, start + self.horizon * inter, inter])
+					if os.environ.get("DEBUG", False) and len(indices) > 1000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
-			return indices
 		else:
 			raise NotImplementedError("mode not supported")
+
+		print("Dataset make indices done, the length is {}".format(len(indices)))
+		return indices
+
 
 	def get_conditions(self, observations):
 		'''
@@ -265,19 +268,22 @@ class EnvTransitionDataset(EnvDataset):
 
 		valid_indices = torch.where(dones == 0)[0]
 		
-		pairs = []
+		indices = []
 		print("making indices ...")
 		for i in tqdm(valid_indices.cpu().numpy()):
 			for j in range(1, multi_step + 1):
 				end_idx = i + j
 				if dones[end_idx]: 
-					pairs.append([i, end_idx])
-					if DEBUG and len(pairs) > 1000: return np.array(pairs)
+					indices.append([i, end_idx])
+					if os.environ.get("DEBUG", False) and len(indices) > 1000: return np.array(indices)
 					break
 				if end_idx >= num_data: break
-				pairs.append([i, end_idx])
-		
-		return np.array(pairs)
+				indices.append([i, end_idx])
+
+
+		print("Dataset make indices done, the length is {}".format(len(indices)))
+
+		return np.array(indices)
 	
 	def __getitem__(self, idx):
 		start, end = self.indices[idx]

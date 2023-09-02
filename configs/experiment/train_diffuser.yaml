@@ -83,27 +83,32 @@ datamodule:
     seed: ${seed}
     clip_denoised: false # ! removed but in paper # maze:true mujoco:true
     use_padding: true # ! removed but in paper # maze:false mujoco:true
-    mode: multi_step#5 # ! multi_step#{step_num}, default
+    mode: multi_step%5 # ! multi_step#{step_num}, default
 runner:
   _target_: src.runner.TrainDiffuserRunner
   _partial_: true
 
 trainer:
-    _target_: "pytorch_lightning.Trainer"
+    _target_: pytorch_lightning.Trainer
     _partial_: true
     default_root_dir: ${output_dir}
     # callbacks: ${callbacks}
     # logger: ${logger}
-    min_epochs: null
-    max_epochs: 100
+    # min_epochs: null
+    # max_epochs: 100
+    # check_val_every_n_epoch: 1
     accelerator: "gpu"
     # devices: 1
     # move_metrics_to_cpu: true
     deterministic: false
-    # max_steps: 40000.0
+    max_steps: 40000
+    val_check_interval: 1000
+    check_val_every_n_epoch: null
     log_every_n_steps: 100
     num_sanity_val_steps: 2
-    check_val_every_n_epoch: 1
+callbacks:
+  checkpoint:
+    every_n_steps: 10
 
 # dataset:
 #   _target_: diffuser.datasets.SequenceGPUDataset
