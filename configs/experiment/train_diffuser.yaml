@@ -106,9 +106,9 @@ trainer:
     check_val_every_n_epoch: null
     log_every_n_steps: 100
     num_sanity_val_steps: 2
-callbacks:
-  model_checkpoint:
-    every_n_steps: 10
+# callbacks:
+#   model_checkpoint:
+#     every_n_steps: 10
 
 # dataset:
 #   _target_: diffuser.datasets.SequenceGPUDataset
