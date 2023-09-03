@@ -291,7 +291,7 @@ class PlanGuidedRunner:
             
             ## make action
             conditions = {0: observation}
-            if "maze" in env.name: 
+            if "mazexxx" in env.name: 
                 conditions[diffusion.horizon-1] = np.array(list(env._target) + [0, 0])
             if t == 0: 
                 actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
@@ -373,8 +373,11 @@ class PlanGuidedRunner:
             first_step_conditions,
             fps=80,
         )
+        guide_specific_metrics = guide.metrics(first_step_plan)
+        for key, value in guide_specific_metrics.items():
+            wandb_logs[f"final/first_step_plan_{key}"] = value[0].item()
         wandb_logs["final/first_step_plan"] = wandb.Image(
-            self.renderer.episodes2img(first_step_plan[:4])
+            self.renderer.episodes2img(first_step_plan[:4], path=Path(cfg.output_dir)/"first_step_plan.png")
         )
         wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
         wandb_logs["final/total_reward"] = total_reward
@@ -382,6 +385,7 @@ class PlanGuidedRunner:
         for key, value in guide_specific_metrics.items():
             wandb_logs[f"final/guide_{key}"] = value[0].item()
         wandb.log(wandb_logs)
+        wandb.close()
 
     def log(self, t, samples, state, rollout=None, conditions=None):
         import os

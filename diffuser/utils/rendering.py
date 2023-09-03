@@ -108,7 +108,6 @@ class Renderer:
             ValueError: If episodes array is not 2 or 3 dimensional.
             AssertionError: If path is not None.
         """
-        assert path is None, "path should be None"
         
         if len(episodes.shape) == 3:
             episodes_list = [episodes[i] for i in range(len(episodes))]

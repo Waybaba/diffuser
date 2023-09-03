@@ -157,7 +157,8 @@ def initialize_wandb(cfg):
 		tags=cfg.tags,
 		config=config_format(cfg),
 		dir=wandb_dir,
-		mode=cfg.wandb.mode
+		mode=cfg.wandb.mode,
+		id = cfg.output_dir.replace("/","_")
 	)
 	return wandb_dir
 
