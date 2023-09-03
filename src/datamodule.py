@@ -11,6 +11,9 @@ from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
 import os
+from glob import glob
+import gymnasium as gym
+import pybullet_envs
 
 
 Batch = namedtuple('Batch', 'trajectories conditions')
@@ -32,7 +35,38 @@ class DatasetNormalizerW:
 
 	def unnormalize(self, x, key):
 		return self.normalizers[key].unnormalize(x)
-		
+
+def load_kuka(env, custom_ds_path):
+	""" load kuka env 
+	"""
+	dataset = custom_ds_path + "/*.npy"
+	dataset = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy" # DEBUG
+	datasets = sorted(glob(dataset))
+	datasets = [np.load(dataset) for dataset in datasets]
+	datasets = [dataset[::2] for dataset in datasets]
+	qstates = np.concatenate(datasets, axis=0)
+
+	# qstates = np.zeros((max_n_episodes, max_path_length, obs_dim))
+	# path_lengths = np.zeros(max_n_episodes, dtype=np.int)
+
+	# for i, dataset in enumerate(datasets):
+	# 	qstate = np.load(dataset)
+	# 	qstate = qstate[::2]
+	# 	print(qstate.max(), qstate.min())
+	# 	# qstate[np.isnan(qstate)] = 0.0
+	# 	path_length = len(qstate)
+
+	# 	if path_length > max_path_length:
+	# 		qstates[i, :max_path_length] = qstate[:max_path_length]
+	# 		path_length = max_path_length
+	# 	else:
+	# 		qstates[i, :path_length] = qstate
+	# 	path_lengths[i] = path_length
+	# qstates = qstates[:i+1]
+	# path_lengths = path_lengths[:i+1]
+	# return qstates, path_lengths
+	return qstates, gym.make(env)
+
 
 ### dataset
 
@@ -82,9 +116,12 @@ class EnvDataset:
 
 		### get dataset
 		self.env_name = env
-		self.env = env = load_environment(env) # TOODO can not use gym.make ?
-		if custom_ds_path: self.dataset = env.get_dataset(custom_ds_path)
-		else: self.dataset = env.get_dataset()
+		if "kuka" in self.env_name:
+			self.env, self.dataset = load_kuka(env, custom_ds_path)
+		else:
+			self.env = load_environment(env) # TOODO can not use gym.make ?
+			if custom_ds_path: self.dataset = env.get_dataset(custom_ds_path)
+			else: self.dataset = env.get_dataset()
 
 		# self.dataset = d4rl.qlearning_dataset(env)
 		# self.dataset.update(env.get_dataset())

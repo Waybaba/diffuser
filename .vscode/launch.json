@@ -27,7 +27,7 @@
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// "global_cfg.horizon=100",
 				// #### mujoco
-				"experiment=train_diffuser_locomotion",
+				// "experiment=train_diffuser_locomotion",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
@@ -40,6 +40,8 @@
 				// "wandb.buf_dir=null",
 				// "wandb.mode=disabled",
 				// "env.delay=0",
+				// #### kuka
+				"experiment=train_diffuser_kuka",
 
 			],
 		},
