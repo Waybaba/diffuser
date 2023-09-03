@@ -186,13 +186,12 @@ class EnvEpisodeDataset(EnvDataset):
 		print("Dataset make indices done, the length is {}".format(len(indices)))
 		return indices
 
-
 	def get_conditions(self, observations):
 		'''
 			condition on both the current observation and the last observation in the plan
 		'''
 		cond = {0: observations[0]}
-		if "maze" in self.env_name:
+		if "mazefwaefaf" in self.env_name:
 			cond.update({
 				self.horizon - 1: observations[-1],
 			})

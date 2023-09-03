@@ -2,6 +2,12 @@ import wandb
 
 from gym.envs.registration import register
 
+import hydra
+from omegaconf import OmegaConf
+from pathlib import Path
+
+import numpy as np
+import torch
 
 OPEN_LARGE = \
         "############\\"+\
@@ -155,8 +161,6 @@ class TrainValuesRunner:
 def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
     """ parse diffusion model from 
     """
-    import hydra
-    from omegaconf import OmegaConf
     diffusion_hydra_cfg_path = diffusion_dir + "/hydra_config.yaml"
     with open(diffusion_hydra_cfg_path, "r") as file:
         cfg = OmegaConf.load(file)
@@ -241,8 +245,11 @@ class PlanGuidedRunner:
     }
     def start(self, cfg):
         self.cfg = cfg
-        import numpy as np
-        diffusion, dataset, self.renderer = parse_diffusion(cfg.diffusion.dir, cfg.diffusion.epoch, cfg.device, cfg.diffusion.dataset_seed)
+
+        diffuser = self.load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
+        diffusion, dataset, self.renderer = diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
+        
+        # diffusion, dataset, self.renderer = parse_diffusion(cfg.diffusion.dir, cfg.diffusion.epoch, cfg.device, cfg.diffusion.dataset_seed)
 
         guide = cfg.guide
 
@@ -251,6 +258,8 @@ class PlanGuidedRunner:
             diffusion_model=diffusion,
             normalizer=dataset.normalizer,
         )
+
+        policy.diffusion_model.to(cfg.device)
 
         env = dataset.env
         if "maze" not in env.name:
@@ -286,8 +295,9 @@ class PlanGuidedRunner:
                 conditions[diffusion.horizon-1] = np.array(list(env._target) + [0, 0])
             if t == 0: 
                 actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
-                action = samples.actions[0][0] # (B, horizon, a_dim)
-                sequence = samples.observations[0]
+                act_env = samples.actions[0][0] # (a_dim) only select one for act_
+                sequence = samples.observations[0] # (horizon, s_dim)
+                first_step_plan = samples.observations # (B, horizon, s_dim)
                 first_step_conditions = conditions
 
                 # import matplotlib.pyplot as plt
@@ -308,7 +318,7 @@ class PlanGuidedRunner:
             else:
                 if not cfg.trainer.plan_once:
                     actions, samples = policy(conditions, batch_size=cfg.trainer.batch_size, verbose=cfg.trainer.verbose)
-                    action = samples.actions[0][0]
+                    act_env = samples.actions[0][0]
                     sequence = samples.observations[0]
             if cfg.trainer.use_controller_act:
                 if t == diffusion.horizon - 1: 
@@ -316,10 +326,10 @@ class PlanGuidedRunner:
                     next_waypoint[2:] = 0
                 else:
                     next_waypoint = sequence[t+1] if cfg.trainer.plan_once else sequence[1]
-                action = next_waypoint[:2] - state[:2] + (next_waypoint[2:] - state[2:])
+                act_env = next_waypoint[:2] - state[:2] + (next_waypoint[2:] - state[2:])
             
             ## execute action in environment
-            next_observation, reward, terminal, _ = env.step(action)
+            next_observation, reward, terminal, _ = env.step(act_env)
  
             ## print reward and score
             total_reward += reward
@@ -340,12 +350,13 @@ class PlanGuidedRunner:
             rollout.append(next_observation.copy())
 
             ## render every `cfg.trainer.vis_freq` steps
-            self.log(t, samples, state, rollout, first_step_conditions)
+            # self.log(t, samples, state, rollout, first_step_conditions)
 
-            # wandb log
+            ## wandb log
             wandb_commit = (not cfg.wandb.lazy_commits_freq) or (t % cfg.wandb.lazy_commits_freq == 0)
             wandb.log(wandb_logs, step=t, commit=wandb_commit)
 
+            ## end
             if terminal:
                 break
             if cfg.trainer.plan_once and t == diffusion.horizon - 1:
@@ -361,6 +372,9 @@ class PlanGuidedRunner:
             rollout,
             first_step_conditions,
             fps=80,
+        )
+        wandb_logs["final/first_step_plan"] = wandb.Image(
+            self.renderer.episodes2img(first_step_plan[:4])
         )
         wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
         wandb_logs["final/total_reward"] = total_reward
@@ -414,3 +428,14 @@ class PlanGuidedRunner:
             'epoch_diffusion': diffusion_experiment.epoch, 'epoch_value': value_experiment.epoch}
         json.dump(json_data, open(json_path, 'w'), indent=2, sort_keys=True)
         print(f'[ utils/logger ] Saved log to {json_path}')
+    
+    def load_diffuser(self, dir_, epoch_):
+        print("\n\n\n### loading diffuser ...")
+        from src.modelmodule import DiffuserModule
+        diffuser_cfg = OmegaConf.load(Path(dir_)/"hydra_config.yaml")
+        datamodule = hydra.utils.instantiate(diffuser_cfg.datamodule)()
+        modelmodule = DiffuserModule.load_from_checkpoint(
+            Path(dir_)/"checkpoints"/f"{epoch_}.ckpt",
+            dataset_info=datamodule.info,
+        )
+        return modelmodule

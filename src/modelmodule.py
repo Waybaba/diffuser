@@ -288,7 +288,7 @@ class DefaultModule(LightningModule):
 
 		# this line allows to access init params with 'self.hparams' attribute
 		# also ensures init params will be stored in ckpt
-		self.save_hyperparameters(logger=False, ignore=["dataset_info"])
+		self.save_hyperparameters(logger=False)
 
 		# setup dynamic config
 		self.dynamic_cfg = dynamic_cfg = self.init_dynamic_cfg(kwargs["dataset_info"])
@@ -755,6 +755,7 @@ class EnvModelModule(FillActModelModule):
 
 		return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
 
+### Diffuser
 class DiffuserModule(DefaultModule):
 	def step(self, batch: Any):
 		""" process the batch from dataloader and return the res_batch
@@ -777,11 +778,11 @@ class DiffuserModule(DefaultModule):
 		assert self.net.training == False, "net should be in eval mode"
 		LOG_PREFIX = "val_ep_end"
 		### get render data # TODO spilt well
-		img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
+		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
 
 		### log
 		to_log = {}
-		to_log["ref"] = [wandb.Image(_) for _ in img_samples]
+		to_log["ref"] = [wandb.Image(_) for _ in ref_samples]
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb.Video(_) for _ in chain_samples]
 		to_log["samples"] = [wandb.Image(_) for _ in img_samples]
@@ -806,8 +807,7 @@ class DiffuserModule(DefaultModule):
 		'''
 		batch_size = 1
 		N_SAMPLES = 4 # would have same condition, rendered in one img
-		img_res = []
-		chain_res = []
+		ref_res, img_res, chain_res = [], [], []
 		dataset = self.dynamic_cfg["data_val"][0]
 		from torch.utils.data.dataloader import default_collate
 		from collections.abc import Mapping, Sequence
@@ -825,11 +825,10 @@ class DiffuserModule(DefaultModule):
 			
 			## get a single datapoint
 			batch = [dataset[random.randint(0, len(dataset)-1)]]
-			# stack
-			batch = recursive_collate(batch)
+			batch = recursive_collate(batch) # stack another dim
 			batch = EpisodeBatch(*batch)
-
 			conditions = batch.conditions
+			refs = to_np(batch.trajectories)
 
 			### ! DEBUG apply noise to conditions
 			# batch.conditions[0]: B,obs_dim
@@ -849,8 +848,10 @@ class DiffuserModule(DefaultModule):
 			conditions = apply_dict(
 				einops.repeat,
 				conditions,
-				'b d -> (repeat b) d', repeat=N_SAMPLES,
+				'b ... -> (repeat b) ...', repeat=N_SAMPLES,
 			)
+			refs = einops.repeat(refs, 'b ... -> (repeat b) ...', repeat=N_SAMPLES)
+
 
 			## [ n_samples x horizon x (action_dim + observation_dim) ]
 			samples = self.net(conditions, return_chain=True) # ! ADD EMA in paper
@@ -858,29 +859,24 @@ class DiffuserModule(DefaultModule):
 			chains = to_np(samples.chains) # (n_samples, diffusion_T, T, act_dim+obs_dim)
 
 			## [ n_samples x horizon x observation_dim ]
+			normed_refs = refs[:, :, self.dynamic_cfg["act_dim"]:]
 			normed_observations = trajectories[:, :, self.dynamic_cfg["act_dim"]:] # (n_samples, T, obs_dim)
 			normed_chains = chains[:, :, :, self.dynamic_cfg["act_dim"]:] # (n_samples, horizon, T, obs_dim)
-
-			# [ 1 x 1 x observation_dim ]
-			normed_conditions = to_np(batch.conditions[0])[:,None]
-
-			## [ n_samples x (horizon + 1) x observation_dim ]
-			normed_observations = np.concatenate([
-				np.repeat(normed_conditions, N_SAMPLES, axis=0),
-				normed_observations
-			], axis=1)
 
 			## [ n_samples x (diffusion_T) x horizon + 1 x observation_dim ]
 			observations = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_observations, 'observations') # [ n_samples x horizon x observation_dim ]
 			chains = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_chains, 'observations') # [ n_samples x (diffusion_T) x horizon x observation_dim ]
+			refs = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_refs, 'observations')
 
-			## render sample
+			## render
+			ref_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(refs))
 			img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations))
-
-			## render chains
 			chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains))
+			
 
-		return img_res, None if len(chain_res) == 0 else chain_res
+		return ref_res, img_res, None if len(chain_res) == 0 else chain_res
 
 	def forward(self, cond=None):
 		raise NotImplementedError("forward is not implemented in DiffuserModule")
+
+### Planner
