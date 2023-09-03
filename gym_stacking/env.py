@@ -12,6 +12,7 @@ from .utils import WorldSaver, connect, dump_body, get_pose, set_pose, Pose, \
     enable_gravity, get_joint_positions, set_client, get_aabb, aabb_contains_aabb, aabb_intersection
 
 import pybullet as p
+# p.connect(p.DIRECT)
 import numpy as np
 from d4rl import offline_env
 
@@ -132,7 +133,7 @@ class StackEnv(gym.Env):
         Considered solved when the average return is greater than or equal to
         195.0 over 100 consecutive trials.
     """
-
+    USE_GUI = False
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
 
     def __init__(self, conditional=False, rearrangment=False, dataset_url=None):
@@ -157,7 +158,7 @@ class StackEnv(gym.Env):
         end = np.array([0.0, 0.0, 1.0])
         viewMatrix = p.computeViewMatrix(location, end, [0, 0, 1])
 
-        self.client = connect()
+        self.client = connect(use_gui=self.USE_GUI)
         set_client(self.client)
 
         self.projectionMatrix = projectionMatrix

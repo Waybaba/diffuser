@@ -1,20 +1,20 @@
+import pyrootutils
+root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True, indicator=["configs"])
 from collections import namedtuple
 import numpy as np
-import torch
 from tqdm import tqdm
 from diffuser.datasets.preprocessing import get_preprocess_fn
 from diffuser.datasets.normalization import get_normalizer
 from diffuser.datasets.d4rl import load_environment
-from torch.nn import functional as F 
 from pytorch_lightning import LightningDataModule
 from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
+from torch import tensor
 import os
-from glob import glob
-import gymnasium as gym
-import pybullet_envs
-from gym_stacking.env import StackEnv
+
+
+
 
 
 Batch = namedtuple('Batch', 'trajectories conditions')
@@ -40,11 +40,18 @@ class DatasetNormalizerW:
 def load_kuka(env, custom_ds_path):
 	""" load kuka env 
 	"""
+	from glob import glob
+	assert "kuka" in env, "only support kuka env"
+	from gym_stacking.env import StackEnv
+	env = StackEnv()
 	dataset = custom_ds_path + "/*.npy"
-	dataset = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy" # DEBUG
+	# dataset = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy" # DEBUG
 	datasets = sorted(glob(dataset))
-	datasets = [np.load(dataset) for dataset in datasets]
+	datasets = [np.load(dataset) for dataset in tqdm(
+		datasets if os.environ.get("DEBUG", False) else datasets[:100],
+	)] # read from file
 	datasets = [dataset[::2] for dataset in datasets]
+	ep_lengths = [len(dataset) for dataset in datasets]
 	qstates = np.concatenate(datasets, axis=0)
 
 	# qstates = np.zeros((max_n_episodes, max_path_length, obs_dim))
@@ -66,7 +73,14 @@ def load_kuka(env, custom_ds_path):
 	# qstates = qstates[:i+1]
 	# path_lengths = path_lengths[:i+1]
 	# return qstates, path_lengths
-	return qstates, StackEnv()
+	terminals = np.zeros_like(qstates[:,0])
+	terminals[np.cumsum(ep_lengths)-1] = 1
+	dataset = {
+		"observations": qstates,
+		"actions": np.zeros_like(qstates)[:,:11], # act_dim = 11
+		"terminals": terminals
+	}
+	return env, dataset
 
 
 ### dataset
@@ -112,8 +126,7 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert "maze" in env or "cheetah" in env, "maze envs not supported, since d4rl does not provide terminal"
-		# assert normalizer in ["LimitsNormalizer", "GaussianNormalizer"], "only support LimitsNormalizer"
+		assert "maze" in env or "cheetah" in env or "kuka" in env, "maze envs not supported, since d4rl does not provide terminal"
 
 		### get dataset
 		self.env_name = env
@@ -122,20 +135,21 @@ class EnvDataset:
 		else:
 			self.env = load_environment(env) # TOODO can not use gym.make ?
 			if custom_ds_path: self.dataset = env.get_dataset(custom_ds_path)
-			else: self.dataset = env.get_dataset()
-
-		# self.dataset = d4rl.qlearning_dataset(env)
-		# self.dataset.update(env.get_dataset())
+			else: self.dataset = self.env.get_dataset()
+			# self.dataset = d4rl.qlearning_dataset(self.env_name)
+			# self.dataset.update(self.env.get_dataset())
 
 		### pre_process
 		assert preprocess_fns == "by_env", "only support by_env"
 		if "maze" in self.env_name: preprocess_fns = ["maze2d_set_terminals"]
 		elif "cheetah" in self.env_name: preprocess_fns = []
+		elif "kuka" in self.env_name: preprocess_fns = []
+		else: raise NotImplementedError("env not supported")
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name) # TOODO do not use original function
 		self.dataset = self.preprocess_fn(self.dataset)
 		
 		### remove keys
-		KEYS_NEED = ["observations", "actions", "rewards", "terminals", "timeouts"]
+		KEYS_NEED = ["observations", "actions", "terminals", "timeouts"]
 		keys_to_delete = [k for k in self.dataset.keys() if k not in KEYS_NEED]
 		for k in keys_to_delete: del self.dataset[k]
 		
@@ -143,6 +157,8 @@ class EnvDataset:
 		assert normalizer == "by_env", "only support by_env"
 		if "maze" in self.env_name: normalizer = "LimitsNormalizer"
 		elif "cheetah" in self.env_name: normalizer = "GaussianNormalizer"
+		elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
+		else: raise NotImplementedError("env not supported")
 		self.observation_dim = self.dataset['observations'].shape[1]
 		self.action_dim = self.dataset['actions'].shape[1]
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
@@ -152,15 +168,18 @@ class EnvDataset:
 		### put into GPU
 		if gpu:
 			for k in self.dataset.keys():
-				self.dataset[k] = torch.tensor(self.dataset[k]).cuda()
+				self.dataset[k] = tensor(self.dataset[k]).cuda()
 		
 		### set renderer
-		from diffuser.utils.rendering import MuJoCoRenderer
-		from diffuser.utils.rendering import Maze2dRenderer
 		if "maze" in self.env_name:
+			from diffuser.utils.rendering import Maze2dRenderer
 			self.renderer = Maze2dRenderer(self.env_name)
 		elif "cheetah" in self.env_name:
+			from diffuser.utils.rendering import MuJoCoRenderer
 			self.renderer = MuJoCoRenderer(self.env_name)
+		elif "kuka" in self.env_name:
+			from denoising_diffusion_pytorch.utils.rendering import KukaRenderer
+			self.renderer = KukaRenderer
 		else:
 			raise NotImplementedError("env not supported")
 
@@ -509,3 +528,10 @@ class EnvDatamodule(LightningDataModule):
 		:param state_dict: The datamodule state returned by `self.state_dict()`.
 		"""
 		pass
+
+
+
+if __name__ == '__main__':
+	# load_kuka("kuka", "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy")
+	dataset = EnvDataset("maze2d-umaze-v1", preprocess_fns="by_env", normalizer="by_env")
+	dataset = EnvDataset("kuka", custom_ds_path="/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/", preprocess_fns="by_env", normalizer="by_env")

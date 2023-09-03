@@ -83,7 +83,7 @@ RUN pip install \
     ftfy \
     regex
 
-RUN pip install moviepy imageio
+RUN pip install moviepy imageio easydict
 
 # RUN pip install pytorch-lightning==1.8.6
 
