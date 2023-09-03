@@ -288,7 +288,7 @@ class DefaultModule(LightningModule):
 
 		# this line allows to access init params with 'self.hparams' attribute
 		# also ensures init params will be stored in ckpt
-		self.save_hyperparameters(logger=False)
+		self.save_hyperparameters(logger=False, ignore=["dataset_info"])
 
 		# setup dynamic config
 		self.dynamic_cfg = dynamic_cfg = self.init_dynamic_cfg(kwargs["dataset_info"])
@@ -872,6 +872,9 @@ class DiffuserModule(DefaultModule):
 			ref_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(refs))
 			img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations))
 			chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains))
+			# ref_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(refs,path=self.hparams+"/ref_latest.png"))
+			# img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations,path=self.hparams+"/ref_latest.png"))
+			# chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains,path=self.hparams+"/ref_latest.png"))
 			
 
 		return ref_res, img_res, None if len(chain_res) == 0 else chain_res

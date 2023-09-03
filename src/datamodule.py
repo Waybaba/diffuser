@@ -180,10 +180,33 @@ class EnvEpisodeDataset(EnvDataset):
 					indices.append([start, start + self.horizon * inter, inter])
 					if os.environ.get("DEBUG", False) and len(indices) > 1000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
+		elif self.kwargs["mode"].startswith("ep_multi_step"):
+			"""
+				same as before but is episode based
+				would be use indices cross episodes
+			"""
+			indices = []
+			mode, multi_step = self.kwargs["mode"].split("%")
+			multi_step = int(multi_step)
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			
+			print("making indexes for episode-based multi-step ...")
+			start = 0
+			max_gap = multi_step * self.horizon
+			for end in tqdm(dones_idxes):
+				for i in range(start, end - max_gap + 1):
+					for inter in range(1, multi_step + 1):
+						indices.append([i, i + self.horizon * inter, inter])
+				start = end + 1  # Move to the start of the next episode
+				if os.environ.get("DEBUG", False) and len(indices) > 1000: 
+					return torch.tensor(indices)
+				
+			indices = torch.tensor(indices)
 		else:
 			raise NotImplementedError("mode not supported")
 
-		print("Dataset make indices done, the length is {}".format(len(indices)))
 		return indices
 
 	def get_conditions(self, observations):
@@ -216,7 +239,7 @@ class EnvEpisodeDataset(EnvDataset):
 			conditions = self.get_conditions(observations)
 			trajectories = torch.cat([actions, observations], axis=-1)
 			batch = EpisodeBatch(trajectories, conditions)
-		elif self.kwargs["mode"].startswith("multi_step"):
+		elif self.kwargs["mode"].startswith("multi_step") or self.kwargs["mode"].startswith("ep_multi_step"):
 			start, end, inter = self.indices[idx]
 			observations = self.dataset["observations"][start:end:inter]
 			actions = self.dataset["actions"][start:end:inter]
@@ -360,7 +383,7 @@ class EnvDatamodule(LightningDataModule):
 			self.dataset = self.hparams.dataset()
 			train_val_test_split = self.hparams.train_val_test_split \
 				if type(self.hparams.train_val_test_split[0]) != float else \
-				[int(len(self.dataset) * split) for split in self.hparams.train_val_test_split]
+				[max(int(len(self.dataset) * split),self.hparams.batch_size) for split in self.hparams.train_val_test_split]
 			train_val_test_split[0] = len(self.dataset) - sum(train_val_test_split[1:])
 			self.data_train, self.data_val, self.data_test = random_split(
 				dataset=self.dataset,
@@ -369,6 +392,10 @@ class EnvDatamodule(LightningDataModule):
 			)
 			self.data_val = [self.data_val]
 			self.data_test = [self.data_test]
+			# print length information
+			print("Dataset length: train {}, val {}, test {}".format(
+				len(self.data_train), len(self.data_val[0]), len(self.data_test[0])
+			))
 			
 	def train_dataloader(self):
 		# return empty dataloader

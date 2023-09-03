@@ -42,57 +42,25 @@ class TrainDiffuserRunner:
         print("Running default runner")
         self.cfg = cfg
 
+        print("\n\n\n### loading datamodule ...")
         self.datamodule = cfg.datamodule()
+
+        print("\n\n\n### loading modelmodule ...")
         self.modelmodule = cfg.modelmodule(
             dataset_info=self.datamodule.info,
         )
+
+        print("\n\n\n### loading trainer ...")
         trainer = cfg.trainer(
             callbacks=[v for k,v in cfg.callbacks.items()],
             logger=[v for k,v in cfg.logger.items()],
         )
+        
+        print("\n\n\n### starting training ...")
         trainer.fit(
             model=self.modelmodule,
             datamodule=self.datamodule,
         )
-        print("Finished!")
-        exit()
-
-
-        ### ! TODO remove
-        dataset = cfg.dataset()
-        render = cfg.render(dataset.env.name)
-        
-        observation_dim = dataset.observation_dim
-        action_dim = dataset.action_dim
-
-        net = cfg.net(
-            transition_dim=observation_dim + action_dim,
-            cond_dim=observation_dim
-        ).to(cfg.device)
-        
-        model = cfg.model(
-            net,
-            observation_dim=observation_dim,
-            action_dim=action_dim,
-        ).to(cfg.device)
-
-        trainer = cfg.trainer(
-            model,
-            dataset,
-            render,
-        )
-
-
-        # save diffuser training cfg for inference reload
-        
-
-        ### train
-
-        n_epochs = int(cfg.global_cfg.n_train_steps // cfg.global_cfg.n_steps_per_epoch)
-        for epoch in range(n_epochs):
-            print(f'Epoch {epoch} / {n_epochs} | {cfg.output_dir}')
-            trainer.train(n_train_steps=cfg.global_cfg.n_steps_per_epoch)
-        
         print("Finished!")
 
 class TrainControllerRunner:
@@ -385,7 +353,6 @@ class PlanGuidedRunner:
         for key, value in guide_specific_metrics.items():
             wandb_logs[f"final/guide_{key}"] = value[0].item()
         wandb.log(wandb_logs)
-        wandb.close()
 
     def log(self, t, samples, state, rollout=None, conditions=None):
         import os
