@@ -14,6 +14,7 @@ import os
 from glob import glob
 import gymnasium as gym
 import pybullet_envs
+from gym_stacking.env import StackEnv
 
 
 Batch = namedtuple('Batch', 'trajectories conditions')
@@ -65,7 +66,7 @@ def load_kuka(env, custom_ds_path):
 	# qstates = qstates[:i+1]
 	# path_lengths = path_lengths[:i+1]
 	# return qstates, path_lengths
-	return qstates, gym.make(env)
+	return qstates, StackEnv()
 
 
 ### dataset
