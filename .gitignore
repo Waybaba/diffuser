@@ -8,3 +8,10 @@ logs/
 kuka_dataset/
 *.pkl
 *.tar.gz
+output
+entry/entry.log
+kuka_dataset
+entry.log
+.env
+/debug
+configs/amlt/latest.yaml

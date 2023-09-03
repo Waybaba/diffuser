@@ -1,3 +1,5 @@
+import pyrootutils
+root = pyrootutils.setup_root(__file__, dotenv=True, pythonpath=True)
 import numpy as np
 import torch
 import pdb
