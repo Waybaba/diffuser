@@ -133,7 +133,7 @@ class StackEnv(gym.Env):
         Considered solved when the average return is greater than or equal to
         195.0 over 100 consecutive trials.
     """
-    USE_GUI = False
+    USE_GUI = False # ! default @waybaba
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 50}
 
     def __init__(self, conditional=False, rearrangment=False, dataset_url=None):

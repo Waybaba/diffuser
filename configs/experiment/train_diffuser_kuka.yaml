@@ -8,7 +8,8 @@ global_cfg:
 
 datamodule:
   dataset:
-    env: kuka_block_pick-v0
+    env: kuka # ! can not make by gym, intead use a custom class
+    custom_ds_path: /data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/ # should be fixed
     mode: ep_multi_step%5 # ! multi_step%{step_num}, default
 
 modelmodule:

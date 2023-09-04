@@ -10,7 +10,7 @@ from pytorch_lightning import LightningDataModule
 from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
-from torch import tensor
+import torch
 import os
 
 
@@ -48,7 +48,7 @@ def load_kuka(env, custom_ds_path):
 	# dataset = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy" # DEBUG
 	datasets = sorted(glob(dataset))
 	datasets = [np.load(dataset) for dataset in tqdm(
-		datasets if os.environ.get("DEBUG", False) else datasets[:100],
+		datasets[:100] if os.environ.get("DEBUG", False) else datasets,
 	)] # read from file
 	datasets = [dataset[::2] for dataset in datasets]
 	ep_lengths = [len(dataset) for dataset in datasets]
@@ -77,7 +77,7 @@ def load_kuka(env, custom_ds_path):
 	terminals[np.cumsum(ep_lengths)-1] = 1
 	dataset = {
 		"observations": qstates,
-		"actions": np.zeros_like(qstates)[:,:11], # act_dim = 11
+		"actions": np.random.randn(*qstates.shape)[:,:11], # act_dim = 11
 		"terminals": terminals
 	}
 	return env, dataset
@@ -157,7 +157,7 @@ class EnvDataset:
 		assert normalizer == "by_env", "only support by_env"
 		if "maze" in self.env_name: normalizer = "LimitsNormalizer"
 		elif "cheetah" in self.env_name: normalizer = "GaussianNormalizer"
-		elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
+		elif "kuka" in self.env_name: normalizer = "DebugNormalizer"
 		else: raise NotImplementedError("env not supported")
 		self.observation_dim = self.dataset['observations'].shape[1]
 		self.action_dim = self.dataset['actions'].shape[1]
@@ -168,7 +168,7 @@ class EnvDataset:
 		### put into GPU
 		if gpu:
 			for k in self.dataset.keys():
-				self.dataset[k] = tensor(self.dataset[k]).cuda()
+				self.dataset[k] = torch.tensor(self.dataset[k]).float().cuda()
 		
 		### set renderer
 		if "maze" in self.env_name:
@@ -179,7 +179,7 @@ class EnvDataset:
 			self.renderer = MuJoCoRenderer(self.env_name)
 		elif "kuka" in self.env_name:
 			from denoising_diffusion_pytorch.utils.rendering import KukaRenderer
-			self.renderer = KukaRenderer
+			self.renderer = KukaRenderer()
 		else:
 			raise NotImplementedError("env not supported")
 
@@ -532,6 +532,20 @@ class EnvDatamodule(LightningDataModule):
 
 
 if __name__ == '__main__':
-	# load_kuka("kuka", "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy")
-	dataset = EnvDataset("maze2d-umaze-v1", preprocess_fns="by_env", normalizer="by_env")
-	dataset = EnvDataset("kuka", custom_ds_path="/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/", preprocess_fns="by_env", normalizer="by_env")
+	print("start...")
+
+	load_kuka("kuka", "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/")
+	# dataset = EnvDataset("maze2d-umaze-v1", horizon=32, mode="ep_multi_step%5", preprocess_fns="by_env", normalizer="by_env")
+	dataset = EnvEpisodeDataset("kuka", horizon=32, mode="ep_multi_step%5", custom_ds_path="/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/", preprocess_fns="by_env", normalizer="by_env")
+
+	from denoising_diffusion_pytorch.utils.rendering import KukaRenderer
+	render = KukaRenderer()
+	ep_shape = [4, 10, *dataset.env.observation_space.shape]
+	obs_dim = dataset.env.observation_space.shape[0]
+	act_dim = dataset.env.action_space.shape[0]
+	render.episodes2img(
+		np.zeros(ep_shape)
+	)
+	render.episodes2img(
+		torch.stack([dataset[0].trajectories[:,act_dim:]],dim=0).cpu().numpy()
+	)

@@ -1,9 +1,10 @@
 ### pytorch image base
 FROM pytorch/pytorch:1.12.1-cuda11.3-cudnn8-devel as base
-ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES},display \
+# ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES},graphics \
+ENV NVIDIA_DRIVER_CAPABILITIES=all \
     DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+    LC_ALL=C.UTF-8A
 
 ### environment variables
 ARG USERNAME=waybaba
@@ -83,7 +84,7 @@ RUN pip install \
     ftfy \
     regex
 
-RUN pip install moviepy imageio easydict
+RUN pip install moviepy imageio easydict panda-gym
 
 # RUN pip install pytorch-lightning==1.8.6
 
@@ -133,6 +134,11 @@ RUN pip install dm_control 'mujoco-py<2.2,>=2.1' # avoid mujoco version change
 ### (optional) diffuser
 RUN pip install gym==0.18.0 einops typed-argument-parser scikit-video==1.1.11 scikit-image==0.17.2
 RUN pip install 'mujoco-py<2.2,>=2.1' # avoid mujoco version change
+RUN apt-get update && apt-get install -y \
+    mesa-utils \
+    xvfb
+# RUN Xvfb :1 -screen 0 1024x768x16 &
+# ENV DISPLAY=:1
 
 
 ### end # comment the following when amlt: amlt need root user to build, but it will switch to a user called aiscuser when running

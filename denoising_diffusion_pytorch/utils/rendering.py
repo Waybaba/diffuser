@@ -4,6 +4,7 @@ import gym
 import mujoco_py as mjc
 import pdb
 import sys
+import einops
 
 import pybullet as p
 from .pybullet_utils import WorldSaver, connect, dump_body, get_pose, set_pose, Pose, \
@@ -12,7 +13,7 @@ from .pybullet_utils import WorldSaver, connect, dump_body, get_pose, set_pose, 
     disconnect, DRAKE_IIWA_URDF, get_bodies, HideOutput, wait_for_user, KUKA_IIWA_URDF, add_data_path, load_pybullet, \
     LockRenderer, has_gui, draw_pose, draw_global_system, get_all_links, set_color, get_movable_joints, set_joint_position
 from imageio import imwrite, get_writer
-
+from .pybullet_utils import set_client
 
 def sample_placements(body_surfaces, obstacles=None, min_distances={}):
     if obstacles is None:
@@ -150,7 +151,8 @@ def load_world():
 
     return robot, body_names, movable_bodies
 
-class Renderer:
+from diffuser.utils.rendering import Renderer as RendererBase # @waybaba
+class Renderer(RendererBase):
 
     def __init__(self, env):
         if type(env) is str:
@@ -227,7 +229,7 @@ class Renderer:
         return self.renders(*args, **kwargs)
 
 
-class TampRenderer:
+class TampRenderer(RendererBase):
 
     def __init__(self):
         connect()
@@ -293,10 +295,11 @@ class TampRenderer:
         return self.renders(*args, **kwargs)
 
 
-class KukaRenderer:
-
+class KukaRenderer(RendererBase):
+    USE_GUI = False
     def __init__(self):
-        connect()
+        self.client = connect(use_gui=self.USE_GUI) # @waybaba
+        set_client(self.client) # @waybaba
         robot, _, movable = load_world()
         self.robot = robot
         self.cubes = movable
@@ -319,7 +322,7 @@ class KukaRenderer:
         ])
         return state
 
-    def render(self, observation, dim=256, partial=False, qvel=True, render_kwargs=None):
+    def render(self, observation, dim=256, partial=False, qvel=True, render_kwargs=None, conditions=None):
         joints = get_movable_joints(self.robot)
         joint_vals = observation[:7]
 
@@ -346,13 +349,19 @@ class KukaRenderer:
             images.append(img)
         return np.stack(images, axis=0)
 
-    def composite(self, savepath, *args, **kwargs):
-        sample_images = self.renders(*args, **kwargs)
+    def composite(self, savepath, *args, ncol=2, **kwargs):
+        images_res = self.renders(*args, **kwargs)
         # writer = get_writer(savepath)
         # composite = np.concatenate(sample_images, axis=1)
 
-        if savepath is not None:
-            imageio.imsave(savepath, composite)
+        # if savepath is not None:
+        #     imageio.imsave(savepath, composite)
+
+        images = np.stack(images_res, axis=0)
+
+        nrow = len(images) // ncol
+        images = einops.rearrange(images,
+            '(nrow ncol) H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
 
         return sample_images
 

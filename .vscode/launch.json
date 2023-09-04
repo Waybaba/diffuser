@@ -21,6 +21,7 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
+				"wandb.mode=disabled",
 				// #### maze
 				// "experiment=train_diffuser",
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
@@ -38,7 +39,6 @@
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-large-v1-1000.hdf5",
 				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
-				// "wandb.mode=disabled",
 				// "env.delay=0",
 				// #### kuka
 				"experiment=train_diffuser_kuka",
