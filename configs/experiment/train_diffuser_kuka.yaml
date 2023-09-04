@@ -9,7 +9,7 @@ global_cfg:
 datamodule:
   dataset:
     env: kuka # ! can not make by gym, intead use a custom class
-    custom_ds_path: /data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/ # should be fixed
+    custom_ds_path: ${oc.env:UDATADIR}/models/diffuser/d4rl_dataset/kuka/kuka_dataset/ # should be fixed
     mode: ep_multi_step%5 # ! multi_step%{step_num}, default
 
 modelmodule:

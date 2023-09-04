@@ -7,13 +7,13 @@ import sys
 import einops
 
 import pybullet as p
-from .pybullet_utils import WorldSaver, connect, dump_body, get_pose, set_pose, Pose, \
+from .pybullet_utils import ClientSaver, WorldSaver, connect, dump_body, get_pose, set_pose, Pose, \
     Point, set_default_camera, stable_z, \
     BLOCK_URDF, SMALL_BLOCK_URDF, get_configuration, SINK_URDF, STOVE_URDF, load_model, is_placement, get_body_name, \
     disconnect, DRAKE_IIWA_URDF, get_bodies, HideOutput, wait_for_user, KUKA_IIWA_URDF, add_data_path, load_pybullet, \
-    LockRenderer, has_gui, draw_pose, draw_global_system, get_all_links, set_color, get_movable_joints, set_joint_position
+    LockRenderer, has_gui, draw_pose, draw_global_system, get_all_links, set_color, get_movable_joints, set_joint_position, get_joint_positions, get_joint_position
 from imageio import imwrite, get_writer
-from .pybullet_utils import set_client
+from .pybullet_utils import set_client, get_client
 
 def sample_placements(body_surfaces, obstacles=None, min_distances={}):
     if obstacles is None:
@@ -307,13 +307,13 @@ class KukaRenderer(RendererBase):
         far = 4.0
         projectionMatrix = p.computeProjectionMatrixFOV(60., 1.0, near, far)
 
-        location = np.array([0.1, 0.1, 2.0])
+        # location = np.array([0.1, 0.1, 2.0]) # 俯视图
+        location = np.array([2.0, 0.0, 1.2])
         end = np.array([0.0, 0.0, 1.0])
         viewMatrix = p.computeViewMatrix(location, end, [0, 0, 1])
 
         self.projectionMatrix = projectionMatrix
         self.viewMatrix = viewMatrix
-
 
     def pad_observation(self, observation):
         state = np.concatenate([
@@ -323,50 +323,80 @@ class KukaRenderer(RendererBase):
         return state
 
     def render(self, observation, dim=256, partial=False, qvel=True, render_kwargs=None, conditions=None):
-        joints = get_movable_joints(self.robot)
-        joint_vals = observation[:7]
+        with ClientSaver(self.client):
+            joints = get_movable_joints(self.robot)
+            joint_vals = observation[:7]
+            for i, cube in enumerate(self.cubes):
+                pos = observation[7+i*8:10+i*8]
+                rot = observation[10+i*8:14+i*8]
+                rot = rot / np.linalg.norm(rot)
+                set_pose(cube, (pos, rot))
 
-        for i, cube in enumerate(self.cubes):
-            pos = observation[7+i*8:10+i*8]
-            rot = observation[10+i*8:14+i*8]
-            rot = rot / np.linalg.norm(rot)
-            set_pose(cube, (pos, rot))
+            for joint, joint_val in zip(joints, joint_vals):
+                set_joint_position(self.robot, joint, joint_val)
 
-        for joint, joint_val in zip(joints, joint_vals):
-            set_joint_position(self.robot, joint, joint_val)
+            projectionMatrix = self.projectionMatrix
+            viewMatrix = self.viewMatrix
+            _, _, im, _, seg = p.getCameraImage(width=256, height=256, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix, physicsClientId=self.client)
+            im = np.array(im).reshape((256, 256, 4))[:, :, :3]
 
-        projectionMatrix = self.projectionMatrix
-        viewMatrix = self.viewMatrix
-        _, _, im, _, seg = p.getCameraImage(width=256, height=256, viewMatrix=viewMatrix, projectionMatrix=projectionMatrix)
-        im = np.array(im).reshape((256, 256, 4))[:, :, :3]
-
+            # # ! DEBUG
+            # savepath = "./debug/test_im.png"
+            # if savepath is not None:
+            #     imageio.imsave(savepath, im)
+            #     print(f'Save samples to: {savepath}')
+            # # ! DEBUG
+        
         return im
 
     def renders(self, observations, **kwargs):
-        images = []
+        # origin fro diffuser (render n images)
+        images = [] 
         for observation in observations:
             img = self.render(observation, **kwargs)
             images.append(img)
-        return np.stack(images, axis=0)
+        # return np.stack(images, axis=0)
+        images = np.concatenate(images, axis=1)
 
-    def composite(self, savepath, *args, ncol=2, **kwargs):
-        images_res = self.renders(*args, **kwargs)
-        # writer = get_writer(savepath)
-        # composite = np.concatenate(sample_images, axis=1)
 
-        # if savepath is not None:
-        #     imageio.imsave(savepath, composite)
+        # if partial:
+        #     samples = self.pad_observations(samples)
+        #     partial = False
 
+        # sample_images = self._renders(observations, partial=partial, **kwargs)
+
+        # composite = np.ones_like(sample_images[0]) * 255
+
+        # for img in sample_images:
+        #     mask = get_image_mask(img)
+        #     composite[mask] = img[mask]
+
+        return images
+
+    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
+        images_res = []
+        # for path, kw in zipkw(paths, **kwargs):
+            # img = self.renders(*path, conditions=conditions, **kw)
+        for path in paths:
+            img = self.renders(path)
+            images_res.append(img)
         images = np.stack(images_res, axis=0)
-
+        
         nrow = len(images) // ncol
         images = einops.rearrange(images,
             '(nrow ncol) H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
 
-        return sample_images
+        if savepath is not None:
+            imageio.imsave(savepath, images)
+            print(f'Saved {len(paths)} samples to: {savepath}')
+
+        return images
 
     def __call__(self, *args, **kwargs):
         return self.renders(*args, **kwargs)
+
+
+
 
 def set_state(env, state):
     qpos_dim = env.sim.data.qpos.size

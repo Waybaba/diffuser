@@ -21,7 +21,7 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				"wandb.mode=disabled",
+				// "wandb.mode=disabled",
 				// #### maze
 				// "experiment=train_diffuser",
 				// "datamodule.dataset.env=maze2d-openlarge-v0",

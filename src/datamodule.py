@@ -531,6 +531,8 @@ class EnvDatamodule(LightningDataModule):
 
 
 
+
+
 if __name__ == '__main__':
 	print("start...")
 
@@ -539,13 +541,18 @@ if __name__ == '__main__':
 	dataset = EnvEpisodeDataset("kuka", horizon=32, mode="ep_multi_step%5", custom_ds_path="/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/", preprocess_fns="by_env", normalizer="by_env")
 
 	from denoising_diffusion_pytorch.utils.rendering import KukaRenderer
-	render = KukaRenderer()
-	ep_shape = [4, 10, *dataset.env.observation_space.shape]
+	renderer = KukaRenderer()
 	obs_dim = dataset.env.observation_space.shape[0]
 	act_dim = dataset.env.action_space.shape[0]
-	render.episodes2img(
-		np.zeros(ep_shape)
+	
+	renderer.episodes2img(
+		torch.stack([dataset[-1].trajectories[:,act_dim:]],dim=0).cpu().numpy(),
+		path="./debug/test1.png"
 	)
-	render.episodes2img(
-		torch.stack([dataset[0].trajectories[:,act_dim:]],dim=0).cpu().numpy()
+	# test random
+	ep_shape = [4, 10, *dataset.env.observation_space.shape]
+	eps = np.random.randn(*ep_shape)
+	renderer.episodes2img(
+		eps, 
+		path="./debug/test2.png"
 	)

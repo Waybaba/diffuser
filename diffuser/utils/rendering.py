@@ -156,6 +156,8 @@ class Renderer:
         video = video.transpose(0, 3, 1, 2)  # T, Ch, H, W
         return video
 
+    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
+        raise NotImplementedError("composite: not implemented")
 
 #-----------------------------------------------------------------------------#
 #----------------------------------- maze2d ----------------------------------#
@@ -233,7 +235,7 @@ class MazeRenderer(Renderer):
         # Save to file
         ani.save(savepath, writer='pillow')
 
-    def composite(self, savepath, paths, conditions=None, ncol=2, **kwargs):
+    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=2, **kwargs):
         '''
             savepath : str
             observations : [ n_paths x horizon x 2 ]
@@ -437,7 +439,7 @@ class MuJoCoRenderer(Renderer):
 
         return composite
 
-    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), **kwargs):
+    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
 
         render_kwargs = {
             'trackbodyid': 2,
