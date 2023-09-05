@@ -142,5 +142,5 @@ RUN pip install 'mujoco-py<2.2,>=2.1' # avoid mujoco version change
 
 
 ### end # comment the following when amlt: amlt need root user to build, but it will switch to a user called aiscuser when running
-# USER $USERNAME 
-# CMD sleep infinity
+USER $USERNAME 
+CMD sleep infinity

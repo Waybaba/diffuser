@@ -11,14 +11,13 @@ from torch.utils import data
 from pathlib import Path
 from torch.optim import Adam
 from torchvision import transforms, utils
-import imageio
 from PIL import Image
 
 import numpy as np
 from tqdm import tqdm
 from einops import rearrange
 from imageio import get_writer
-from diffusion import utils
+# from diffusion import utils
 
 try:
     from apex import amp
@@ -594,7 +593,8 @@ class GaussianDiffusion(nn.Module):
         batch_size = shape[0]
         x = torch.randn(shape, device=device)
 
-        progress = utils.Progress(self.num_timesteps) if verbose else Silent()
+        # progress = utils.Progress(self.num_timesteps) if verbose else Silent()
+        progress = Silent()
         for i in reversed(range(0, self.num_timesteps)):
             timesteps = torch.full((batch_size,), i, device=device, dtype=torch.long)
             x, values, scale = self.tamp_p_sample(cube, x, mask, timesteps, target_ratio, **sample_kwargs)
