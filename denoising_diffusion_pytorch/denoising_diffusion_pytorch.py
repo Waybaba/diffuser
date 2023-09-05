@@ -17,7 +17,7 @@ import numpy as np
 from tqdm import tqdm
 from einops import rearrange
 from imageio import get_writer
-# from diffusion import utils
+from diffuser import utils
 
 try:
     from apex import amp
@@ -587,14 +587,14 @@ class GaussianDiffusion(nn.Module):
         return model_mean + nonzero_mask * sigma * (noise + scale * grad), y, scale
 
     @torch.no_grad()
-    def tamp_p_sample_loop(self, shape, mask, cube, target_ratio, return_path=False, verbose=True, **sample_kwargs):
+    def tamp_p_sample_loop(self, shape, mask, cube, target_ratio, return_path=False, verbose=False, **sample_kwargs):
         device = self.betas.device
 
         batch_size = shape[0]
         x = torch.randn(shape, device=device)
 
-        # progress = utils.Progress(self.num_timesteps) if verbose else Silent()
-        progress = Silent()
+        progress = utils.Progress(self.num_timesteps) if verbose else utils.Silent()
+
         for i in reversed(range(0, self.num_timesteps)):
             timesteps = torch.full((batch_size,), i, device=device, dtype=torch.long)
             x, values, scale = self.tamp_p_sample(cube, x, mask, timesteps, target_ratio, **sample_kwargs)

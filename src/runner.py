@@ -125,6 +125,13 @@ class TrainValuesRunner:
         
         print("Finished!")
 
+class EvalRunner:
+    """
+
+    diffuser
+    guide
+    controller
+    """
 
 def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
     """ parse diffusion model from 
