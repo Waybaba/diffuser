@@ -597,7 +597,8 @@ class FillActModelModule(DefaultModule):
 		ep_r = []
 		for env_i in tqdm(range(len(ep_ref["s"]))):
 			device = next(model.parameters()).device
-			act = model(torch.cat([torch.tensor(s).to(device), torch.tensor(ep_ref["s_"][env_i])], dim=-1).float().to(device))
+			model.to(device)
+			act = model(torch.cat([torch.tensor(s).to(device), torch.tensor(ep_ref["s_"][env_i]).to(device)], dim=-1).float().to(device))
 			act = act.detach().cpu().numpy()
 			# act = ep_ref["act"][env_i] # ! DEBUG
 			s_, r, done, info = env.step(act)
