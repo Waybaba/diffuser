@@ -226,6 +226,10 @@ class EnvDataset:
 						cur_dict[k[6:]] = v[start:end]
 				episodes_ref.append(cur_dict)
 			self.episodes_ref = episodes_ref
+		# to cpu if cpu, to numpy if tensor
+		for i in range(len(self.episodes_ref)):
+			for k, v in self.episodes_ref[i].items():
+				if torch.is_tensor(v): self.episodes_ref[i][k] = v.cpu().numpy()
 		return self.episodes_ref
 
 class EnvEpisodeDataset(EnvDataset):

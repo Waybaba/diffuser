@@ -208,6 +208,8 @@ class FillActWrapper(ModelWrapperBase):
 			self.net[0] = self.net[0](in_features=in_dim)
 		if isinstance(self.net[-1], functools.partial):
 			self.net[-1] = self.net[-1](out_features=out_dim)
+		if kwargs["tahn"]:
+			self.net.append(nn.Tanh())
 		self.net = torch.nn.Sequential(*self.net)
 	
 	def forward(self, x):
