@@ -265,7 +265,7 @@ class EnvEpisodeDataset(EnvDataset):
 				if dones_idxes[i] > start: 
 					if dones_idxes[i] - start >= self.horizon:
 						indices.append([start, dones_idxes[i]])
-						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: return torch.tensor(indices)
+						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 					start = dones_idxes[i] + 1
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("multi_step"):
@@ -288,7 +288,7 @@ class EnvEpisodeDataset(EnvDataset):
 			for start in tqdm(range(0, len(dones) - max_gap)):
 				for inter in range(1, int(multi_step) + 1):
 					indices.append([start, start + self.horizon * inter, inter])
-					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: return torch.tensor(indices)
+					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("ep_multi_step"):
 			"""
@@ -310,7 +310,7 @@ class EnvEpisodeDataset(EnvDataset):
 					for inter in range(1, multi_step + 1):
 						indices.append([i, i + self.horizon * inter, inter])
 				start = end + 1  # Move to the start of the next episode
-				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: 
+				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: 
 					return torch.tensor(indices)
 				
 			indices = torch.tensor(indices)
@@ -410,7 +410,7 @@ class EnvTransitionDataset(EnvDataset):
 					break
 				if end_idx >= num_data: break
 				indices.append([i, end_idx])
-				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: return np.array(indices)
+				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return np.array(indices)
 
 
 		print("Dataset make indices done, the length is {}".format(len(indices)))
