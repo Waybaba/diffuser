@@ -66,7 +66,7 @@ modelmodule:
 datamodule: 
   _target_: src.datamodule.EnvDatamodule
   _partial_: true
-  batch_size: 1024
+  batch_size: 32
   pin_memory: false
   num_workers: ${oc.decode:${oc.env:NUM_WORKERS}}
   train_val_test_split: [0.95,0.025,0.025]

@@ -496,7 +496,7 @@ class EnvDatamodule(LightningDataModule):
 			self.data_val = [self.data_val]
 			self.data_test = [self.data_test]
 			# print length information
-			print("Dataset length: train {}, val {}, test {}".format(
+			print("[Dataset length][dslen,dataset length, val_len]: train {}, val {}, test {}".format(
 				len(self.data_train), len(self.data_val[0]), len(self.data_test[0])
 			))
 			
