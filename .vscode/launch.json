@@ -100,6 +100,7 @@
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
+			"noDebug": true,
 			"args": [
 				"experiment=train_controller",
 				"wandb.mode=disabled",
