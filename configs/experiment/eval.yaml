@@ -15,8 +15,9 @@ guide:
   _target_: diffuser.sampling.NoTrainGuideYLower
 
 controller:
-  # dir: /output/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
-  dir: /output/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
+  # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
+  # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
+  dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0
   epoch: last
 
 policy:
@@ -42,5 +43,5 @@ max_render: 1
 
 # common - for all tasks (task_name, tags, output_dir, device)
 algorithm_name: "DefaultAlgName"
-task_name: "RL_Diffuser"
+task_name: "EvalDiffuser"
 tags: ["debug"]

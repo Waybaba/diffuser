@@ -311,9 +311,14 @@ class DefaultModule(LightningModule):
 		self.val_acc_best_mean = MinMetric()
 
 		# log dataset length
-		self.log("once/len_train", len(dynamic_cfg["data_train"]))
-		self.log("once/len_val", [len(each) for each in dynamic_cfg["data_val"]])
-		self.log("once/len_test", [len(each) for each in dynamic_cfg["data_test"]])
+		if "data_train" in dynamic_cfg:
+			self.log("once/len_train", len(dynamic_cfg["data_train"]))
+		if "data_val" in dynamic_cfg:
+			self.log("once/len_val", sum([len(each) for each in dynamic_cfg["data_val"]]))
+		if "data_test" in dynamic_cfg:
+			self.log("once/len_test", sum([len(each) for each in dynamic_cfg["data_test"]]))
+		if "dataset" in dynamic_cfg:
+			self.log("once/len_dataset", len(dynamic_cfg["dataset"]))
 
 	def on_train_start(self):
 		# by default lightning executes validation step sanity checks before training starts,
@@ -881,8 +886,5 @@ class DiffuserModule(DefaultModule):
 			
 
 		return ref_res, img_res, None if len(chain_res) == 0 else chain_res
-
-	def forward(self, cond=None):
-		raise NotImplementedError("forward is not implemented in DiffuserModule")
-
+	
 ### Planner

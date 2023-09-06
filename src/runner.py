@@ -141,11 +141,12 @@ class EvalRunner:
 		self.cfg = cfg
 
 		# load
+		print("Loading modules ...")
 		diffuser = self.load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
 		controller = self.load_controller(cfg.controller.dir, cfg.controller.epoch)
 		assert diffuser.dynamic_cfg["dataset"].env_name.split("-")[0] == controller.dynamic_cfg["dataset"].env_name.split("-")[0], \
 			f"diffuser and controller should be trained on the same environment, while got {diffuser.dynamic_cfg['dataset'].env_name} and {controller.dynamic_cfg['dataset'].env_name}"
-		
+		print(f"\n\n\n### diffuser env loaded!: {diffuser.dynamic_cfg['dataset'].env_name}")
 		# TODO controller could be null
 		# TODO guide could be null
 		# TODO
@@ -201,8 +202,11 @@ class EvalRunner:
 		)]
 		wandb.log(to_log, commit=True)
 		
-		
 	def generate(self, conditions={}, repeat=1):
+		"""
+		return:
+			Trajectories(actions, observations, samples.values)
+		"""
 		actions, samples = self.policy(conditions, batch_size=repeat)
 		return samples.observations
 	

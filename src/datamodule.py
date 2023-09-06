@@ -13,10 +13,6 @@ from torchvision.transforms import transforms
 import torch
 import os
 
-
-
-
-
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 TransitionBatch = namedtuple('TransitionBatch', 's s_ act')
@@ -193,7 +189,6 @@ class EnvDataset:
 	def __len__(self):
 		return len(self.indices)
 
-
 	def get_episodes_ref(self, ep_num=10):
 		""" get reference episodes from dataset
 			a list of reference episodes [{
@@ -259,6 +254,7 @@ class EnvEpisodeDataset(EnvDataset):
 			(N, 2)
 			each element is (start, end)
 		"""
+		# fast_idx_making = True
 		if self.kwargs["mode"] == "default":
 			dones = dataset["terminals"]
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
@@ -477,6 +473,7 @@ class EnvDatamodule(LightningDataModule):
 			"act_dim": self.dataset.env.action_space.shape[0],
 			"env": self.dataset.env,
 			"dataset": self.dataset,
+			"data_train": self.data_train,
 			"data_val": self.data_val,
 			"data_test": self.data_test,
 			"renderer": self.dataset.renderer
