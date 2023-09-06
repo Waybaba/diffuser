@@ -597,17 +597,17 @@ class FillActModelModule(DefaultModule):
 			device = next(model.parameters()).device
 			model.to(device)
 			act = model(torch.cat([
-				normalizer.normalize(
-					torch.tensor(s).to(device), 
+				torch.tensor(normalizer.normalize(
+					s
 					"observations"
-				), 
-				normalizer.normalize(
-					torch.tensor(ep_ref["s_"][env_i]).to(device),
+				)).to(device), 
+				torch.tensor(normalizer.normalize(
+					ep_ref["s_"][env_i],
 					"observations"
-				)
+				)).to(device)
 			], dim=-1).float().to(device))
-			act = normalizer.unnormalize(act, "actions")
 			act = act.detach().cpu().numpy()
+			act = normalizer.unnormalize(act, "actions")
 			# act = ep_ref["act"][env_i] # ! DEBUG
 			s_, r, done, info = env.step(act)
 			ep_s.append(s)
