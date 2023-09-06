@@ -115,7 +115,7 @@ storage:
     container_name: v-wangwei1
     mount_dir: /mnt/storage
     # local_dir: /home/v-wangwei1/storage
-    local_dir: /mnt/storage
+    local_dir: /home/v-wangwei1/
 
 search:
   job_template:
