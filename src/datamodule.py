@@ -207,7 +207,7 @@ class EnvDataset:
 		# if not hasattr(self, "episodes_ref") or len(self.episodes_ref) == ep_num:
 		dataset = self.dataset
 		episodes_ref = []
-		from random import random
+		import random
 		cur = random.randint(0, len(dataset["terminals"]) - 1)
 		for i in range(ep_num):
 			start = cur
