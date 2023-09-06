@@ -598,7 +598,7 @@ class FillActModelModule(DefaultModule):
 			model.to(device)
 			act = model(torch.cat([
 				torch.tensor(normalizer.normalize(
-					s
+					s,
 					"observations"
 				)).to(device), 
 				torch.tensor(normalizer.normalize(
