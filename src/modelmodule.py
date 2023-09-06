@@ -553,7 +553,7 @@ class FillActModelModule(DefaultModule):
 		
 		### rollout -> [(T, obs_dim)]
 		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(ep_num=4)
-		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net) for ep_ref in episodes_ref]
+		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
 		
 		### cals metric
 		metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
@@ -569,9 +569,7 @@ class FillActModelModule(DefaultModule):
 			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,np.arange(STEPS)])
 		)])
 	
-
-	
-	def rollout_ref(self, env, ep_ref, model):
+	def rollout_ref(self, env, ep_ref, model, normalizer):
 		""" rollout reference episodes
 			env: the environment
 			ep_ref: (T, obs_dim)
@@ -598,7 +596,17 @@ class FillActModelModule(DefaultModule):
 		for env_i in tqdm(range(len(ep_ref["s"]))):
 			device = next(model.parameters()).device
 			model.to(device)
-			act = model(torch.cat([torch.tensor(s).to(device), torch.tensor(ep_ref["s_"][env_i]).to(device)], dim=-1).float().to(device))
+			act = model(torch.cat([
+				normalizer.normalize(
+					torch.tensor(s).to(device), 
+					"observations"
+				), 
+				normalizer.normalize(
+					torch.tensor(ep_ref["s_"][env_i]).to(device),
+					"observations"
+				)
+			], dim=-1).float().to(device))
+			act = normalizer.unnormalize(act, "actions")
 			act = act.detach().cpu().numpy()
 			# act = ep_ref["act"][env_i] # ! DEBUG
 			s_, r, done, info = env.step(act)
@@ -660,6 +668,13 @@ class FillActModelModule(DefaultModule):
 		img = renderer.composite(path, states[:, steps])
 		return img
 
+	def act(self, s, s_):
+		"""
+		assume s, s_ are unnormalized
+		"""
+		
+
+
 class EnvModelModule(FillActModelModule):
 	def step(self, batch: Any):
 		""" process the batch from dataloader and return the res_batch
@@ -690,7 +705,7 @@ class EnvModelModule(FillActModelModule):
 		# get ref episode from dataset (T, obs_dim)
 		episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=10)
 		# rollout to get [(T, obs_dim)]
-		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net) for ep_ref in episodes_ref]
+		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
 		# metric
 		metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
 		for k, v in metrics.items():
@@ -705,38 +720,38 @@ class EnvModelModule(FillActModelModule):
 			self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
 		)])
 
-	def rollout_ref(self, env, ep_ref, model):
-		SAMPLE_STEPS = 100
-		env.reset()
-		env.set_state(ep_ref["qpos"][0], ep_ref["qvel"][0])
-		s = ep_ref["s"][0]
-		ep_s, ep_a, ep_r = [], [], []
-		device = next(model.parameters()).device
-		model = model.to(device)
+	# def rollout_ref(self, env, ep_ref, model):
+	# 	SAMPLE_STEPS = 100
+	# 	env.reset()
+	# 	env.set_state(ep_ref["qpos"][0], ep_ref["qvel"][0])
+	# 	s = ep_ref["s"][0]
+	# 	ep_s, ep_a, ep_r = [], [], []
+	# 	device = next(model.parameters()).device
+	# 	model = model.to(device)
 
-		for env_i in tqdm(range(len(ep_ref["s"]))):
-			s, s_target = torch.tensor(s).float().to(device), torch.tensor(ep_ref["s_"][env_i]).float().to(device)
-			act = torch.tensor(env.action_space.sample()).float().to(device).requires_grad_(True)
+	# 	for env_i in tqdm(range(len(ep_ref["s"]))):
+	# 		s, s_target = torch.tensor(s).float().to(device), torch.tensor(ep_ref["s_"][env_i]).float().to(device)
+	# 		act = torch.tensor(env.action_space.sample()).float().to(device).requires_grad_(True)
 
-			optimizer = RMSprop([act], lr=1e-2, alpha=0.9)  # Assuming learning rate is 1e-2, adjust as needed
+	# 		optimizer = RMSprop([act], lr=1e-2, alpha=0.9)  # Assuming learning rate is 1e-2, adjust as needed
 
-			with torch.enable_grad():
-				for _ in range(SAMPLE_STEPS):
-					optimizer.zero_grad()
-					loss = torch.norm(model(torch.cat([s, act], dim=-1)) - s_target)
-					loss.backward()
-					optimizer.step()
+	# 		with torch.enable_grad():
+	# 			for _ in range(SAMPLE_STEPS):
+	# 				optimizer.zero_grad()
+	# 				loss = torch.norm(model(torch.cat([s, act], dim=-1)) - s_target)
+	# 				loss.backward()
+	# 				optimizer.step()
 
-			act_np = act.detach().cpu().numpy()
-			s_, r, done, _ = env.step(act_np)
-			ep_s.append(s.cpu().numpy())
-			ep_a.append(act_np)
-			ep_r.append(r)
-			s = s_
+	# 		act_np = act.detach().cpu().numpy()
+	# 		s_, r, done, _ = env.step(act_np)
+	# 		ep_s.append(s.cpu().numpy())
+	# 		ep_a.append(act_np)
+	# 		ep_r.append(r)
+	# 		s = s_
 
-			if done: break
+	# 		if done: break
 
-		return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
+	# 	return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
 
 ### Diffuser
 class DiffuserModule(DefaultModule):
