@@ -237,7 +237,11 @@ class EnvDataset:
 			self.episodes_ref[i]["s"] = self.normalizer.unnormalize(self.episodes_ref[i]["s"], "observations")
 			self.episodes_ref[i]["s_"] = self.normalizer.unnormalize(self.episodes_ref[i]["s_"], "observations")
 			self.episodes_ref[i]["act"] = self.normalizer.unnormalize(self.episodes_ref[i]["act"], "actions")
-
+		# cut to the same length
+		min_len = min([len(ep["s"]) for ep in self.episodes_ref])
+		for i in range(len(self.episodes_ref)):
+			for k, v in self.episodes_ref[i].items():
+				if isinstance(v, np.ndarray): self.episodes_ref[i][k] = v[:min_len]
 		return self.episodes_ref
 
 class EnvEpisodeDataset(EnvDataset):
