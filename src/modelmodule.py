@@ -310,6 +310,11 @@ class DefaultModule(LightningModule):
 		self.val_acc_best = nn.ModuleList([MinMetric()for _ in dynamic_cfg["data_val"]])
 		self.val_acc_best_mean = MinMetric()
 
+		# log dataset length
+		self.log("once/len_train", len(dynamic_cfg["data_train"]))
+		self.log("once/len_val", [len(each) for each in dynamic_cfg["data_val"]])
+		self.log("once/len_test", [len(each) for each in dynamic_cfg["data_test"]])
+
 	def on_train_start(self):
 		# by default lightning executes validation step sanity checks before training starts,
 		# so we need to make sure val_acc_best doesn't store accuracy from these checks
