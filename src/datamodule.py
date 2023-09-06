@@ -204,38 +204,39 @@ class EnvDataset:
 			always return the first {ep_num} episodes, since we do not distinguish train, val
 			ps. return are unnormalized!
 		"""
-		if not hasattr(self, "episodes_ref") or len(self.episodes_ref) == ep_num:
-			dataset = self.dataset
-			episodes_ref = []
-			cur = 0
-			for i in range(ep_num):
-				start = cur
-				while True:
-					done = dataset["terminals"][cur]
-					if "timeouts" in dataset: done |= dataset["timeouts"][cur]
-					cur += 1
-					if done: 
-						end = cur
-						break
-				cur_dict = {}
-				cur_dict["s"] = dataset["observations"][start:end]
-				cur_dict["act"] = dataset["actions"][start:end]
-				cur_dict["s_"] = dataset["observations"][start+1:end+1]
-				# cur_dict["r"] = dataset["rewards"][start:end]
-				for k, v in dataset.items():
-					if k.startswith("infos/"): # for ther d4rl keys such as infos/qvel
-						cur_dict[k[6:]] = v[start:end]
-				episodes_ref.append(cur_dict)
-			self.episodes_ref = episodes_ref
-			# to cpu if cpu, to numpy if tensor
-			for i in range(len(self.episodes_ref)):
-				for k, v in self.episodes_ref[i].items():
-					if torch.is_tensor(v): self.episodes_ref[i][k] = v.cpu().numpy()
-			# unnormalize
-			for i in range(len(self.episodes_ref)):
-				self.episodes_ref[i]["s"] = self.normalizer.unnormalize(self.episodes_ref[i]["s"], "observations")
-				self.episodes_ref[i]["s_"] = self.normalizer.unnormalize(self.episodes_ref[i]["s_"], "observations")
-				self.episodes_ref[i]["act"] = self.normalizer.unnormalize(self.episodes_ref[i]["act"], "actions")
+		# if not hasattr(self, "episodes_ref") or len(self.episodes_ref) == ep_num:
+		dataset = self.dataset
+		episodes_ref = []
+		from random import random
+		cur = random.randint(0, len(dataset["terminals"]) - 1)
+		for i in range(ep_num):
+			start = cur
+			while True:
+				done = dataset["terminals"][cur]
+				if "timeouts" in dataset: done |= dataset["timeouts"][cur]
+				cur += 1
+				if done: 
+					end = cur
+					break
+			cur_dict = {}
+			cur_dict["s"] = dataset["observations"][start:end]
+			cur_dict["act"] = dataset["actions"][start:end]
+			cur_dict["s_"] = dataset["observations"][start+1:end+1]
+			# cur_dict["r"] = dataset["rewards"][start:end]
+			for k, v in dataset.items():
+				if k.startswith("infos/"): # for ther d4rl keys such as infos/qvel
+					cur_dict[k[6:]] = v[start:end]
+			episodes_ref.append(cur_dict)
+		self.episodes_ref = episodes_ref
+		# to cpu if cpu, to numpy if tensor
+		for i in range(len(self.episodes_ref)):
+			for k, v in self.episodes_ref[i].items():
+				if torch.is_tensor(v): self.episodes_ref[i][k] = v.cpu().numpy()
+		# unnormalize
+		for i in range(len(self.episodes_ref)):
+			self.episodes_ref[i]["s"] = self.normalizer.unnormalize(self.episodes_ref[i]["s"], "observations")
+			self.episodes_ref[i]["s_"] = self.normalizer.unnormalize(self.episodes_ref[i]["s_"], "observations")
+			self.episodes_ref[i]["act"] = self.normalizer.unnormalize(self.episodes_ref[i]["act"], "actions")
 
 		return self.episodes_ref
 
