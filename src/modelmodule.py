@@ -203,8 +203,11 @@ class FillActWrapper(ModelWrapperBase):
 		in_dim = dynamic_cfg["obs_dim"] * 2
 		out_dim = dynamic_cfg["act_dim"]
 		self.net = kwargs["net"]
-		self.net[0] = self.net[0](in_features=in_dim)
-		self.net[-1] = self.net[-1](out_features=out_dim)
+		# if partial, give input dim
+		if isinstance(self.net[0], functools.partial):
+			self.net[0] = self.net[0](in_features=in_dim)
+		if isinstance(self.net[-1], functools.partial):
+			self.net[-1] = self.net[-1](out_features=out_dim)
 		self.net = torch.nn.Sequential(*self.net)
 	
 	def forward(self, x):
@@ -547,7 +550,7 @@ class FillActModelModule(DefaultModule):
 		super().validation_epoch_end(outputs)
 		
 		### rollout -> [(T, obs_dim)]
-		episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=4)
+		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(ep_num=4)
 		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net) for ep_ref in episodes_ref]
 		
 		### cals metric
@@ -564,30 +567,7 @@ class FillActModelModule(DefaultModule):
 			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,np.arange(STEPS)])
 		)])
 	
-	def get_ref_episodes(self, env, ep_num=10):
-		""" get reference episodes from dataset
-			a list of reference episodes [(T_i, obs_dim)]
-		"""
-		dataset = env.get_dataset()
-		episodes_ref = []
-		cur = 0
-		for i in range(ep_num):
-			start = cur
-			while True:
-				done = dataset["terminals"][cur] or dataset["timeouts"][cur]
-				cur += 1
-				if done: 
-					end = cur
-					break
-			episodes_ref.append({
-				"s": dataset["observations"][start:end],
-				"act": dataset["actions"][start:end],
-				"s_": dataset["observations"][start+1:end+1],
-				"r": dataset["rewards"][start:end],
-				"qpos": dataset["infos/qpos"][start:end],
-				"qvel": dataset["infos/qvel"][start:end], # TODO ! only support mujoco now
-			})
-		return episodes_ref
+
 	
 	def rollout_ref(self, env, ep_ref, model):
 		""" rollout reference episodes

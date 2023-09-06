@@ -55,9 +55,9 @@ modelmodule:
         scheduler:
           _target_: torch.optim.lr_scheduler.CosineAnnealingLR
           _partial_: true
-          T_max: ${trainer.max_epochs}
+          T_max: ${trainer.max_steps}
           eta_min: 1e-5
-        interval: epoch
+        interval: step 
         frequency: 1
   optimization_first: ${modelmodule.optimizations.0} # for wandb log
 
@@ -88,8 +88,8 @@ trainer:
     default_root_dir: ${output_dir}
     # callbacks: ${callbacks}
     # logger: ${logger}
-    min_epochs: null
-    max_epochs: 10
+    # min_epochs: null
+    # max_epochs: 10
     accelerator: "gpu"
     # devices: 1
     # move_metrics_to_cpu: true
@@ -97,8 +97,14 @@ trainer:
     # max_steps: 40000.0
     log_every_n_steps: 100
     num_sanity_val_steps: 2
-    check_val_every_n_epoch: 1
-
+    # check_val_every_n_epoch: 1
+    
+    # min_epochs: null
+    # max_epochs: 100
+    # move_metrics_to_cpu: true
+    max_steps: 40000
+    val_check_interval: 1000
+    check_val_every_n_epoch: null
 
 # common - for all tasks (task_name, tags, output_dir, device)
 algorithm_name: "DefaultAlgName"

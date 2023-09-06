@@ -11,6 +11,8 @@
 		"--shm-size", "32G",
 		"--cpus", ".75",
 		"--memory", "32g",
+		// env variable
+		"--env", "UDEVICEID=${localEnv:UDEVICEID}",
 	],
 	"overrideCommand": false, // important! the default true will override the command in the dockerfile as "/bin/sh -c "while sleep 1000; do :; done"" so that tensorboard service will be down
 	"extensions": [

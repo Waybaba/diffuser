@@ -29,6 +29,7 @@
 				// "global_cfg.horizon=100",
 				// #### mujoco
 				// "experiment=train_diffuser_locomotion",
+				"+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
 				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
@@ -103,7 +104,7 @@
 				"experiment=train_controller",
 				"wandb.mode=disabled",
 				"datamodule.dataset.multi_step=5",
-				// "+trainer.fast_dev_run=5",
+				"datamodule.dataset.env=kuka",
 			],
 		},
 		// train_envmodel
@@ -119,6 +120,19 @@
 				// "wandb.mode=disabled",
 				"callbacks.model_checkpoint.every_n_epochs=1",
 				// "+trainer.fast_dev_run=5",
+			],
+		},
+		// eval
+		{
+			"name": "eval",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				"experiment=eval",
+				// "wandb.mode=disabled",
 			],
 		},
 		{

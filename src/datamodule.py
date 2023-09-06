@@ -37,18 +37,22 @@ class DatasetNormalizerW:
 	def unnormalize(self, x, key):
 		return self.normalizers[key].unnormalize(x)
 
-def load_kuka(env, custom_ds_path):
+def load_kuka(env, custom_ds_path=None):
 	""" load kuka env 
 	"""
 	from glob import glob
 	assert "kuka" in env, "only support kuka env"
+	if custom_ds_path is None:
+		custom_ds_path = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/"
+		print(f"using kuka default dataset path {custom_ds_path}")
 	from gym_stacking.env import StackEnv
 	env = StackEnv()
 	dataset = custom_ds_path + "/*.npy"
 	# dataset = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy" # DEBUG
 	datasets = sorted(glob(dataset))
+	print(f"found {len(datasets)} datasets at {dataset}")
 	datasets = [np.load(dataset) for dataset in tqdm(
-		datasets[:100] if os.environ.get("DEBUG", False) else datasets,
+		datasets[:100] if os.environ.get("DEBUG", "false").lower()=="true" else datasets,
 	)] # read from file
 	datasets = [dataset[::2] for dataset in datasets]
 	ep_lengths = [len(dataset) for dataset in datasets]
@@ -168,7 +172,10 @@ class EnvDataset:
 		### put into GPU
 		if gpu:
 			for k in self.dataset.keys():
-				self.dataset[k] = torch.tensor(self.dataset[k]).float().cuda()
+				# if double, turn to float
+				if self.dataset[k].dtype == np.float64:
+					self.dataset[k] = self.dataset[k].astype(np.float32)
+				self.dataset[k] = torch.tensor(self.dataset[k]).cuda()
 		
 		### set renderer
 		if "maze" in self.env_name:
@@ -185,6 +192,41 @@ class EnvDataset:
 
 	def __len__(self):
 		return len(self.indices)
+
+
+	def get_episodes_ref(self, ep_num=10):
+		""" get reference episodes from dataset
+			a list of reference episodes [{
+				"s": (T, obs_dim)
+				"act": (T, act_dim)
+				...
+			}]
+			always return the first {ep_num} episodes, since we do not distinguish train, val
+		"""
+		if not hasattr(self, "episodes_ref") or len(self.episodes_ref) == ep_num:
+			dataset = self.dataset
+			episodes_ref = []
+			cur = 0
+			for i in range(ep_num):
+				start = cur
+				while True:
+					done = dataset["terminals"][cur]
+					if "timeouts" in dataset: done |= dataset["timeouts"][cur]
+					cur += 1
+					if done: 
+						end = cur
+						break
+				cur_dict = {}
+				cur_dict["s"] = dataset["observations"][start:end]
+				cur_dict["act"] = dataset["actions"][start:end]
+				cur_dict["s_"] = dataset["observations"][start+1:end+1]
+				# cur_dict["r"] = dataset["rewards"][start:end]
+				for k, v in dataset.items():
+					if k.startswith("infos/"): # for ther d4rl keys such as infos/qvel
+						cur_dict[k[6:]] = v[start:end]
+				episodes_ref.append(cur_dict)
+			self.episodes_ref = episodes_ref
+		return self.episodes_ref
 
 class EnvEpisodeDataset(EnvDataset):
 
@@ -212,7 +254,7 @@ class EnvEpisodeDataset(EnvDataset):
 				if dones_idxes[i] > start: 
 					if dones_idxes[i] - start >= self.horizon:
 						indices.append([start, dones_idxes[i]])
-						if os.environ.get("DEBUG", False) and len(indices) > 1000: return torch.tensor(indices)
+						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: return torch.tensor(indices)
 					start = dones_idxes[i] + 1
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("multi_step"):
@@ -235,7 +277,7 @@ class EnvEpisodeDataset(EnvDataset):
 			for start in tqdm(range(0, len(dones) - max_gap)):
 				for inter in range(1, int(multi_step) + 1):
 					indices.append([start, start + self.horizon * inter, inter])
-					if os.environ.get("DEBUG", False) and len(indices) > 1000: return torch.tensor(indices)
+					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("ep_multi_step"):
 			"""
@@ -257,7 +299,7 @@ class EnvEpisodeDataset(EnvDataset):
 					for inter in range(1, multi_step + 1):
 						indices.append([i, i + self.horizon * inter, inter])
 				start = end + 1  # Move to the start of the next episode
-				if os.environ.get("DEBUG", False) and len(indices) > 1000: 
+				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: 
 					return torch.tensor(indices)
 				
 			indices = torch.tensor(indices)
@@ -354,10 +396,10 @@ class EnvTransitionDataset(EnvDataset):
 				end_idx = i + j
 				if dones[end_idx]: 
 					indices.append([i, end_idx])
-					if os.environ.get("DEBUG", False) and len(indices) > 1000: return np.array(indices)
 					break
 				if end_idx >= num_data: break
 				indices.append([i, end_idx])
+				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 1000: return np.array(indices)
 
 
 		print("Dataset make indices done, the length is {}".format(len(indices)))
