@@ -579,15 +579,15 @@ class FillActModelModule(DefaultModule):
 			then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
 		"""
 		# reset env with qpos, qvel
-		init_qpos = ep_ref["qpos"][0]
-		init_qvel = ep_ref["qvel"][0]
-		env.reset()
-		env.set_state(init_qpos, init_qvel)
-		s = ep_ref["s"][0]
-		# s_ref = ep_ref["s_"][0]
-		# s_, _, _, _ = env.step(ep_ref["act"][0])
-		# print(s_)
-		# print(s_ref)
+		if "qpos" in ep_ref:
+			init_qpos = ep_ref["qpos"][0]
+			init_qvel = ep_ref["qvel"][0]
+			env.set_state(init_qpos, init_qvel)
+			env.reset()
+			s = ep_ref["s"][0]
+		else:
+			s = env.reset()
+
 
 		# run
 		ep_s = []
