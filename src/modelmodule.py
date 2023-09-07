@@ -1,16 +1,12 @@
 from typing import Any, List
-import torch
 from pytorch_lightning import LightningModule
 from torchmetrics import MaxMetric, MinMetric, Metric
 import torch.nn as nn
 from torchmetrics.classification.accuracy import Accuracy
 import torch
-import torch.nn as nn
 from tqdm import tqdm
 import numpy as np
 import wandb
-from collections import namedtuple
-from torch.optim import RMSprop
 import inspect
 import einops
 from diffuser.utils.arrays import batch_to_device, to_np, to_device, apply_dict
@@ -377,6 +373,7 @@ class DefaultModule(LightningModule):
 		self.val_acc_best_mean = MinMetric()
 
 		# log dataset length
+		len_log = {}
 		if "data_train" in dynamic_cfg:
 			self.log("once/len_train", len(dynamic_cfg["data_train"]))
 		if "data_val" in dynamic_cfg:
@@ -385,6 +382,7 @@ class DefaultModule(LightningModule):
 			self.log("once/len_test", sum([len(each) for each in dynamic_cfg["data_test"]]))
 		if "dataset" in dynamic_cfg:
 			self.log("once/len_dataset", len(dynamic_cfg["dataset"]))
+		if len_log: wandb.log(len_log)
 
 	def on_train_start(self):
 		# by default lightning executes validation step sanity checks before training starts,

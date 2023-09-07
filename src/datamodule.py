@@ -135,7 +135,7 @@ class EnvDataset:
 			self.env, self.dataset = load_kuka(env, custom_ds_path)
 		else:
 			self.env = load_environment(env) # TOODO can not use gym.make ?
-			if custom_ds_path: self.dataset = env.get_dataset(custom_ds_path)
+			if custom_ds_path: self.dataset = self.env.get_dataset(custom_ds_path)
 			else: self.dataset = self.env.get_dataset()
 			# self.dataset = d4rl.qlearning_dataset(self.env_name)
 			# self.dataset.update(self.env.get_dataset())
@@ -326,10 +326,10 @@ class EnvEpisodeDataset(EnvDataset):
 			condition on both the current observation and the last observation in the plan
 		'''
 		cond = {0: observations[0]}
-		if "mazefwaefaf" in self.env_name:
-			cond.update({
-				self.horizon - 1: observations[-1],
-			})
+		# if "maze" in self.env_name:
+		# 	cond.update({
+		# 		self.horizon - 1: observations[-1],
+		# 	})
 		return cond
 	
 	def __getitem__(self, idx):

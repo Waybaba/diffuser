@@ -4,8 +4,11 @@ defaults:
   - /callbacks: default.yaml
   - /logger: wandb.yaml
 
-global_cfg: # would be passed to actor, critic1, critic2, policy, env
+### shared by modelmodule, datamodule, runner, trainer ...
+global_cfg:
   null
+
+### main
 
 runner:
   _target_: src.runner.TrainControllerRunner
@@ -62,7 +65,6 @@ modelmodule:
         frequency: 1
   optimization_first: ${modelmodule.optimizations.0} # for wandb log
 
-
 datamodule: 
   _target_: src.datamodule.EnvDatamodule
   _partial_: true
@@ -81,33 +83,19 @@ datamodule:
     gpu: true
     seed: ${seed}
 
-
-
 trainer:
     _target_: "pytorch_lightning.Trainer"
     _partial_: true
     default_root_dir: ${output_dir}
-    # callbacks: ${callbacks}
-    # logger: ${logger}
-    # min_epochs: null
-    # max_epochs: 10
     accelerator: "gpu"
-    # devices: 1
-    # move_metrics_to_cpu: true
     deterministic: false
-    # max_steps: 40000.0
     log_every_n_steps: 100
     num_sanity_val_steps: 2
-    # check_val_every_n_epoch: 1
-    
-    # min_epochs: null
-    # max_epochs: 100
-    # move_metrics_to_cpu: true
     max_steps: 40000
     val_check_interval: 1000
     check_val_every_n_epoch: null
 
-# common - for all tasks (task_name, tags, output_dir, device)
+### common - for all tasks (task_name, tags, output_dir, device)
 algorithm_name: "DefaultAlgName"
 task_name: "RL_Diffuser"
 tags: ["debug"]
