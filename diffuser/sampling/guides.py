@@ -118,6 +118,20 @@ class NoTrainGuideHalfLonger(NoTrainGuideDistance):
 	SHORTER = False
 	HALF = True
 
+class DummyGuide(NoTrainGuideShorter):
+	"""
+	always return 0
+	"""
+	SHORTER = False
+	HALF = False
+
+	def forward(self, x, cond, t):
+		total_distance = self.cal_distance(x)
+		
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance * 0
+		else: return total_distance *  0.0
+
 ## Average coordinate
 
 class NoTrainGuideAvgCoordinate(NoTrainGuide):

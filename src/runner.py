@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-
+from .modelmodule import rollout_ref
 from tqdm import tqdm
 
 OPEN_LARGE = \
@@ -149,9 +149,9 @@ class EvalRunner:
 		print(f"\n\n\n### diffuser env loaded!: {diffuser.dynamic_cfg['dataset'].env_name}")
 		# TODO controller could be null
 		# TODO guide could be null
-		# TODO
 
-		# distill
+		### distill
+		N_EPISODES = 4
 		diffusion, dataset, self.renderer = diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
 		self.policy = cfg.policy(
 			guide=cfg.guide,
@@ -166,17 +166,31 @@ class EvalRunner:
 		self.actor.eval()
 		self.env = dataset.env
 
-		# generate
+		### generate
 		episodes_ref = self.generate(
 			conditions={
 				0: np.zeros(
 					shape=dataset.env.observation_space.shape
 				)
-			}
+			}, repeat=N_EPISODES
 		) # N, T, obs_dim
+		episodes_ds = dataset.get_episodes_ref(ep_num=N_EPISODES)
 
-		# control
-		episodes_rollout = [self.rollout_ep(self.env, episodes_ref[i], self.actor) for i in range(len(episodes_ref))]
+		### control
+		episodes_rollout = [rollout_ref(self.env, episodes_ref[i], self.actor, dataset.normalizer) for i in range(len(episodes_ref))]
+		episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]
+		# stack_all
+		# res = {}
+		# for k in episodes_rollout[0].keys():
+		# 	res[k] = np.stack([each[k] for each in episodes_rollout], axis=0)
+		# episodes_rollout = res
+		# res = {}
+		# for k in episodes_ds_rollout[0].keys():
+		# 	res[k] = np.stack([each[k] for each in episodes_ds_rollout], axis=0)
+		# episodes_ds_rollout = res
+		# obs_rollout = episodes_rollout["s"]
+		# obs_ds_rollout = episodes_ds_rollout["s"]
+
 		
 		### cals metric
 		# metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
@@ -184,21 +198,22 @@ class EvalRunner:
 		
 		### render
 		LOG_PREFIX = "val_ep_end"
-		STEPS = 20
+		STEPS = min(len(episodes_rollout[0]["s"]), len(episodes_ds_rollout[0]["s"]), 32)
+		states_episode_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
+		states_ds_rollout = np.stack([each["s"] for each in episodes_ds_rollout], axis=0)
 		to_log = {}
-
-		# wandb.log(f"{LOG_PREFIX}/ref", [wandb.Image(
-		# 	self.renderer.episodes2img(episodes_ref[:4,np.arange(STEPS)])
-		# )])
-		# wandb.log(f"{LOG_PREFIX}/rollout", [wandb.Image(
-		# 	self.renderer.episodes2img(states_rollout[:4,np.arange(STEPS)])
-		# )])
 		to_log[f"{LOG_PREFIX}/ref"] = [wandb.Image(
 			self.renderer.episodes2img(episodes_ref[:4,np.arange(STEPS)])
 		)]
 		to_log[f"{LOG_PREFIX}/rollout"] = [wandb.Image(
 			self.renderer.episodes2img(states_rollout[:4,np.arange(STEPS)])
+		)]
+		to_log[f"{LOG_PREFIX}/ds"] = [wandb.Image(
+			self.renderer.episodes2img(states_episode_ds[:4,np.arange(STEPS)])
+		)]
+		to_log[f"{LOG_PREFIX}/ds_rollout"] = [wandb.Image(
+			self.renderer.episodes2img(states_ds_rollout[:4,np.arange(STEPS)])
 		)]
 		wandb.log(to_log, commit=True)
 		
@@ -234,62 +249,6 @@ class EvalRunner:
 		)
 		return modelmodule
 	
-	def rollout_ref(self, env, ep_ref, model):
-		""" rollout reference episodes
-			env: the environment
-			ep_ref: {
-				"s": (T, obs_dim),
-				"s_": (T, obs_dim),
-				"qpos": # for mujoco
-				"qvel": # for mujoco
-			}
-			model: (obs_cur, obs_next) -> act
-			for each step i, use current obs as obs_cur, use ep_ref[i] as obs_next
-			act = model(obs_cur, obs_next)
-			then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
-		"""
-		# reset env with qpos, qvel
-		if "qpos" in ep_ref:
-			init_qpos = ep_ref["qpos"][0]
-			init_qvel = ep_ref["qvel"][0]
-			env.set_state(init_qpos, init_qvel)
-			env.reset()
-			s = ep_ref["s"][0]
-		else:
-			s = env.reset()
-
-		# run
-		ep_s = []
-		ep_a = []
-		ep_r = []
-		for env_i in tqdm(range(len(ep_ref["s"]))):
-			device = next(model.parameters()).device
-			act = model(torch.cat([torch.tensor(s), torch.tensor(ep_ref["s_"][env_i])], dim=-1).float().to(device))
-			act = act.detach().cpu().numpy()
-			# act = ep_ref["act"][env_i] # ! DEBUG
-			s_, r, done, info = env.step(act)
-			ep_s.append(s)
-			ep_a.append(act)
-			ep_r.append(r)
-			s = s_
-			if done: break
-		return {
-			"s": np.stack(ep_s),
-			"act": np.stack(ep_a),
-			"r": np.stack(ep_r),
-		}
-	
-	def rollout_ep(self, env, ep, model):
-		"""
-			ep: T, obs_dim
-		"""
-		ep_ref = {
-			"s": np.stack(ep),
-			"s_": np.concatenate([ep[1:], ep[-1:]], axis=0),
-		}
-		return self.rollout_ref(env, ep_ref, model)
-
-
 
 
 

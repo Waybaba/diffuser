@@ -135,6 +135,7 @@
 			"args": [
 				"experiment=eval",
 				// "wandb.mode=disabled",
+				"wandb.mode=online",
 			],
 		},
 		{

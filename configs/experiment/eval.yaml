@@ -12,7 +12,8 @@ diffuser:
   epoch: last
 
 guide:
-  _target_: diffuser.sampling.NoTrainGuideYLower
+  # _target_: diffuser.sampling.NoTrainGuideYLower
+  _target_: diffuser.sampling.DummyGuide
 
 controller:
   # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/

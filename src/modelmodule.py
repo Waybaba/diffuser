@@ -120,7 +120,73 @@ class Controller:
 			return torch.random.randint(0, self.kwargs["act_dim"], size=(1,))
 		else:
 			raise ValueError(f"mode {self.mode} not supported")
-		
+
+def rollout_ref(env, ep_ref, model, normalizer):
+	""" rollout reference episodes
+		TODO support different type of model, now it is
+		env: the environment
+		ep_ref: 
+			1. {
+				"s": (T, obs_dim),
+				"s_": (T, obs_dim),
+				"qpos": # optional for mujoco reset
+				"qvel": # 
+			} 
+			2. (T, obs_dim)
+				would be convert to 1.
+			
+		model: (obs_cur, obs_next) -> act
+		for each step i, use current obs as obs_cur, use ep_ref[i] as obs_next
+		act = model(obs_cur, obs_next)
+		then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
+	"""
+	# convert if not dict
+	if not isinstance(ep_ref, dict):
+		ep_ref = {
+			"s": np.stack(ep_ref),
+			"s_": np.concatenate([ep_ref[1:], ep_ref[-1:]], axis=0),
+		}
+	# reset env with qpos, qvel
+	if "qpos" in ep_ref:
+		init_qpos = ep_ref["qpos"][0]
+		init_qvel = ep_ref["qvel"][0]
+		env.set_state(init_qpos, init_qvel)
+		env.reset()
+		s = ep_ref["s"][0]
+	else:
+		s = env.reset()
+
+	# run
+	ep_s = []
+	ep_a = []
+	ep_r = []
+	for env_i in tqdm(range(len(ep_ref["s"]))):
+		device = next(model.parameters()).device
+		model.to(device)
+		act = model(torch.cat([
+			torch.tensor(normalizer.normalize(
+				s,
+				"observations"
+			)).to(device), 
+			torch.tensor(normalizer.normalize(
+				ep_ref["s_"][env_i],
+				"observations"
+			)).to(device)
+		], dim=-1).float().to(device))
+		act = act.detach().cpu().numpy()
+		act = normalizer.unnormalize(act, "actions")
+		# act = ep_ref["act"][env_i] # ! DEBUG
+		s_, r, done, info = env.step(act)
+		ep_s.append(s)
+		ep_a.append(act)
+		ep_r.append(r)
+		s = s_
+		if done: break
+	return {
+		"s": np.stack(ep_s),
+		"act": np.stack(ep_a),
+		"r": np.stack(ep_r),
+	}
 
 import functools
 
@@ -558,12 +624,12 @@ class FillActModelModule(DefaultModule):
 	def validation_epoch_end(self, outputs):
 		assert self.net.training == False, "net should be in eval mode"
 		LOG_PREFIX = "val_ep_end"
-		STEPS = 40
+		STEPS = 80
 		super().validation_epoch_end(outputs)
 		
 		### rollout -> [(T, obs_dim)]
 		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(ep_num=4)
-		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
+		episodes_rollout = [rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
 		
 		### cals metric
 		metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
@@ -578,58 +644,6 @@ class FillActModelModule(DefaultModule):
 		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
 			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,np.arange(STEPS)])
 		)])
-	
-	def rollout_ref(self, env, ep_ref, model, normalizer):
-		""" rollout reference episodes
-			env: the environment
-			ep_ref: (T, obs_dim)
-			model: (obs_cur, obs_next) -> act
-			for each step i, use current obs as obs_cur, use ep_ref[i] as obs_next
-			act = model(obs_cur, obs_next)
-			then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
-		"""
-		# reset env with qpos, qvel
-		if "qpos" in ep_ref:
-			init_qpos = ep_ref["qpos"][0]
-			init_qvel = ep_ref["qvel"][0]
-			env.set_state(init_qpos, init_qvel)
-			env.reset()
-			s = ep_ref["s"][0]
-		else:
-			s = env.reset()
-
-
-		# run
-		ep_s = []
-		ep_a = []
-		ep_r = []
-		for env_i in tqdm(range(len(ep_ref["s"]))):
-			device = next(model.parameters()).device
-			model.to(device)
-			act = model(torch.cat([
-				torch.tensor(normalizer.normalize(
-					s,
-					"observations"
-				)).to(device), 
-				torch.tensor(normalizer.normalize(
-					ep_ref["s_"][env_i],
-					"observations"
-				)).to(device)
-			], dim=-1).float().to(device))
-			act = act.detach().cpu().numpy()
-			act = normalizer.unnormalize(act, "actions")
-			# act = ep_ref["act"][env_i] # ! DEBUG
-			s_, r, done, info = env.step(act)
-			ep_s.append(s)
-			ep_a.append(act)
-			ep_r.append(r)
-			s = s_
-			if done: break
-		return {
-			"s": np.stack(ep_s),
-			"act": np.stack(ep_a),
-			"r": np.stack(ep_r),
-		}
 	
 	def cal_ref_rollout_metrics(self, episodes_ref, episodes_rollout):
 		""" cal ref rollout metrics
@@ -715,7 +729,8 @@ class EnvModelModule(FillActModelModule):
 		# get ref episode from dataset (T, obs_dim)
 		episodes_ref = self.get_ref_episodes(self.dynamic_cfg["env"], ep_num=10)
 		# rollout to get [(T, obs_dim)]
-		episodes_rollout = [self.rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
+		raise ValueError("need to implement rollout for this")
+		episodes_rollout = [rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
 		# metric
 		metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
 		for k, v in metrics.items():
@@ -729,39 +744,6 @@ class EnvModelModule(FillActModelModule):
 		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
 			self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
 		)])
-
-	# def rollout_ref(self, env, ep_ref, model):
-	# 	SAMPLE_STEPS = 100
-	# 	env.reset()
-	# 	env.set_state(ep_ref["qpos"][0], ep_ref["qvel"][0])
-	# 	s = ep_ref["s"][0]
-	# 	ep_s, ep_a, ep_r = [], [], []
-	# 	device = next(model.parameters()).device
-	# 	model = model.to(device)
-
-	# 	for env_i in tqdm(range(len(ep_ref["s"]))):
-	# 		s, s_target = torch.tensor(s).float().to(device), torch.tensor(ep_ref["s_"][env_i]).float().to(device)
-	# 		act = torch.tensor(env.action_space.sample()).float().to(device).requires_grad_(True)
-
-	# 		optimizer = RMSprop([act], lr=1e-2, alpha=0.9)  # Assuming learning rate is 1e-2, adjust as needed
-
-	# 		with torch.enable_grad():
-	# 			for _ in range(SAMPLE_STEPS):
-	# 				optimizer.zero_grad()
-	# 				loss = torch.norm(model(torch.cat([s, act], dim=-1)) - s_target)
-	# 				loss.backward()
-	# 				optimizer.step()
-
-	# 		act_np = act.detach().cpu().numpy()
-	# 		s_, r, done, _ = env.step(act_np)
-	# 		ep_s.append(s.cpu().numpy())
-	# 		ep_a.append(act_np)
-	# 		ep_r.append(r)
-	# 		s = s_
-
-	# 		if done: break
-
-	# 	return {"s": np.stack(ep_s), "act": np.stack(ep_a), "r": np.stack(ep_r)}
 
 ### Diffuser
 class DiffuserModule(DefaultModule):
@@ -886,5 +868,5 @@ class DiffuserModule(DefaultModule):
 			
 
 		return ref_res, img_res, None if len(chain_res) == 0 else chain_res
-	
+
 ### Planner

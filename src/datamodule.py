@@ -13,6 +13,7 @@ from torchvision.transforms import transforms
 import torch
 import os
 
+
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 TransitionBatch = namedtuple('TransitionBatch', 's s_ act')
@@ -189,7 +190,7 @@ class EnvDataset:
 	def __len__(self):
 		return len(self.indices)
 
-	def get_episodes_ref(self, ep_num=10):
+	def get_episodes_ref(self, ep_num=4):
 		""" get reference episodes from dataset
 			a list of reference episodes [{
 				"s": (T, obs_dim)
