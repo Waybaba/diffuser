@@ -754,6 +754,11 @@ class DiffuserModule(DefaultModule):
 		"""
 		# s, s_, act
 		loss, _ = self.net.loss(*batch)
+		# applying nosie robustness
+		if self.hparams.data_noise: 
+			batch = batch._replace(trajectories=batch.trajectories + torch.randn_like(batch.trajectories) * self.hparams.data_noise)
+			for k, v in batch.conditions.items():
+				batch.conditions[k] += torch.randn_like(v) * self.hparams.data_noise
 		res_batch = {
 			"outputs": batch.trajectories, # TODO
 			"preds": batch.trajectories, # TODO

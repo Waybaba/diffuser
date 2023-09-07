@@ -21,7 +21,7 @@ def n_step_guided_p_sample(
         if scale_grad_by_std:
             grad = model_var * grad
 
-        grad[t < t_stopgrad] = 0
+        grad[t < t_stopgrad] = 0 # 
 
         x = x + scale * grad
         x = apply_conditioning(x, cond, model.action_dim)
@@ -32,7 +32,7 @@ def n_step_guided_p_sample(
     noise = torch.randn_like(x)
     noise[t == 0] = 0
     
-    # ! DEBUG # add this would make the first and target step have no gradient
+    # ! DEBUG # add this would make the first and target step have no gradient? really? only make the first step more fixed
     model_mean = apply_conditioning(model_mean, cond, model.action_dim)
     # ! DEBUG
     return model_mean + model_std * noise, y
