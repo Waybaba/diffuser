@@ -642,14 +642,15 @@ class FillActModelModule(DefaultModule):
 		for k, v in metrics.items(): self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
 		
 		### render
-		STEPS = min(80, *[len(ep) for ep in episodes_ref])
+		# STEPS = min(80, *[len(ep) for ep in episodes_ref])
+		MAXSTEP = 100
 		states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
 		self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
-			self.dynamic_cfg["renderer"].episodes2img(states_ref[:4,np.arange(STEPS)])
+			self.dynamic_cfg["renderer"].episodes2img(states_ref[:4,:MAXSTEP])
 		)])
 		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
-			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,np.arange(STEPS)])
+			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,:MAXSTEP])
 		)])
 	
 	def cal_ref_rollout_metrics(self, episodes_ref, episodes_rollout):

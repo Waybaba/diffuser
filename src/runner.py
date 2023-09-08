@@ -167,14 +167,16 @@ class EvalRunner:
 		self.env = dataset.env
 
 		### generate
-		episodes_ref = self.generate(
-			conditions={
-				0: np.zeros(
-					shape=dataset.env.observation_space.shape
-				)
-			}, repeat=N_EPISODES
-		) # N, T, obs_dim
+		# episodes_ref = self.generate(
+		# 	conditions={
+		# 		0: np.zeros(
+		# 			shape=dataset.env.observation_space.shape
+		# 		)
+		# 	}, repeat=N_EPISODES
+		# ) # N, T, obs_dim
 		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES)
+		episodes_ref = self.gen_with_same_cond(episodes_ds)
+
 
 		### control
 		episodes_rollout = [rollout_ref(self.env, episodes_ref[i], self.actor, dataset.normalizer) for i in range(len(episodes_ref))]

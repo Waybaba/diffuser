@@ -127,7 +127,7 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert "maze" in env or "cheetah" in env or "kuka" in env or "walker2d" in env or "hopper" in env, "maze envs not supported, since d4rl does not provide terminal"
+		assert "maze" in env or "halfcheetah" in env or "kuka" in env or "walker2d" in env or "hopper" in env, "maze envs not supported, since d4rl does not provide terminal"
 
 		### get dataset
 		self.env_name = env
@@ -143,7 +143,7 @@ class EnvDataset:
 		### pre_process fns
 		assert preprocess_fns == "by_env", "only support by_env"
 		if "maze" in self.env_name: preprocess_fns = ["maze2d_set_terminals"]
-		elif [self.env_name.startswith(v) for v in ["cheetah", "walker2d", "hopper"]].count(True) == 1: 
+		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
 			preprocess_fns = []
 		elif "kuka" in self.env_name: preprocess_fns = []
 		else: raise NotImplementedError("env not supported")
@@ -159,7 +159,7 @@ class EnvDataset:
 		### normalize
 		assert normalizer == "by_env", "only support by_env"
 		if "maze" in self.env_name: normalizer = "LimitsNormalizer"
-		elif [self.env_name.startswith(v) for v in ["cheetah", "walker2d", "hopper"]].count(True) == 1: 
+		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
 			normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
 		elif "kuka" in self.env_name: normalizer = "DebugNormalizer"
 		else: raise NotImplementedError(f"env {self.env_name} not supported")
@@ -181,7 +181,7 @@ class EnvDataset:
 		if "maze" in self.env_name:
 			from diffuser.utils.rendering import Maze2dRenderer
 			self.renderer = Maze2dRenderer(self.env_name)
-		elif [self.env_name.startswith(v) for v in ["cheetah", "walker2d", "hopper"]].count(True) == 1:
+		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1:
 			from diffuser.utils.rendering import MuJoCoRenderer
 			self.renderer = MuJoCoRenderer(self.env_name)
 		elif "kuka" in self.env_name:
