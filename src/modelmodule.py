@@ -146,9 +146,18 @@ def rollout_ref(env, ep_ref, model, normalizer):
 	if "qpos" in ep_ref:
 		init_qpos = ep_ref["qpos"][0]
 		init_qvel = ep_ref["qvel"][0]
-		env.set_state(init_qpos, init_qvel)
 		env.reset()
-		s = ep_ref["s"][0]
+		env.set_state(init_qpos, init_qvel)
+		s = env._get_obs()
+		# env.sim.set_state(sim_state)
+		# ss = env.state_vector()
+		# # ss = env.reset()
+		# print(ss)
+		# s = ep_ref["s"][0]
+		# s_ =  ep_ref["s_"][0]
+		# print(s)
+		# print(s_)
+		# ! TODO have a check about this if equal
 	else:
 		s = env.reset()
 
@@ -622,11 +631,10 @@ class FillActModelModule(DefaultModule):
 	def validation_epoch_end(self, outputs):
 		assert self.net.training == False, "net should be in eval mode"
 		LOG_PREFIX = "val_ep_end"
-		STEPS = 80
 		super().validation_epoch_end(outputs)
 		
 		### rollout -> [(T, obs_dim)]
-		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(ep_num=4)
+		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(num_episodes=4)
 		episodes_rollout = [rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
 		
 		### cals metric
@@ -634,6 +642,7 @@ class FillActModelModule(DefaultModule):
 		for k, v in metrics.items(): self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
 		
 		### render
+		STEPS = min(80, *[len(ep) for ep in episodes_ref])
 		states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
 		self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(

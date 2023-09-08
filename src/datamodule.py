@@ -12,7 +12,7 @@ from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
 import torch
 import os
-
+import random
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -127,23 +127,24 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert "maze" in env or "cheetah" in env or "kuka" in env, "maze envs not supported, since d4rl does not provide terminal"
+		assert "maze" in env or "cheetah" in env or "kuka" in env or "walker2d" in env or "hopper" in env, "maze envs not supported, since d4rl does not provide terminal"
 
 		### get dataset
 		self.env_name = env
 		if "kuka" in self.env_name:
-			self.env, self.dataset = load_kuka(env, custom_ds_path)
+			self.env, self.dataset = load_kuka(self.env_name, custom_ds_path)
 		else:
-			self.env = load_environment(env) # TOODO can not use gym.make ?
+			self.env = load_environment(self.env_name) # TOODO can not use gym.make ?
 			if custom_ds_path: self.dataset = self.env.get_dataset(custom_ds_path)
 			else: self.dataset = self.env.get_dataset()
 			# self.dataset = d4rl.qlearning_dataset(self.env_name)
 			# self.dataset.update(self.env.get_dataset())
 
-		### pre_process
+		### pre_process fns
 		assert preprocess_fns == "by_env", "only support by_env"
 		if "maze" in self.env_name: preprocess_fns = ["maze2d_set_terminals"]
-		elif "cheetah" in self.env_name: preprocess_fns = []
+		elif [self.env_name.startswith(v) for v in ["cheetah", "walker2d", "hopper"]].count(True) == 1: 
+			preprocess_fns = []
 		elif "kuka" in self.env_name: preprocess_fns = []
 		else: raise NotImplementedError("env not supported")
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name) # TOODO do not use original function
@@ -151,15 +152,17 @@ class EnvDataset:
 		
 		### remove keys
 		KEYS_NEED = ["observations", "actions", "terminals", "timeouts"]
+		KEYS_NEED += ["infos/qpos", "infos/qvel", "infos/action_lop_probs"] # TOODO for controller reset position
 		keys_to_delete = [k for k in self.dataset.keys() if k not in KEYS_NEED]
 		for k in keys_to_delete: del self.dataset[k]
 		
 		### normalize
 		assert normalizer == "by_env", "only support by_env"
 		if "maze" in self.env_name: normalizer = "LimitsNormalizer"
-		elif "cheetah" in self.env_name: normalizer = "GaussianNormalizer"
+		elif [self.env_name.startswith(v) for v in ["cheetah", "walker2d", "hopper"]].count(True) == 1: 
+			normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
 		elif "kuka" in self.env_name: normalizer = "DebugNormalizer"
-		else: raise NotImplementedError("env not supported")
+		else: raise NotImplementedError(f"env {self.env_name} not supported")
 		self.observation_dim = self.dataset['observations'].shape[1]
 		self.action_dim = self.dataset['actions'].shape[1]
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
@@ -178,7 +181,7 @@ class EnvDataset:
 		if "maze" in self.env_name:
 			from diffuser.utils.rendering import Maze2dRenderer
 			self.renderer = Maze2dRenderer(self.env_name)
-		elif "cheetah" in self.env_name:
+		elif [self.env_name.startswith(v) for v in ["cheetah", "walker2d", "hopper"]].count(True) == 1:
 			from diffuser.utils.rendering import MuJoCoRenderer
 			self.renderer = MuJoCoRenderer(self.env_name)
 		elif "kuka" in self.env_name:
@@ -190,54 +193,70 @@ class EnvDataset:
 	def __len__(self):
 		return len(self.indices)
 
-	def get_episodes_ref(self, ep_num=4):
-		""" get reference episodes from dataset
-			a list of reference episodes [{
-				"s": (T, obs_dim)
-				"act": (T, act_dim)
-				...
-			}]
-			always return the first {ep_num} episodes, since we do not distinguish train, val
-			ps. return are unnormalized!
+	def get_episodes_ref(self, num_episodes=4):
 		"""
-		# if not hasattr(self, "episodes_ref") or len(self.episodes_ref) == ep_num:
+		Retrieves reference episodes from the dataset.
+
+		Each episode is represented as a dictionary with the following structure:
+		{
+			"s": (T, obs_dim),      # states
+			"act": (T, act_dim),    # actions
+			...
+		}
+
+		Returns the first {num_episodes} episodes from the dataset. The returned values are unnormalized.
+
+		Returns:
+			list: A list of dictionaries, each representing a reference episode.
+		"""
 		dataset = self.dataset
-		episodes_ref = []
-		import random
-		cur = random.randint(0, len(dataset["terminals"]) - 1)
-		for i in range(ep_num):
-			start = cur
-			while True:
-				done = dataset["terminals"][cur]
-				if "timeouts" in dataset: done |= dataset["timeouts"][cur]
-				cur += 1
-				if done: 
-					end = cur
-					break
-			cur_dict = {}
-			cur_dict["s"] = dataset["observations"][start:end]
-			cur_dict["act"] = dataset["actions"][start:end]
-			cur_dict["s_"] = dataset["observations"][start+1:end+1]
-			# cur_dict["r"] = dataset["rewards"][start:end]
-			for k, v in dataset.items():
-				if k.startswith("infos/"): # for ther d4rl keys such as infos/qvel
-					cur_dict[k[6:]] = v[start:end]
-			episodes_ref.append(cur_dict)
-		self.episodes_ref = episodes_ref
-		# to cpu if cpu, to numpy if tensor
-		for i in range(len(self.episodes_ref)):
-			for k, v in self.episodes_ref[i].items():
-				if torch.is_tensor(v): self.episodes_ref[i][k] = v.cpu().numpy()
-		# unnormalize
-		for i in range(len(self.episodes_ref)):
-			self.episodes_ref[i]["s"] = self.normalizer.unnormalize(self.episodes_ref[i]["s"], "observations")
-			self.episodes_ref[i]["s_"] = self.normalizer.unnormalize(self.episodes_ref[i]["s_"], "observations")
-			self.episodes_ref[i]["act"] = self.normalizer.unnormalize(self.episodes_ref[i]["act"], "actions")
-		# cut to the same length
-		min_len = min([len(ep["s"]) for ep in self.episodes_ref])
-		for i in range(len(self.episodes_ref)):
-			for k, v in self.episodes_ref[i].items():
-				if isinstance(v, np.ndarray): self.episodes_ref[i][k] = v[:min_len]
+		
+		# Find indices where the episodes terminate
+		dones = dataset["terminals"]
+		if "timeouts" in dataset: dones |= dataset["timeouts"]
+		termination_indices = torch.where(dones)[0]
+		
+		# Randomly select {num_episodes} starting indices for the episodes
+		random_start_indices = np.random.randint(0, len(termination_indices) - 3, num_episodes)
+		episode_boundaries = torch.stack([termination_indices[random_start_indices], 
+										termination_indices[random_start_indices + 1]], dim=1)
+		
+		# Construct the list of reference episodes
+		reference_episodes = []
+		for start_idx, end_idx in episode_boundaries:
+			episode_data = {
+				"s": dataset["observations"][start_idx:end_idx-1],
+				"act": dataset["actions"][start_idx:end_idx-1],
+				"s_": dataset["observations"][start_idx + 1:end_idx -1 + 1]
+			}
+			
+			# Include additional keys starting with "infos/"
+			for key, value in dataset.items():
+				if key.startswith("infos/"):
+					episode_data[key[6:]] = value[start_idx:end_idx]
+			
+			reference_episodes.append(episode_data)
+
+		# Convert to CPU and numpy format, if needed
+		for episode in reference_episodes:
+			for key, value in episode.items():
+				if torch.is_tensor(value):
+					episode[key] = value.cpu().numpy()
+
+		# Unnormalize the data
+		for episode in reference_episodes:
+			episode["s"] = self.normalizer.unnormalize(episode["s"], "observations")
+			episode["s_"] = self.normalizer.unnormalize(episode["s_"], "observations")
+			episode["act"] = self.normalizer.unnormalize(episode["act"], "actions")
+
+		# Ensure all episodes have the same length
+		min_length = min(len(episode["s"]) for episode in reference_episodes)
+		for episode in reference_episodes:
+			for key, value in episode.items():
+				if isinstance(value, np.ndarray):
+					episode[key] = value[:min_length]
+		
+		self.episodes_ref = reference_episodes
 		return self.episodes_ref
 
 class EnvEpisodeDataset(EnvDataset):

@@ -16,6 +16,20 @@ import rich.syntax
 import rich.tree
 from pathlib import Path
 
+### check DEBUG mode
+# if env variable UDEVICE != docker, set DEBUG=true
+print("\n\n### Check Debug")
+assert os.environ.get("DEBUG", "noname") != "true", \
+	"DEBUG should not be true, or that in all cases data would be loaded from small dataset for debugging."
+if os.environ.get("UDEVICEID", "noname") != "docker": # if not docker
+	os.environ["DEBUG"] = "true"
+	print("Not in docker, setting DEBUG=true ...")
+	print("Would skip full data collection and use small dataset for debugging...")
+else:
+	print("In docker, setting DEBUG=false ...")
+	os.environ["DEBUG"] = "false"
+
+
 
 ### utils
 

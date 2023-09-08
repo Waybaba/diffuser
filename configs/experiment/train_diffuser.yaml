@@ -12,7 +12,7 @@ global_cfg:
 modelmodule:
   _target_: src.modelmodule.DiffuserModule
   _partial_: true
-  data_noise: 0.01
+  data_noise: 0.00
   net:
     _target_: src.modelmodule.DiffusionWrapper
     _partial_: true

@@ -23,21 +23,17 @@
 			"args": [
 				// "wandb.mode=disabled",
 				// #### maze
-				"experiment=train_diffuser",
-				"datamodule.dataset.env=maze2d-openlarge-v0",
-				"datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
-				"global_cfg.horizon=100",
+				// "experiment=train_diffuser",
+				// "datamodule.dataset.env=maze2d-openlarge-v0",
+				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
+				// "global_cfg.horizon=100",
 				// #### mujoco
-				// "experiment=train_diffuser_locomotion",
+				"experiment=train_diffuser_locomotion",
+				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				"datamodule.dataset.env=walker2d-medium-expert-v2",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-large-1e6FirstGenerate.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/maze2d-open-v0_1e7.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/latest.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-100000.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-1000000-onlytwo.hdf5",
-				// "dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-large-v1-1000.hdf5",
 				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
 				// "env.delay=0",
@@ -100,7 +96,7 @@
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
-			"noDebug": true,
+			"noDebug": false,
 			"args": [
 				"experiment=train_controller",
 				"wandb.mode=disabled",

@@ -174,7 +174,7 @@ class EvalRunner:
 				)
 			}, repeat=N_EPISODES
 		) # N, T, obs_dim
-		episodes_ds = dataset.get_episodes_ref(ep_num=N_EPISODES)
+		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES)
 
 		### control
 		episodes_rollout = [rollout_ref(self.env, episodes_ref[i], self.actor, dataset.normalizer) for i in range(len(episodes_ref))]
