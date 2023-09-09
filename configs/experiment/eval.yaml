@@ -37,7 +37,7 @@ policy:
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   scale_grad_by_std: true
 
-plan_freq: 0.1
+plan_freq: 1.0
 
 
 # common - for all tasks (task_name, tags, output_dir, device)

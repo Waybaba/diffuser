@@ -15,6 +15,31 @@ import random
 
 
 """functions"""
+def safefill_rollout(episodes_rollout):
+	"""
+	episodes_rollout:
+		[{
+			"s": (T, obs_dim),
+			"act": (T, act_dim),
+			"r": (T),
+		}]]
+	they could have different length, fill with the last frame to 
+	make all have the same with the maximum length one
+	for "s" and "act", repeat the last frame
+	for "r", fill with 0
+	"""
+	max_len = max([len(ep["s"]) for ep in episodes_rollout])
+	for i in range(len(episodes_rollout)):
+		ep = episodes_rollout[i]
+		for key in ["s", "act"]:
+			if len(ep[key]) < max_len:
+				ep[key] = np.concatenate([ep[key], np.repeat(ep[key][-1:], max_len - len(ep[key]), axis=0)], axis=0)
+		if len(ep["r"]) < max_len:
+			ep["r"] = np.concatenate([ep["r"], np.zeros(max_len - len(ep["r"]))], axis=0)
+		episodes_rollout[i] = ep
+	return episodes_rollout
+
+	
 def collect_parameters(model, set="all"):
 	""" Collect parameters from model depending on set.
 	Args: 
@@ -189,7 +214,7 @@ def rollout_ref(env, ep_ref, model, normalizer):
 		ep_r.append(r)
 		s = s_
 		if done: break
-		
+
 	return {
 		"s": np.stack(ep_s),
 		"act": np.stack(ep_a),
@@ -639,7 +664,8 @@ class FillActModelModule(DefaultModule):
 		### rollout -> [(T, obs_dim)]
 		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(num_episodes=4)
 		episodes_rollout = [rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
-		
+		episodes_rollout = safefill_rollout(episodes_rollout)
+
 		### cals metric
 		metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
 		for k, v in metrics.items(): self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
@@ -663,18 +689,18 @@ class FillActModelModule(DefaultModule):
 			return a dict of metrics
 		"""
 		return {
-			"mean_l1_shift_total": np.mean([
-				L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"]), torch.tensor(episodes_rollout[i]["s"])) \
-					for i in range(len(episodes_ref))
-			]),
-			"mean_l1_shift_20steps": np.mean([
-				L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"][:20]), torch.tensor(episodes_rollout[i]["s"][:20])) \
-					for i in range(len(episodes_ref))
-			]),
-			"mean_l1_shift_80steps": np.mean([
-				L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"][:80]), torch.tensor(episodes_rollout[i]["s"][:80])) \
-					for i in range(len(episodes_ref))
-			]),
+			# "mean_l1_shift_total": np.mean([
+			# 	L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"]), torch.tensor(episodes_rollout[i]["s"])) \
+			# 		for i in range(len(episodes_ref))
+			# ]),
+			# "mean_l1_shift_20steps": np.mean([
+			# 	L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"][:20]), torch.tensor(episodes_rollout[i]["s"][:20])) \
+			# 		for i in range(len(episodes_ref))
+			# ]),
+			# "mean_l1_shift_80steps": np.mean([
+			# 	L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"][:80]), torch.tensor(episodes_rollout[i]["s"][:80])) \
+			# 		for i in range(len(episodes_ref))
+			# ]),
 			"sum_reward_total": np.mean([
 				np.sum(episodes_rollout[i]["r"]) \
 				for i in range(len(episodes_ref))

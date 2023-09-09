@@ -311,13 +311,13 @@ class EvalRunner:
 			actor, 
 			normalizer, 
 			plan_freq=1,
-			len_max=5000
+			len_max=1000
 		):
 		"""
 			env: 
 			time: 
 		"""
-		assert self.model.horizon > plan_freq, "plan_freq should be smaller than horizon"
+		assert self.model.horizon >= plan_freq, "plan_freq should be smaller than horizon"
 		print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
 		res = {
 			"act": [],
@@ -386,7 +386,6 @@ class EvalRunner:
 		actions, samples = planner(cond, batch_size=1,verbose=False)
 		plan = samples.observations[0] # (T, obs_dim)
 		return plan
-
 
 
 
