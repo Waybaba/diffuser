@@ -189,6 +189,7 @@ def rollout_ref(env, ep_ref, model, normalizer):
 		ep_r.append(r)
 		s = s_
 		if done: break
+		
 	return {
 		"s": np.stack(ep_s),
 		"act": np.stack(ep_a),

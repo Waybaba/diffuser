@@ -6,6 +6,7 @@ import hydra
 from omegaconf import OmegaConf
 from pathlib import Path
 from copy import deepcopy
+from collections import namedtuple
 
 import numpy as np
 import torch
@@ -155,6 +156,7 @@ class EvalRunner:
 
 		### distill
 		N_EPISODES = 4
+		N_FULLROLLOUT = 4
 		diffusion, dataset, self.renderer = diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
 		self.policy = cfg.policy(
 			guide=cfg.guide,
@@ -182,12 +184,20 @@ class EvalRunner:
 		### episodes - rollout
 		episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
 		episodes_diffuser_rollout = [rollout_ref(self.env, episodes_diffuser[i], self.actor, dataset.normalizer) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
+		episodes_full_rollout = [self.full_rollout_once(
+			self.env, 
+			self.policy, 
+			self.actor, 
+			dataset.normalizer, 
+			cfg.plan_freq if isinstance(cfg.plan_freq, int) else max(int(cfg.plan_freq * self.model.horizon),1),
+		) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
 
 		### distill state
 		states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
 		states_diffuser = np.stack([each["s"] for each in episodes_diffuser], axis=0)
 		states_ds_rollout = np.stack([each["s"] for each in episodes_ds_rollout], axis=0)
 		states_diffuser_rollout = np.stack([each["s"] for each in episodes_diffuser_rollout], axis=0)
+		states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
 		# unnormlize
 		
 		### cals common metric
@@ -204,6 +214,9 @@ class EvalRunner:
 		LOG_SUB_PREFIX = "diffuser_rollout"
 		metrics = cfg.guide.metrics(states_diffuser_rollout)
 		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+		LOG_SUB_PREFIX = "full_rollout"
+		metrics = cfg.guide.metrics(states_full_rollout)
+		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
 
 		### cals rollout metric
 		LOG_PREFIX = "value"
@@ -212,6 +225,9 @@ class EvalRunner:
 		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
 		LOG_SUB_PREFIX = "diffuser_rollout"
 		r_sum = np.mean([each["r"].sum() for each in episodes_diffuser_rollout])
+		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+		LOG_SUB_PREFIX = "full_rollout"
+		r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
 		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
 
 
@@ -230,6 +246,9 @@ class EvalRunner:
 		)]
 		to_log[f"{LOG_PREFIX}/states_diffuser_rollout"] = [wandb.Image(
 			self.renderer.episodes2img(states_diffuser_rollout[:4,:MAXSTEP])
+		)]
+		to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb.Image(
+			self.renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
 		)]
 		wandb.log(to_log, commit=True)
 		
@@ -285,6 +304,89 @@ class EvalRunner:
 		)
 		return modelmodule
 	
+	def full_rollout_once(
+			self, 
+			env, 
+			planner, 
+			actor, 
+			normalizer, 
+			plan_freq=1,
+			len_max=5000
+		):
+		"""
+			env: 
+			time: 
+		"""
+		assert self.model.horizon > plan_freq, "plan_freq should be smaller than horizon"
+		print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
+		res = {
+			"act": [],
+			"s": [],
+			"s_": [],
+			"r": [],
+		}
+		env_step = 0
+
+		t_madeplan = -99999
+		
+		s = env.reset()
+		while True: 
+			if env_step - t_madeplan >= plan_freq:
+				plan = self.make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
+				t_madeplan = env_step
+			a = self.make_act(actor, res["s"]+[s], plan, t_madeplan, normalizer)
+			s_, r, done, info = env.step(a)
+			s = s_
+			
+			res["act"].append(a)
+			res["s"].append(s)
+			res["s_"].append(s_)
+			res["r"].append(r)
+			env_step += 1
+			if done or env_step > len_max: break
+		
+		# stack
+		for k in res.keys():
+			res[k] = np.stack(res[k], axis=0)
+		
+		print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
+		return res
+			
+	def make_act(self, actor, history, plan, t_madeplan, normalizer):
+		"""
+		actor: would generate act, different for diff methods
+		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
+		"""
+		s = history[-1]
+		s_ = plan[len(history)-1-t_madeplan] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
+		model = actor
+		device = next(actor.parameters()).device
+		model.to(device)
+		act = model(torch.cat([
+			torch.tensor(normalizer.normalize(
+				s,
+				"observations"
+			)).to(device), 
+			torch.tensor(normalizer.normalize(
+				s_,
+				"observations"
+			)).to(device)
+		], dim=-1).float().to(device))
+		act = act.detach().cpu().numpy()
+		act = normalizer.unnormalize(act, "actions")
+		return act
+
+	def make_plan(self, planner, history):
+		"""
+		TODO: use history in guide
+		"""
+		cond = {
+			0: history[-1]
+		}
+		actions, samples = planner(cond, batch_size=1,verbose=False)
+		plan = samples.observations[0] # (T, obs_dim)
+		return plan
+
 
 
 
