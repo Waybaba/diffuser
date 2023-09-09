@@ -306,12 +306,10 @@ class NoTrainGuideFarther(NoTrainGuideOffset):
 	LOWER = False
 
 ## Mujoco Height
-class NoTrainGuideHeight(NoTrainGuide):
-	"""
-	make the total distance of the trajectory become shorter or longer
-	"""
+class SingleValueGuide(NoTrainGuide):
+	INDEX = None # z:6, vx:14, vz:15
 	LOWER = None
-	HALF = False
+	NAME = None
 
 	def forward(self, x, cond, t):
 		"""
@@ -320,11 +318,15 @@ class NoTrainGuideHeight(NoTrainGuide):
 			the last dim is [x, y, vx, vy, act_x, act_y]
 			we only use x, y to calculate distance
 		"""
-		total_distance = self.cal_value(x)
+		assert self.INDEX is not None, "INDEX is not defined"
+		assert self.LOWER is not None, "LOWER is not defined"
+		assert self.NAME is not None, "NAME is not defined"
+
+		value = self.cal_value(x)
 
 		if self.LOWER is None: raise NotImplementedError("SHOTER is not defined")
-		if self.LOWER: return -total_distance
-		else: return total_distance
+		if self.LOWER: return -value
+		else: return value
 	
 	def cal_value(self, x):
 		"""
@@ -334,10 +336,11 @@ class NoTrainGuideHeight(NoTrainGuide):
 			we only use x, y to calculate distance
 		"""
 		# Extract x, y coordinates
-		ACT_DIM = 6
-		z = x[:, :, ACT_DIM+0] # height
-		vx = x[:, :, ACT_DIM+8] # v horizontal
-		vz = x[:, :, ACT_DIM+9] # v vertical/height
+		# ACT_DIM = 6
+		# z = x[:, :, ACT_DIM+0] # height
+		# vx = x[:, :, ACT_DIM+8] # v horizontal
+		# vz = x[:, :, ACT_DIM+9] # v vertical/height
+		z = x[:, :, self.INDEX]
 		total_distance = z.mean(dim=1)
 		return total_distance
 	
@@ -346,11 +349,25 @@ class NoTrainGuideHeight(NoTrainGuide):
 		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
 		with torch.no_grad():
 			return {
-				"offset": self.cal_value(x),
+				self.NAME: self.cal_value(x),
 			}
 
-class NoTrainGuideLower(NoTrainGuideOffset):
-	LOWER = True
-
-class NoTrainGuideHigher(NoTrainGuideOffset):
+class MujocoFaster(SingleValueGuide):
 	LOWER = False
+	INDEX = 14
+	NAME = "speed"
+
+class MujocoSlower(SingleValueGuide):
+	LOWER = True
+	INDEX = 14
+	NAME = "speed"
+
+class MujocoHigher(SingleValueGuide):
+	LOWER = False
+	INDEX = 6
+	NAME = "height"
+
+class MujocoLower(SingleValueGuide):
+	LOWER = True
+	INDEX = 6
+	NAME = "height"

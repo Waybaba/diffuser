@@ -135,9 +135,11 @@ def rollout_ref(env, ep_ref, model, normalizer):
 		for each step i, use current obs as obs_cur, use ep_ref[i] as obs_next
 		act = model(obs_cur, obs_next)
 		then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
+	! TODO there is error for last obs
 	"""
 	# convert if not dict
 	if not isinstance(ep_ref, dict):
+		raise ValueError("ep_ref should be a dict")
 		ep_ref = {
 			"s": np.stack(ep_ref),
 			"s_": np.concatenate([ep_ref[1:], ep_ref[-1:]], axis=0),

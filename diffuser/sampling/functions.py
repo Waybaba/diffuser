@@ -41,6 +41,9 @@ def n_step_guided_p_sample(
 def n_step_guided_p_sample_freedom_timetravel(
     model, x, cond, t, guide, scale=0.001, t_stopgrad=0, n_guide_steps=1, scale_grad_by_std=True,
 ):
+    """
+    !!! UNFINISHED
+    """
     alpha_cum = []
     model_log_variance = extract(model.posterior_log_variance_clipped, t, x.shape)
     model_std = torch.exp(0.5 * model_log_variance)
@@ -48,7 +51,7 @@ def n_step_guided_p_sample_freedom_timetravel(
 
     for _ in range(n_guide_steps):
         with torch.enable_grad():
-            x0_e = (1/np.sqrt(alpha_cum[t])) * (x+(1-alpha_cum[t])*)
+            x0_e = (1/np.sqrt(alpha_cum[t])) * (x+(1-alpha_cum[t]))
             y, grad = guide.gradients(x0_e, cond, t)
 
         if scale_grad_by_std:

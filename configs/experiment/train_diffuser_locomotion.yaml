@@ -9,7 +9,7 @@ global_cfg:
 datamodule:
   dataset:
     env: halfcheetah-medium-expert-v2
-    mode: ep_multi_step%5 # ! multi_step%{step_num}, default
+    mode: ep_multi_step%1 # ! multi_step%{step_num}, default
 
 modelmodule:
   net:

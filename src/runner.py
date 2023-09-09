@@ -5,11 +5,13 @@ from gym.envs.registration import register
 import hydra
 from omegaconf import OmegaConf
 from pathlib import Path
+from copy import deepcopy
 
 import numpy as np
 import torch
 from .modelmodule import rollout_ref
 from tqdm import tqdm
+from diffuser.sampling import DummyGuide
 
 OPEN_LARGE = \
 		"############\\"+\
@@ -136,6 +138,7 @@ class EvalRunner:
 	2. generating with guide
 	3. control
 	4. control with guide
+	ps. everything is unnormlized in this class
 	"""
 	def start(self, cfg):
 		self.cfg = cfg
@@ -158,6 +161,11 @@ class EvalRunner:
 			diffusion_model=diffusion,
 			normalizer=dataset.normalizer,
 		)
+		self.policy_noguide = cfg.policy(
+			guide=DummyGuide(),
+			diffusion_model=diffusion, 
+			normalizer=dataset.normalizer,
+		)
 		self.model = self.policy.diffusion_model
 		self.model.to(cfg.device)
 		self.model.eval()
@@ -166,56 +174,62 @@ class EvalRunner:
 		self.actor.eval()
 		self.env = dataset.env
 
-		### generate
-		# episodes_ref = self.generate(
-		# 	conditions={
-		# 		0: np.zeros(
-		# 			shape=dataset.env.observation_space.shape
-		# 		)
-		# 	}, repeat=N_EPISODES
-		# ) # N, T, obs_dim
-		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES)
-		episodes_ref = self.gen_with_same_cond(episodes_ds)
+		to_log = {}
 
+		### episodes - generate
+		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES) # [{"s": ...}]
+		episodes_diffuser = self.gen_with_same_cond(episodes_ds) # [{"s": ...}]
+		### episodes - rollout
+		episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
+		episodes_diffuser_rollout = [rollout_ref(self.env, episodes_diffuser[i], self.actor, dataset.normalizer) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
 
-		### control
-		episodes_rollout = [rollout_ref(self.env, episodes_ref[i], self.actor, dataset.normalizer) for i in range(len(episodes_ref))]
-		episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]
-		# stack_all
-		# res = {}
-		# for k in episodes_rollout[0].keys():
-		# 	res[k] = np.stack([each[k] for each in episodes_rollout], axis=0)
-		# episodes_rollout = res
-		# res = {}
-		# for k in episodes_ds_rollout[0].keys():
-		# 	res[k] = np.stack([each[k] for each in episodes_ds_rollout], axis=0)
-		# episodes_ds_rollout = res
-		# obs_rollout = episodes_rollout["s"]
-		# obs_ds_rollout = episodes_ds_rollout["s"]
-
+		### distill state
+		states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
+		states_diffuser = np.stack([each["s"] for each in episodes_diffuser], axis=0)
+		states_ds_rollout = np.stack([each["s"] for each in episodes_ds_rollout], axis=0)
+		states_diffuser_rollout = np.stack([each["s"] for each in episodes_diffuser_rollout], axis=0)
+		# unnormlize
 		
-		### cals metric
-		# metrics = self.cal_ref_rollout_metrics(episodes_ref, episodes_rollout)
-		# for k, v in metrics.items(): self.log(f"{LOG_PREFIX}/{k}", v, on_epoch=True, prog_bar=True)
-		
+		### cals common metric
+		LOG_PREFIX = "value"
+		LOG_SUB_PREFIX = "ds"
+		metrics = cfg.guide.metrics(states_ds)
+		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+		LOG_SUB_PREFIX = "diffuser"
+		metrics = cfg.guide.metrics(states_diffuser)
+		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+		LOG_SUB_PREFIX = "ds_rollout"
+		metrics = cfg.guide.metrics(states_ds_rollout)
+		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+		LOG_SUB_PREFIX = "diffuser_rollout"
+		metrics = cfg.guide.metrics(states_diffuser_rollout)
+		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+
+		### cals rollout metric
+		LOG_PREFIX = "value"
+		LOG_SUB_PREFIX = "ds_rollout"
+		r_sum = np.mean([each["r"].sum() for each in episodes_ds_rollout])
+		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+		LOG_SUB_PREFIX = "diffuser_rollout"
+		r_sum = np.mean([each["r"].sum() for each in episodes_diffuser_rollout])
+		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+
+
 		### render
 		LOG_PREFIX = "val_ep_end"
-		STEPS = min(len(episodes_rollout[0]["s"]), len(episodes_ds_rollout[0]["s"]), 32)
-		states_episode_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
-		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
-		states_ds_rollout = np.stack([each["s"] for each in episodes_ds_rollout], axis=0)
-		to_log = {}
-		to_log[f"{LOG_PREFIX}/ref"] = [wandb.Image(
-			self.renderer.episodes2img(episodes_ref[:4,np.arange(STEPS)])
+		# STEPS = min(len(episodes_rollout[0]["s"]), len(episodes_ds_rollout[0]["s"]), 32)
+		MAXSTEP = 200
+		to_log[f"{LOG_PREFIX}/states_ds"] = [wandb.Image(
+			self.renderer.episodes2img(states_ds[:4,:MAXSTEP])
 		)]
-		to_log[f"{LOG_PREFIX}/rollout"] = [wandb.Image(
-			self.renderer.episodes2img(states_rollout[:4,np.arange(STEPS)])
+		to_log[f"{LOG_PREFIX}/states_diffuser"] = [wandb.Image(
+			self.renderer.episodes2img(states_diffuser[:4,:MAXSTEP])
 		)]
-		to_log[f"{LOG_PREFIX}/ds"] = [wandb.Image(
-			self.renderer.episodes2img(states_episode_ds[:4,np.arange(STEPS)])
+		to_log[f"{LOG_PREFIX}/states_ds_rollout"] = [wandb.Image(
+			self.renderer.episodes2img(states_ds_rollout[:4,:MAXSTEP])
 		)]
-		to_log[f"{LOG_PREFIX}/ds_rollout"] = [wandb.Image(
-			self.renderer.episodes2img(states_ds_rollout[:4,np.arange(STEPS)])
+		to_log[f"{LOG_PREFIX}/states_diffuser_rollout"] = [wandb.Image(
+			self.renderer.episodes2img(states_diffuser_rollout[:4,:MAXSTEP])
 		)]
 		wandb.log(to_log, commit=True)
 		
@@ -226,6 +240,26 @@ class EvalRunner:
 		"""
 		actions, samples = self.policy(conditions, batch_size=repeat)
 		return samples.observations
+
+	def gen_with_same_cond(self, episodes_ds):
+		"""
+		"""
+		# get conditions
+		episodes_ds_ = deepcopy(episodes_ds)
+		res = []
+		for i in range(len(episodes_ds_)):
+			ep_i = episodes_ds_[i]
+			cond = {
+				0: episodes_ds_[i]["s"][0]
+			}
+			del ep_i["act"] # to avoid misuse
+			del ep_i["s"]
+			del ep_i["s_"]
+			obs_gen = self.generate(cond, repeat=1) # samples (B, T, obs_dim)
+			ep_i["s"] = obs_gen[0] # (T, obs_dim)
+			ep_i["s_"] = np.concatenate([obs_gen[0][1:], obs_gen[0][-1:]], axis=0)
+			res.append(ep_i)
+		return res
 	
 	def load_diffuser(self, dir_, epoch_):
 		print("\n\n\n### loading diffuser ...")

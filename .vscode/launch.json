@@ -29,8 +29,8 @@
 				// "global_cfg.horizon=100",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
-				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
-				"datamodule.dataset.env=walker2d-expert-v2",
+				"datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
@@ -132,6 +132,7 @@
 				"experiment=eval",
 				// "wandb.mode=disabled",
 				"wandb.mode=online",
+				"guide._target_=diffuser.sampling.MujocoFaster"
 			],
 		},
 		{
