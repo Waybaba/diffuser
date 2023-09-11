@@ -50,15 +50,17 @@ def n_step_guided_p_sample_freedom_timetravel(
     alphas_cumprod = []
     horizon = 
     """
-    model_log_variance = extract(model.posterior_log_variance_clipped, t, x.shape)
-    model_std = torch.exp(0.5 * model_log_variance)
-    model_var = torch.exp(model_log_variance)
-    if isinstance(travel_interval[0], float):
+    if isinstance(travel_interval, str): # e.g. "[0.1,1.0]"
+        travel_interval = eval(travel_interval)
+    elif isinstance(travel_interval[0], float):
         assert travel_interval[1] > travel_interval[0] and travel_interval[1] <= 1.0, "travel_interval should be [0.0, 1.0]"
         travel_interval = [int(travel_interval[0]*horizon), int(travel_interval[1]*horizon)]
     if t in range(travel_interval[0], travel_interval[1]): # travel
         alphas_cumprod[t] = 1.0
     
+    model_log_variance = extract(model.posterior_log_variance_clipped, t, x.shape)
+    model_std = torch.exp(0.5 * model_log_variance)
+    model_var = torch.exp(model_log_variance)
     for travel_i in range(travel_repeat):
         with torch.enable_grad():
             # x0_e = (1/np.sqrt(alphas_cumprod[t])) * (x+(1-alphas_cumprod[t]))
