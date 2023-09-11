@@ -41,13 +41,13 @@ def n_step_guided_p_sample(
 
 def n_step_guided_p_sample_freedom_timetravel(
     model, x, cond, t, guide, scale=0.001, t_stopgrad=0, n_guide_steps=1, scale_grad_by_std=True,
-    horizon=None, travel_interval=[0.0, 1.0], travel_repeat=1, alphas_cumprod=None, **kwargs
+    horizon=None, travel_interval=[0.0, 1.0], travel_repeat=1, betas=None, **kwargs
 ):
     """
     !!! UNFINISHED
     travel_interval: [0.0,1.0]
     travel_repeat: 1 # 1 means no travel
-    alphas_cumprod = []
+    betas = []
     horizon = 
     """
     if isinstance(travel_interval, str): # e.g. "[0.1,1.0]"
@@ -55,12 +55,11 @@ def n_step_guided_p_sample_freedom_timetravel(
     elif isinstance(travel_interval[0], float):
         assert travel_interval[1] > travel_interval[0] and travel_interval[1] <= 1.0, "travel_interval should be [0.0, 1.0]"
         travel_interval = [int(travel_interval[0]*horizon), int(travel_interval[1]*horizon)]
-    if t in range(travel_interval[0], travel_interval[1]): # travel
-        alphas_cumprod[t] = 1.0
     
     model_log_variance = extract(model.posterior_log_variance_clipped, t, x.shape)
     model_std = torch.exp(0.5 * model_log_variance)
     model_var = torch.exp(model_log_variance)
+
     for travel_i in range(travel_repeat):
         with torch.enable_grad():
             # x0_e = (1/np.sqrt(alphas_cumprod[t])) * (x+(1-alphas_cumprod[t]))
@@ -75,9 +74,11 @@ def n_step_guided_p_sample_freedom_timetravel(
 
         if travel_i < travel_repeat-1:
             rand = torch.rand_like(x)
-            travel_weight = alphas_cumprod[t].sqrt()
-            travel_weight[~(travel_interval[0]<=t<travel_interval[1])] = 1.0 # use this to cancel the effect of travel
-            x = x * alphas_cumprod[t].sqrt() + (1-alphas_cumprod[t]).sqrt() * rand
+            travel_weight_x = (1-betas[t]).sqrt()
+            travel_weight_x[~(travel_interval[0]<=t<travel_interval[1])] = 1.0 # use this to cancel the effect of travel
+            travel_weight_noise = betas[t].sqrt()
+            travel_weight_noise[~(travel_interval[0]<=t<travel_interval[1])] = 0.0 # use this to cancel the effect of travel
+            x = x * travel_weight_x + rand * travel_weight_noise
             
         x = apply_conditioning(x, cond, model.action_dim)
 

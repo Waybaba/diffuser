@@ -60,6 +60,7 @@ class GaussianDiffusion(nn.Module):
         self.loss_beta_weight = loss_beta_weight
 
         betas = cosine_beta_schedule(n_timesteps)
+        # betas = torch.tensor(np.linspace(1e-4,2e-2,n_timesteps)) # ! TODO dongqi
         alphas = 1. - betas
         alphas_cumprod = torch.cumprod(alphas, axis=0)
         alphas_cumprod_prev = torch.cat([torch.ones(1), alphas_cumprod[:-1]])
@@ -179,7 +180,7 @@ class GaussianDiffusion(nn.Module):
         progress = utils.Progress(self.n_timesteps) if verbose else utils.Silent()
         for i in reversed(range(0, self.n_timesteps)):
             t = make_timesteps(batch_size, i, device)
-            x, values = sample_fn(self, x, cond, t, horizon=self.horizon, alphas_cumprod=self.alphas_cumprod, **sample_kwargs)
+            x, values = sample_fn(self, x, cond, t, horizon=self.horizon, betas=self.betas, **sample_kwargs)
             x = apply_conditioning(x, cond, self.action_dim) # ! DEBUG used in paper but accidently deleted
 
             progress.update({'t': i, 'vmin': values.min().item(), 'vmax': values.max().item()})
