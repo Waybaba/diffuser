@@ -29,7 +29,8 @@
 				// "global_cfg.horizon=100",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
-				"datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				"datamodule.dataset.env=walker2d-mixed",
 				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
@@ -98,27 +99,20 @@
 			"justMyCode": true,
 			"noDebug": false,
 			"args": [
-				"experiment=train_controller",
-				// "wandb.mode=disabled",
-				"datamodule.dataset.multi_step=5",
-				// "datamodule.dataset.env=kuka",
-				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
-				"datamodule.dataset.env=walker2d-medium-expert-v2",
-			],
-		},
-		// train_envmodel
-		{
-			"name": "train_envmodel",
-			"type": "python",
-			"request": "launch",
-			"program": "${workspaceFolder}/entry/entry.py",
-			"console": "integratedTerminal",
-			"justMyCode": true,
-			"args": [
+				// "experiment=train_controller",
 				"experiment=train_envmodel",
-				// "wandb.mode=disabled",
-				"callbacks.model_checkpoint.every_n_epochs=1",
-				// "+trainer.fast_dev_run=5",
+				"datamodule.dataset.multi_step=1",
+				// ### controller
+				// 
+				"wandb.mode=disabled",
+				// ### maze
+				// "datamodule.dataset.env=maze2d-openlarge-v0",
+				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
+				// ### mujoco
+				"datamodule.dataset.env=halfcheetah-mixed",
+				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				// "datamodule.dataset.env=walker2d-medium-expert-v2",
+				// "datamodule.dataset.env=kuka",
 			],
 		},
 		// eval
@@ -131,9 +125,18 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=eval",
-				// "wandb.mode=disabled",
-				"wandb.mode=online",
-				"guide._target_=diffuser.sampling.MujocoFaster"
+				"wandb.mode=disabled",
+				// "wandb.mode=online",
+				// ### maze
+				// "guide._target_=diffuser.sampling.NoTrainGuideXLower",
+				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-07_21-01-11_183716/0",
+				// "controller.turn_on=false",
+				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
+				// ### mujoco
+				"guide._target_=diffuser.sampling.MujocoFaster",
+				"diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
+				"controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
+
 			],
 		},
 		{

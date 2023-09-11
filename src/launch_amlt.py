@@ -101,9 +101,13 @@ environment:
     setup:
         - echo "setup start..."
         - export UPRJDIR=/mnt/default/
-        - export UDATADIR=/mnt/storage/data
-        - export UOUTDIR=/mnt/storage/output
-        - mkdir -p /mnt/storage/output /mnt/storage/data
+        # - export UDATADIR=/mnt/storage/data
+        # - export UOUTDIR=/mnt/storage/output
+        # - export UDATADIR=/data
+        # - export UOUTDIR=/output
+        - sudo mkdir -p /mnt/storage/output /mnt/storage/data
+        - sudo ln -s /mnt/storage/output /output
+        - sudo ln -s /mnt/storage/data /data
         - echo "setup finished!"
 
 code:

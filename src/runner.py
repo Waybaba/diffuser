@@ -147,7 +147,8 @@ class EvalRunner:
 		# load
 		print("Loading modules ...")
 		diffuser = self.load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
-		controller = self.load_controller(cfg.controller.dir, cfg.controller.epoch)
+		if cfg.controller.turn_on:
+			controller = self.load_controller(cfg.controller.dir, cfg.controller.epoch)
 		assert diffuser.dynamic_cfg["dataset"].env_name.split("-")[0] == controller.dynamic_cfg["dataset"].env_name.split("-")[0], \
 			f"diffuser and controller should be trained on the same environment, while got {diffuser.dynamic_cfg['dataset'].env_name} and {controller.dynamic_cfg['dataset'].env_name}"
 		print(f"\n\n\n### diffuser env loaded!: {diffuser.dynamic_cfg['dataset'].env_name}")
@@ -171,9 +172,10 @@ class EvalRunner:
 		self.model = self.policy.diffusion_model
 		self.model.to(cfg.device)
 		self.model.eval()
-		self.actor = controller.net
-		self.actor.to(cfg.device)
-		self.actor.eval()
+		if cfg.controller.turn_on:
+			self.actor = controller.net
+			self.actor.to(cfg.device)
+			self.actor.eval()
 		self.env = dataset.env
 
 		to_log = {}
@@ -182,22 +184,24 @@ class EvalRunner:
 		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES) # [{"s": ...}]
 		episodes_diffuser = self.gen_with_same_cond(episodes_ds) # [{"s": ...}]
 		### episodes - rollout
-		episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
-		episodes_diffuser_rollout = [rollout_ref(self.env, episodes_diffuser[i], self.actor, dataset.normalizer) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
-		episodes_full_rollout = [self.full_rollout_once(
-			self.env, 
-			self.policy, 
-			self.actor, 
-			dataset.normalizer, 
-			cfg.plan_freq if isinstance(cfg.plan_freq, int) else max(int(cfg.plan_freq * self.model.horizon),1),
-		) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
+		if cfg.controller.turn_on:
+			episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
+			episodes_diffuser_rollout = [rollout_ref(self.env, episodes_diffuser[i], self.actor, dataset.normalizer) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
+			episodes_full_rollout = [self.full_rollout_once(
+				self.env, 
+				self.policy, 
+				self.actor, 
+				dataset.normalizer, 
+				cfg.plan_freq if isinstance(cfg.plan_freq, int) else max(int(cfg.plan_freq * self.model.horizon),1),
+			) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
 
 		### distill state
 		states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
 		states_diffuser = np.stack([each["s"] for each in episodes_diffuser], axis=0)
-		states_ds_rollout = np.stack([each["s"] for each in episodes_ds_rollout], axis=0)
-		states_diffuser_rollout = np.stack([each["s"] for each in episodes_diffuser_rollout], axis=0)
-		states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
+		if cfg.controller.turn_on:
+			states_ds_rollout = np.stack([each["s"] for each in episodes_ds_rollout], axis=0)
+			states_diffuser_rollout = np.stack([each["s"] for each in episodes_diffuser_rollout], axis=0)
+			states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
 		# unnormlize
 		
 		### cals common metric
@@ -208,27 +212,29 @@ class EvalRunner:
 		LOG_SUB_PREFIX = "diffuser"
 		metrics = cfg.guide.metrics(states_diffuser)
 		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
-		LOG_SUB_PREFIX = "ds_rollout"
-		metrics = cfg.guide.metrics(states_ds_rollout)
-		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
-		LOG_SUB_PREFIX = "diffuser_rollout"
-		metrics = cfg.guide.metrics(states_diffuser_rollout)
-		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
-		LOG_SUB_PREFIX = "full_rollout"
-		metrics = cfg.guide.metrics(states_full_rollout)
-		for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+		if cfg.controller.turn_on:
+			LOG_SUB_PREFIX = "ds_rollout"
+			metrics = cfg.guide.metrics(states_ds_rollout)
+			for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+			LOG_SUB_PREFIX = "diffuser_rollout"
+			metrics = cfg.guide.metrics(states_diffuser_rollout)
+			for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+			LOG_SUB_PREFIX = "full_rollout"
+			metrics = cfg.guide.metrics(states_full_rollout)
+			for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
 
 		### cals rollout metric
-		LOG_PREFIX = "value"
-		LOG_SUB_PREFIX = "ds_rollout"
-		r_sum = np.mean([each["r"].sum() for each in episodes_ds_rollout])
-		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
-		LOG_SUB_PREFIX = "diffuser_rollout"
-		r_sum = np.mean([each["r"].sum() for each in episodes_diffuser_rollout])
-		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
-		LOG_SUB_PREFIX = "full_rollout"
-		r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
-		to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+		if cfg.controller.turn_on:
+			LOG_PREFIX = "value"
+			LOG_SUB_PREFIX = "ds_rollout"
+			r_sum = np.mean([each["r"].sum() for each in episodes_ds_rollout])
+			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+			LOG_SUB_PREFIX = "diffuser_rollout"
+			r_sum = np.mean([each["r"].sum() for each in episodes_diffuser_rollout])
+			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+			LOG_SUB_PREFIX = "full_rollout"
+			r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
+			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
 
 
 		### render
@@ -241,15 +247,16 @@ class EvalRunner:
 		to_log[f"{LOG_PREFIX}/states_diffuser"] = [wandb.Image(
 			self.renderer.episodes2img(states_diffuser[:4,:MAXSTEP])
 		)]
-		to_log[f"{LOG_PREFIX}/states_ds_rollout"] = [wandb.Image(
-			self.renderer.episodes2img(states_ds_rollout[:4,:MAXSTEP])
-		)]
-		to_log[f"{LOG_PREFIX}/states_diffuser_rollout"] = [wandb.Image(
-			self.renderer.episodes2img(states_diffuser_rollout[:4,:MAXSTEP])
-		)]
-		to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb.Image(
-			self.renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
-		)]
+		if cfg.controller.turn_on:
+			to_log[f"{LOG_PREFIX}/states_ds_rollout"] = [wandb.Image(
+				self.renderer.episodes2img(states_ds_rollout[:4,:MAXSTEP])
+			)]
+			to_log[f"{LOG_PREFIX}/states_diffuser_rollout"] = [wandb.Image(
+				self.renderer.episodes2img(states_diffuser_rollout[:4,:MAXSTEP])
+			)]
+			to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb.Image(
+				self.renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
+			)]
 		wandb.log(to_log, commit=True)
 		
 	def generate(self, conditions={}, repeat=1):

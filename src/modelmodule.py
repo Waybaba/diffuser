@@ -195,17 +195,29 @@ def rollout_ref(env, ep_ref, model, normalizer):
 	for env_i in tqdm(range(len(ep_ref["s"]))):
 		device = next(model.parameters()).device
 		model.to(device)
-		act = model(torch.cat([
-			torch.tensor(normalizer.normalize(
-				s,
-				"observations"
-			)).to(device), 
-			torch.tensor(normalizer.normalize(
-				ep_ref["s_"][env_i],
-				"observations"
-			)).to(device)
-		], dim=-1).float().to(device))
-		act = act.detach().cpu().numpy()
+		if isinstance(model, FillActWrapper):
+			act = model(torch.cat([
+				torch.tensor(normalizer.normalize(
+					s,
+					"observations"
+				)).to(device), 
+				torch.tensor(normalizer.normalize(
+					ep_ref["s_"][env_i],
+					"observations"
+				)).to(device)
+			], dim=-1).float().to(device))
+			act = act.detach().cpu().numpy()
+		elif isinstance(model, EnvModelWrapper):
+			act = model.act(
+				torch.tensor(normalizer.normalize(
+					s,
+					"observations"
+				)).to(device).float(),
+				torch.tensor(normalizer.normalize(
+					ep_ref["s_"][env_i],
+					"observations"
+				)).to(device).float()
+			)
 		act = normalizer.unnormalize(act, "actions")
 		# act = ep_ref["act"][env_i] # ! DEBUG
 		s_, r, done, info = env.step(act)
@@ -323,6 +335,9 @@ class FillActWrapper(ModelWrapperBase):
 class EnvModelWrapper(ModelWrapperBase):
 	def __init__(self, dynamic_cfg, **kwargs):
 		self.torch_module_init()
+		self.dynamic_cfg = dynamic_cfg
+		self.act_dim = dynamic_cfg["act_dim"]
+		self.obs_dim = dynamic_cfg["obs_dim"]
 		in_dim = dynamic_cfg["obs_dim"] + dynamic_cfg["act_dim"]
 		out_dim = dynamic_cfg["obs_dim"]
 		self.net = kwargs["net"]
@@ -339,6 +354,9 @@ class EnvModelWrapper(ModelWrapperBase):
 	def select_param_group(self, name):
 		raise NotImplementedError
 
+	def act(self, x):
+		return x
+	
 class DiffusionWrapper(ModelWrapperBase):
 	def __init__(self, dynamic_cfg, **kwargs):
 		self.torch_module_init()
@@ -734,7 +752,6 @@ class FillActModelModule(DefaultModule):
 		assume s, s_ are unnormalized
 		"""
 		
-
 
 class EnvModelModule(FillActModelModule):
 	def step(self, batch: Any):

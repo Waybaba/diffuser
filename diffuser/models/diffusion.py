@@ -17,7 +17,7 @@ Sample = namedtuple('Sample', 'trajectories values chains')
 
 
 @torch.no_grad()
-def default_sample_fn(model, x, cond, t):
+def default_sample_fn(model, x, cond, t, **kwargs):
     # x = apply_conditioning(x, cond, model.action_dim) # ! DEBUG set start (and end) to target
     model_mean, _, model_log_variance = model.p_mean_variance(x=x, cond=cond, t=t)
     model_std = torch.exp(0.5 * model_log_variance)
@@ -179,7 +179,7 @@ class GaussianDiffusion(nn.Module):
         progress = utils.Progress(self.n_timesteps) if verbose else utils.Silent()
         for i in reversed(range(0, self.n_timesteps)):
             t = make_timesteps(batch_size, i, device)
-            x, values = sample_fn(self, x, cond, t, **sample_kwargs)
+            x, values = sample_fn(self, x, cond, t, horizon=self.horizon, alphas_cumprod=self.alphas_cumprod, **sample_kwargs)
             x = apply_conditioning(x, cond, self.action_dim) # ! DEBUG used in paper but accidently deleted
 
             progress.update({'t': i, 'vmin': values.min().item(), 'vmax': values.max().item()})

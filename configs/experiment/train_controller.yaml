@@ -75,13 +75,15 @@ datamodule:
   dataset:
     _target_: src.datamodule.EnvTransitionDataset
     _partial_: true
-    env: "halfcheetah-expert-v2"
+    env: "halfcheetah-mixed"
     multi_step: 5 # ! only for transition dataset
     custom_ds_path: null
     preprocess_fns: by_env
     normalizer: by_env
     gpu: true
     seed: ${seed}
+    lazyload: true
+    forcesave: false
 
 trainer:
     _target_: "pytorch_lightning.Trainer"

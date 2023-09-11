@@ -19,4 +19,5 @@ modelmodule:
       n_timesteps: 20
       # clip_denoised: true # ! different from maze in original paper
     net: 
+      dim: 128
       dim_mults: [1, 2, 4, 8]

@@ -13,11 +13,15 @@ from torchvision.transforms import transforms
 import torch
 import os
 import random
+from copy import deepcopy
+import hashlib
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 TransitionBatch = namedtuple('TransitionBatch', 's s_ act')
 EpisodeBatch = namedtuple('EpisodeBatch', 'trajectories conditions')
+MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
+
 ### functions
 
 class DatasetNormalizerW:
@@ -51,6 +55,8 @@ def load_kuka(env, custom_ds_path=None):
 	datasets = [np.load(dataset) for dataset in tqdm(
 		datasets[:100] if os.environ.get("DEBUG", "false").lower()=="true" else datasets,
 	)] # read from file
+	if os.environ.get("DEBUG", "false").lower()=="true":
+		print("\n### debug mode is on, only load 100 datasets !!!\n")
 	datasets = [dataset[::2] for dataset in datasets]
 	ep_lengths = [len(dataset) for dataset in datasets]
 	qstates = np.concatenate(datasets, axis=0)
@@ -129,10 +135,23 @@ class EnvDataset:
 		assert type(env) == str, "env should be a string"
 		assert "maze" in env or "halfcheetah" in env or "kuka" in env or "walker2d" in env or "hopper" in env, "maze envs not supported, since d4rl does not provide terminal"
 
-		### get dataset
+		### get dataset (setup self.dataset, self.env)
 		self.env_name = env
 		if "kuka" in self.env_name:
 			self.env, self.dataset = load_kuka(self.env_name, custom_ds_path)
+		elif self.env_name.endswith("mixed"):
+			# e.g. halfcheetah-mixed
+			base_name = self.env_name.split("-")[0]
+			ds_suffix_list = ["random", "medium", "expert"]
+			ds_list = []
+			for suffix in ds_suffix_list:
+				env_name_ = base_name + "-" + suffix + "-v0"
+				env_ = load_environment(env_name_)
+				ds = env_.get_dataset()
+				ds_list.append(ds)
+			self.env, self.dataset = env_, {}
+			for k in ds_list[0].keys():
+				self.dataset[k] = np.concatenate([ds[k] for ds in ds_list], axis=0)
 		else:
 			self.env = load_environment(self.env_name) # TOODO can not use gym.make ?
 			if custom_ds_path: self.dataset = self.env.get_dataset(custom_ds_path)
@@ -157,12 +176,14 @@ class EnvDataset:
 		for k in keys_to_delete: del self.dataset[k]
 		
 		### normalize
-		assert normalizer == "by_env", "only support by_env"
-		if "maze" in self.env_name: normalizer = "LimitsNormalizer"
-		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
-			normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
-		elif "kuka" in self.env_name: normalizer = "DebugNormalizer"
-		else: raise NotImplementedError(f"env {self.env_name} not supported")
+		if normalizer == "by_env":
+			if "maze" in self.env_name: normalizer = "LimitsNormalizer"
+			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
+				normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
+			elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
+			else: raise NotImplementedError(f"env {self.env_name} not supported")
+		else:
+			normalizer = normalizer
 		self.observation_dim = self.dataset['observations'].shape[1]
 		self.action_dim = self.dataset['actions'].shape[1]
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
@@ -189,6 +210,9 @@ class EnvDataset:
 			self.renderer = KukaRenderer()
 		else:
 			raise NotImplementedError("env not supported")
+
+		### lazyload indices
+		self.indices = self.lazyload_indices()
 
 	def __len__(self):
 		return len(self.indices)
@@ -259,21 +283,55 @@ class EnvDataset:
 		self.episodes_ref = reference_episodes
 		return self.episodes_ref
 
+	def lazyload_indices(self):
+		""" lazyload indices
+		save indices with pickle after first-time processing
+		hash self.kwargs as the unique name for the indices
+		"""
+		assert os.environ.get("UDATADIR") is not None, "UDATADIR not set"
+		save_dir = os.path.join(os.environ.get("UDATADIR"), "models", "diffuser", "d4rl_dataset", "indices_buf")
+		if not os.path.exists(save_dir):
+			os.makedirs(save_dir)
+
+		cfgs = deepcopy(self.kwargs)
+		cfgs["debug"] = os.environ.get("DEBUG", "false").lower() == "true"
+		if cfgs["debug"]: print("\n### DEBUG is on !!! Only load part data!")
+		if "forcesave" in cfgs: del cfgs["forcesave"]
+		if "lazyload" in cfgs: del cfgs["lazyload"]
+		hash_name = hashlib.md5(str(cfgs).encode()).hexdigest()
+		file_path = os.path.join(save_dir, hash_name + ".pkl")
+
+		if "lazyload" in self.kwargs and self.kwargs["lazyload"] and os.path.exists(file_path):
+			print(f"\n[EnvDataset] loading indices from {file_path}\n")
+			indices = torch.load(file_path)
+		else:
+			if "lazyload" not in self.kwargs:
+				msg = "lazyload not found, would load ..."
+			else:
+				msg = "will always remake indices" if not self.kwargs["lazyload"] else f"can not find {file_path}, will remake indices"
+			print(msg)
+			indices = self.make_indices()
+			if not os.path.exists(file_path) or ("forcesave" in self.kwargs and self.kwargs["forcesave"]):
+				torch.save(indices, file_path)
+				print(f"\n[EnvDataset] indices saved to {file_path}\n")
+
+		print(f"indices length is {len(indices)}\n")
+		return indices
+
 class EnvEpisodeDataset(EnvDataset):
 
 	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.horizon = kwargs["horizon"]
 		self.kwargs = kwargs
-		self.indices = self.make_indices(self.dataset)
+		super().__init__(*args, **kwargs)
 
-	def make_indices(self, dataset):
+	def make_indices(self):
 		"""
 			makes indices for sampling from dataset;
 			each index maps to a datapoint
 			(N, 2)
 			each element is (start, end)
 		"""
+		dataset = self.dataset
 		# fast_idx_making = True
 		if self.kwargs["mode"] == "default":
 			dones = dataset["terminals"]
@@ -284,7 +342,7 @@ class EnvEpisodeDataset(EnvDataset):
 			print("making indexes ...")
 			for i in tqdm(range(len(dones_idxes))):
 				if dones_idxes[i] > start: 
-					if dones_idxes[i] - start >= self.horizon:
+					if dones_idxes[i] - start >= self.kwargs["horizon"]:
 						indices.append([start, dones_idxes[i]])
 						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 					start = dones_idxes[i] + 1
@@ -305,10 +363,10 @@ class EnvEpisodeDataset(EnvDataset):
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
 			dones_idxes = torch.where(dones)[0]
 			start = 0
-			max_gap = multi_step * self.horizon
+			max_gap = multi_step * self.kwargs["horizon"]
 			for start in tqdm(range(0, len(dones) - max_gap)):
 				for inter in range(1, int(multi_step) + 1):
-					indices.append([start, start + self.horizon * inter, inter])
+					indices.append([start, start + self.kwargs["horizon"] * inter, inter])
 					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("ep_multi_step"):
@@ -325,14 +383,13 @@ class EnvEpisodeDataset(EnvDataset):
 			
 			print("making indexes for episode-based multi-step ...")
 			start = 0
-			max_gap = multi_step * self.horizon
+			max_gap = multi_step * self.kwargs["horizon"]
 			for end in tqdm(dones_idxes):
 				for i in range(start, end - max_gap + 1):
 					for inter in range(1, multi_step + 1):
-						indices.append([i, i + self.horizon * inter, inter])
+						indices.append([i, i + self.kwargs["horizon"] * inter, inter])
 				start = end + 1  # Move to the start of the next episode
-				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: 
-					return torch.tensor(indices)
+				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 				
 			indices = torch.tensor(indices)
 		else:
@@ -347,7 +404,7 @@ class EnvEpisodeDataset(EnvDataset):
 		cond = {0: observations[0]}
 		# if "maze" in self.env_name:
 		# 	cond.update({
-		# 		self.horizon - 1: observations[-1],
+		# 		self.kwargs["horizon"] - 1: observations[-1],
 		# 	})
 		return cond
 	
@@ -357,8 +414,8 @@ class EnvEpisodeDataset(EnvDataset):
 		if self.kwargs["mode"] == "default":
 			### B random slice
 			start, end = self.indices[idx]
-			start = np.random.randint(start, end - self.horizon + 1)
-			end = start + self.horizon
+			start = np.random.randint(start, end - self.kwargs["horizon"] + 1)
+			end = start + self.kwargs["horizon"]
 			observations = self.dataset["observations"][start:end]
 			actions = self.dataset["actions"][start:end]
 
@@ -396,10 +453,10 @@ class EnvEpisodeDataset(EnvDataset):
 class EnvTransitionDataset(EnvDataset):
 
 	def __init__(self, *args, **kwargs):
+		self.kwargs = kwargs
 		super().__init__(*args, **kwargs)
-		self.indices = self.make_indices(self.dataset, kwargs["multi_step"])
 
-	def make_indices(self, dataset, multi_step):
+	def make_indices(self):
 		"""
 		Generate indices for sampling.
 		
@@ -415,6 +472,8 @@ class EnvTransitionDataset(EnvDataset):
 		  indices: (N*multi_step, 2)
 		  	[start, end) does not include any dones==True
 		"""
+		dataset, multi_step = self.dataset, self.kwargs["multi_step"]
+
 		num_data = len(dataset["observations"])
 		dones = dataset.get("terminals", np.zeros(num_data, dtype=bool))
 		if "timeouts" in dataset: dones |= dataset["timeouts"]
@@ -426,15 +485,13 @@ class EnvTransitionDataset(EnvDataset):
 		for i in tqdm(valid_indices.cpu().numpy()):
 			for j in range(1, multi_step + 1):
 				end_idx = i + j
-				if dones[end_idx]: 
+				if end_idx >= num_data: break
+				if dones[end_idx]:
 					indices.append([i, end_idx])
 					break
-				if end_idx >= num_data: break
 				indices.append([i, end_idx])
 				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return np.array(indices)
 
-
-		print("Dataset make indices done, the length is {}".format(len(indices)))
 
 		return np.array(indices)
 	
