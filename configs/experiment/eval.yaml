@@ -13,7 +13,8 @@ diffuser:
 
 guide:
   # _target_: diffuser.sampling.NoTrainGuideYLower
-  _target_: diffuser.sampling.DummyGuide
+  _target_: diffuser.sampling.Maze2dTargetGuide
+  target: [0,0]
 
 controller:
   # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
@@ -35,10 +36,10 @@ policy:
     _target_: diffuser.sampling.n_step_guided_p_sample_freedom_timetravel
     _partial_: true
   scale: 1000
-  n_guide_steps: 2 # ! does not used, only use one step + time travel
+  n_guide_steps: 1 # ! does not used, only use one step + time travel
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   scale_grad_by_std: true
-  travel_repeat: 5 # time travel
+  travel_repeat: 1 # time travel
   travel_interval: [0.0,1.0] # if float, would use [horizon*travel_interval, horizon]
 
 plan_freq: 1.0

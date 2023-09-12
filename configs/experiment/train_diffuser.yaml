@@ -83,7 +83,7 @@ datamodule:
     seed: ${seed}
     clip_denoised: false # ! removed but in paper # maze:true mujoco:true
     use_padding: true # ! removed but in paper # maze:false mujoco:true
-    mode: multi_step%5 # ! multi_step%{step_num}, default
+    mode: valid_multi_step%10 # ! multi_step%{step_num}, default, valid_multi_step%{step_num}
     lazyload: true # would lazy make indices
     forcesave: false # ! would not replace if already exists a file even when remake to avoid WRITE conflicts
 

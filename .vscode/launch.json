@@ -26,6 +26,8 @@
 				// "experiment=train_diffuser",
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
+				// "datamodule.dataset.env=maze2d-open55-v0",
+				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-open55-v0-10000000-onlytwo.hdf5",
 				// "global_cfg.horizon=100",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
@@ -125,17 +127,21 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=eval",
-				"wandb.mode=disabled",
-				// "wandb.mode=online",
+				// "wandb.mode=disabled",
+				"wandb.mode=online",
 				// ### maze
 				// "guide._target_=diffuser.sampling.NoTrainGuideXLower",
+				"guide._target_=diffuser.sampling.Maze2dTargetGuide",
+				// "+guide.target",
+				"policy.scale=1.0",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-07_21-01-11_183716/0",
-				// "controller.turn_on=false",
+				"diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-10_13-54-48_692127/0",
+				"controller.turn_on=false",
 				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
 				// ### mujoco
-				"guide._target_=diffuser.sampling.MujocoFaster",
-				"diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
-				"controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
+				// "guide._target_=diffuser.sampling.MujocoFaster",
+				// "diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
+				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
 
 			],
 		},

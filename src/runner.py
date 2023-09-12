@@ -39,6 +39,30 @@ register(
 	}
 )
 
+OPEN55 = \
+        "#######\\"+\
+        "#OOOOO#\\"+\
+        "#OOOOO#\\"+\
+        "#OOGOO#\\"+\
+        "#OOOOO#\\"+\
+        "#OOOOO#\\"+\
+        "#######"
+
+register(
+    id='maze2d-open55-v0',
+    entry_point='d4rl.pointmaze:MazeEnv',
+    max_episode_steps=10000, # ! the origin value is 150
+    kwargs={
+        'maze_spec':OPEN55,
+        'reward_type':'sparse',
+        'reset_target': False,
+        'ref_min_score': 0.01,
+        'ref_max_score': 20.66,
+        'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-open-sparse.hdf5'
+    }
+)
+
+
 
 
 class TrainDiffuserRunner:
@@ -149,8 +173,8 @@ class EvalRunner:
 		diffuser = self.load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
 		if cfg.controller.turn_on:
 			controller = self.load_controller(cfg.controller.dir, cfg.controller.epoch)
-		assert diffuser.dynamic_cfg["dataset"].env_name.split("-")[0] == controller.dynamic_cfg["dataset"].env_name.split("-")[0], \
-			f"diffuser and controller should be trained on the same environment, while got {diffuser.dynamic_cfg['dataset'].env_name} and {controller.dynamic_cfg['dataset'].env_name}"
+			assert diffuser.dynamic_cfg["dataset"].env_name.split("-")[0] == controller.dynamic_cfg["dataset"].env_name.split("-")[0], \
+				f"diffuser and controller should be trained on the same environment, while got {diffuser.dynamic_cfg['dataset'].env_name} and {controller.dynamic_cfg['dataset'].env_name}"
 		print(f"\n\n\n### diffuser env loaded!: {diffuser.dynamic_cfg['dataset'].env_name}")
 		# TODO controller could be null
 		# TODO guide could be null

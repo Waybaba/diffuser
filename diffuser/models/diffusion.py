@@ -218,7 +218,7 @@ class GaussianDiffusion(nn.Module):
 
         return sample
 
-    def p_losses(self, x_start, cond, t):
+    def p_losses(self, x_start, cond, t, **kwargs):
         noise = torch.randn_like(x_start)
         if APPLY_CONDITION == False:
             cond = {} # ! DEBUG
@@ -240,16 +240,16 @@ class GaussianDiffusion(nn.Module):
         # ! DEBUG
 
         if self.predict_epsilon:
-            loss, info = self.loss_fn(x_recon, noise, weight)
+            loss, info = self.loss_fn(x_recon, noise, weight, **kwargs)
         else:
-            loss, info = self.loss_fn(x_recon, x_start, weight)
+            loss, info = self.loss_fn(x_recon, x_start, weight, **kwargs)
 
         return loss, info
 
-    def loss(self, x, *args):
+    def loss(self, x, *args, **kwargs):
         batch_size = len(x)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
-        return self.p_losses(x, *args, t)
+        return self.p_losses(x, *args, t, **kwargs)
 
     def forward(self, cond, *args, **kwargs):
         return self.conditional_sample(cond, *args, **kwargs)

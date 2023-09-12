@@ -20,6 +20,7 @@ Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
 TransitionBatch = namedtuple('TransitionBatch', 's s_ act')
 EpisodeBatch = namedtuple('EpisodeBatch', 'trajectories conditions')
+EpisodeValidBatch = namedtuple('EpisodeValidBatch', 'trajectories conditions valids')
 MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
 
 ### functions
@@ -338,14 +339,14 @@ class EnvEpisodeDataset(EnvDataset):
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
 			dones_idxes = torch.where(dones)[0]
 			indices = []
-			start = 0
+			ep_start = 0
 			print("making indexes ...")
 			for i in tqdm(range(len(dones_idxes))):
-				if dones_idxes[i] > start: 
-					if dones_idxes[i] - start >= self.kwargs["horizon"]:
-						indices.append([start, dones_idxes[i]])
+				if dones_idxes[i] > ep_start: 
+					if dones_idxes[i] - ep_start >= self.kwargs["horizon"]:
+						indices.append([ep_start, dones_idxes[i]])
 						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
-					start = dones_idxes[i] + 1
+					ep_start = dones_idxes[i] + 1
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("multi_step"):
 			""" make indices with different values of interval
@@ -362,17 +363,17 @@ class EnvEpisodeDataset(EnvDataset):
 			dones = dataset["terminals"]
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
 			dones_idxes = torch.where(dones)[0]
-			start = 0
+			ep_start = 0
 			max_gap = multi_step * self.kwargs["horizon"]
-			for start in tqdm(range(0, len(dones) - max_gap)):
+			for ep_start in tqdm(range(0, len(dones) - max_gap)):
 				for inter in range(1, int(multi_step) + 1):
-					indices.append([start, start + self.kwargs["horizon"] * inter, inter])
+					indices.append([ep_start, ep_start + self.kwargs["horizon"] * inter, inter])
 					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("ep_multi_step"):
 			"""
 				same as before but is episode based
-				would be use indices cross episodes
+				would not use indices cross episodes
 			"""
 			indices = []
 			mode, multi_step = self.kwargs["mode"].split("%")
@@ -382,15 +383,42 @@ class EnvEpisodeDataset(EnvDataset):
 			dones_idxes = torch.where(dones)[0]
 			
 			print("making indexes for episode-based multi-step ...")
-			start = 0
+			ep_start = 0
 			max_gap = multi_step * self.kwargs["horizon"]
-			for end in tqdm(dones_idxes):
-				for i in range(start, end - max_gap + 1):
+			for ep_end in tqdm(dones_idxes):
+				for i in range(ep_start, ep_end - max_gap + 1):
 					for inter in range(1, multi_step + 1):
 						indices.append([i, i + self.kwargs["horizon"] * inter, inter])
-				start = end + 1  # Move to the start of the next episode
+				ep_start = ep_end + 1  # Move to the start of the next episode
 				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 				
+			indices = torch.tensor(indices)
+		elif self.kwargs["mode"].startswith("valid_multi_step"):
+			"""
+				same as before but is episode based
+				would use indices cross episodes but mark the ones in the 
+				later as invalid
+				[(start, end, interval, invalid_start)]
+			"""
+			indices = []
+			mode, multi_step = self.kwargs["mode"].split("%")
+			multi_step = int(multi_step)
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			
+			print("making indexes for valid episode-based multi-step ...")
+			ep_start = 0
+			max_gap = multi_step * self.kwargs["horizon"]
+			for ep_end in tqdm(dones_idxes):
+				for i in range(ep_start, ep_end):
+					for inter in range(1, multi_step + 1):
+						item_end = i + self.kwargs["horizon"] * inter
+						invalid_start = max((ep_end-i)//inter, self.kwargs["horizon"]-1)
+						indices.append([i, item_end, inter, invalid_start])
+				ep_start = ep_end + 1  # Move to the start of the next episode
+				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+			
 			indices = torch.tensor(indices)
 		else:
 			raise NotImplementedError("mode not supported")
@@ -434,6 +462,15 @@ class EnvEpisodeDataset(EnvDataset):
 			conditions = self.get_conditions(observations)
 			trajectories = torch.cat([actions, observations], axis=-1)
 			batch = EpisodeBatch(trajectories, conditions)
+		elif self.kwargs["mode"].startswith("valid_multi_step"):
+			start, end, inter, invalid_start = self.indices[idx]
+			observations = self.dataset["observations"][start:end:inter]
+			actions = self.dataset["actions"][start:end:inter]
+			valids = torch.ones_like(observations[:,0])
+			valids[invalid_start:] = 0
+			conditions = self.get_conditions(observations)
+			trajectories = torch.cat([actions, observations], axis=-1)
+			batch = EpisodeValidBatch(trajectories, conditions, valids)
 
 		return batch
 

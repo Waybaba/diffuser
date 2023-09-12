@@ -809,7 +809,9 @@ class DiffuserModule(DefaultModule):
 			be task-specific, so we need to implement it in the subclass
 		"""
 		# s, s_, act
-		loss, _ = self.net.loss(*batch)
+		kwargs = {}
+		if len(batch) == 3: kwargs["valids"] = batch.valids
+		loss, _ = self.net.loss(batch.trajectories, batch.conditions, **kwargs)
 		# applying nosie robustness
 		if self.hparams.data_noise: 
 			batch = batch._replace(trajectories=batch.trajectories + torch.randn_like(batch.trajectories) * self.hparams.data_noise)

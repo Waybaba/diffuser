@@ -156,16 +156,19 @@ class WeightedLoss(nn.Module):
         self.register_buffer('weights', weights)
         self.action_dim = action_dim
 
-    def forward(self, pred, targ, weight=None):
+    def forward(self, pred, targ, weight=None, valids=None):
         '''
             pred, targ : tensor
                 [ batch_size x horizon x transition_dim ]
+            valids: [ batch_size x horizon ]
         '''
         loss = self._loss(pred, targ)
         # ! DEBUG add beta weight adjust
-        if weight is not None:
+        if weight is not None: # for transition_dim
             loss = torch.einsum('i, i... -> i...', weight, loss)
-        #
+        if valids is not None: # for batch_size x horizon
+            loss = torch.einsum('ij, ij... -> ij...', valids, loss)
+            
         weighted_loss = (loss * self.weights).mean()
         a0_loss = (loss[:, 0, :self.action_dim] / self.weights[0, :self.action_dim]).mean()
         return weighted_loss, {'a0_loss': a0_loss, "weighted_loss": weighted_loss}
