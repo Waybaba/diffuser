@@ -1,7 +1,5 @@
 import wandb
 
-from gym.envs.registration import register
-
 import hydra
 from omegaconf import OmegaConf
 from pathlib import Path
@@ -158,7 +156,7 @@ class EvalRunner:
 
 		### episodes - generate
 		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES) # [{"s": ...}]
-		episodes_diffuser = self.gen_with_same_cond(episodes_ds) # [{"s": ...}]
+		episodes_diffuser = gen_with_same_cond(self.policy, episodes_ds) # [{"s": ...}]
 		### episodes - rollout
 		if cfg.controller.turn_on:
 			episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
@@ -234,34 +232,7 @@ class EvalRunner:
 				self.renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
 			)]
 		wandb.log(to_log, commit=True)
-		
-	def generate(self, conditions={}, repeat=1):
-		"""
-		return:
-			Trajectories(actions, observations, samples.values)
-		"""
-		actions, samples = self.policy(conditions, batch_size=repeat)
-		return samples.observations
 
-	def gen_with_same_cond(self, episodes_ds):
-		"""
-		"""
-		# get conditions
-		episodes_ds_ = deepcopy(episodes_ds)
-		res = []
-		for i in range(len(episodes_ds_)):
-			ep_i = episodes_ds_[i]
-			cond = {
-				0: episodes_ds_[i]["s"][0]
-			}
-			del ep_i["act"] # to avoid misuse
-			del ep_i["s"]
-			del ep_i["s_"]
-			obs_gen = self.generate(cond, repeat=1) # samples (B, T, obs_dim)
-			ep_i["s"] = obs_gen[0] # (T, obs_dim)
-			ep_i["s_"] = np.concatenate([obs_gen[0][1:], obs_gen[0][-1:]], axis=0)
-			res.append(ep_i)
-		return res
 
 
 def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):

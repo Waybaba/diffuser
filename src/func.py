@@ -1,4 +1,14 @@
 
+from gym.envs.registration import register
+from copy import deepcopy
+import numpy as np
+from omegaconf import OmegaConf
+from pathlib import Path
+import hydra
+import os
+from tqdm import tqdm
+import torch
+
 """Functions"""
 def load_diffuser(dir_, epoch_):
 	print("\n\n\n### loading diffuser ...")
@@ -163,6 +173,27 @@ def load_kuka(env, custom_ds_path=None):
 	}
 	return env, dataset
 
+def gen_with_same_cond(policy, episodes_ds):
+	"""
+	"""
+	# get conditions
+	episodes_ds_ = deepcopy(episodes_ds)
+	res = []
+	for i in range(len(episodes_ds_)):
+		ep_i = episodes_ds_[i]
+		cond = {
+			0: episodes_ds_[i]["s"][0]
+		}
+		del ep_i["act"] # to avoid misuse
+		del ep_i["s"]
+		del ep_i["s_"]
+		_, samples = policy(cond, batch_size=1)
+		obs_gen = samples.observations
+		ep_i["s"] = obs_gen[0] # (T, obs_dim)
+		ep_i["s_"] = np.concatenate([obs_gen[0][1:], obs_gen[0][-1:]], axis=0)
+		res.append(ep_i)
+	return res
+
 
 """others"""
 
@@ -213,3 +244,6 @@ register(
         'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-open-sparse.hdf5'
     }
 )
+
+if __name__ == "__main__":
+	pass

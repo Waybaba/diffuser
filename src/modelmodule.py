@@ -13,6 +13,7 @@ from diffuser.utils.arrays import batch_to_device, to_np, to_device, apply_dict
 from src.datamodule import EpisodeBatch, EpisodeValidBatch
 import random
 from src.func import *
+GuidedPolicy
 
 
 """functions"""
@@ -800,6 +801,14 @@ class EnvModelModule(FillActModelModule):
 
 # Diffuser
 class DiffuserModule(DefaultModule):
+	def __init__(
+		self,
+		**kwargs
+	):
+		super().__init__(**kwargs)
+		if "contoller" in self.hparams and self.hparams.controller.turn_on:
+			self.controller = load_controller(self.hparams.controller.dir, self.hparams.controller.epoch)
+		
 	def step(self, batch: Any):
 		""" process the batch from dataloader and return the res_batch
 		input: `batch dict` from dataloader
@@ -825,13 +834,33 @@ class DiffuserModule(DefaultModule):
 		return res_batch
 
 	def validation_epoch_end(self, outputs):
+		### init
 		assert self.net.training == False, "net should be in eval mode"
 		LOG_PREFIX = "val_ep_end"
+		to_log = {}
+
 		### get render data # TODO spilt well
+		env = self.dynamic_cfg["env"]
+		dataset = self.dynamic_cfg["dataset"]
 		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
+		# ! TODO get full ep
+		N_FULLROLLOUT = 4
+		if self.hparams.controller.turn_on:
+			policy_noguide = GuidedPolicy(
+				guide=DummyGuide(),
+				diffusion_model=self.net.net, 
+				normalizer=dataset.normalizer,
+			)
+			episodes_full_rollout = [self.full_rollout_once(
+				env, 
+				self.net, 
+				self.actor, 
+				dataset.normalizer, 
+				self.hparams.plan_freq if isinstance(self.hparams.plan_freq, int) else max(int(self.hparams.plan_freq * dataset.kwargs["horizon"]),1),
+			) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
+
 
 		### log
-		to_log = {}
 		to_log["ref"] = [wandb.Image(_) for _ in ref_samples]
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb.Video(_) for _ in chain_samples]

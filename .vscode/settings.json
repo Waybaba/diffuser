@@ -1,0 +1,14 @@
+{
+    "search.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "**/public": true,
+        "**/bower_components": true,
+		"**/gym_stacking": true,
+		"**/denoising_diffusion_pytorch": true,
+    },
+
+    "files.exclude": {
+        "**/public": true
+    }
+}
