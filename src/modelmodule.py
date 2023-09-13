@@ -13,33 +13,13 @@ from diffuser.utils.arrays import batch_to_device, to_np, to_device, apply_dict
 from src.datamodule import EpisodeBatch, EpisodeValidBatch
 import random
 from src.func import *
-GuidedPolicy
+from diffuser.sampling.guides import DummyGuide
+from diffuser.sampling.policies import GuidedPolicy
+from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel
 
 
 """functions"""
-def safefill_rollout(episodes_rollout):
-	"""
-	episodes_rollout:
-		[{
-			"s": (T, obs_dim),
-			"act": (T, act_dim),
-			"r": (T),
-		}]]
-	they could have different length, fill with the last frame to 
-	make all have the same with the maximum length one
-	for "s" and "act", repeat the last frame
-	for "r", fill with 0
-	"""
-	max_len = max([len(ep["s"]) for ep in episodes_rollout])
-	for i in range(len(episodes_rollout)):
-		ep = episodes_rollout[i]
-		for key in ["s", "act"]:
-			if len(ep[key]) < max_len:
-				ep[key] = np.concatenate([ep[key], np.repeat(ep[key][-1:], max_len - len(ep[key]), axis=0)], axis=0)
-		if len(ep["r"]) < max_len:
-			ep["r"] = np.concatenate([ep["r"], np.zeros(max_len - len(ep["r"]))], axis=0)
-		episodes_rollout[i] = ep
-	return episodes_rollout
+
 
 def collect_parameters(model, set="all"):
 	""" Collect parameters from model depending on set.
@@ -806,7 +786,7 @@ class DiffuserModule(DefaultModule):
 		**kwargs
 	):
 		super().__init__(**kwargs)
-		if "contoller" in self.hparams and self.hparams.controller.turn_on:
+		if "controller" in self.hparams and self.hparams.controller.turn_on:
 			self.controller = load_controller(self.hparams.controller.dir, self.hparams.controller.epoch)
 		
 	def step(self, batch: Any):
@@ -846,18 +826,42 @@ class DiffuserModule(DefaultModule):
 		# ! TODO get full ep
 		N_FULLROLLOUT = 4
 		if self.hparams.controller.turn_on:
+			self.actor = self.controller.net
+			self.actor.to(self.device)
+			self.actor.eval()
 			policy_noguide = GuidedPolicy(
 				guide=DummyGuide(),
-				diffusion_model=self.net.net, 
+				diffusion_model=self.net.diffusion, 
 				normalizer=dataset.normalizer,
+				preprocess_fns=[],
+				scale=1.0,
+				n_guide_steps=1, # ! does not used, only use one step + time travel
+				sample_fn=n_step_guided_p_sample_freedom_timetravel,
+				t_stopgrad=2, # positive: grad[t < t_stopgrad] = 0; bigger is noise
+				scale_grad_by_std=True,
+				travel_repeat=1, # time travel
+				travel_interval=[0.0,1.0], # if float, would use [horizon*travel_interval, horizon]
 			)
-			episodes_full_rollout = [self.full_rollout_once(
+			episodes_full_rollout = [full_rollout_once(
 				env, 
-				self.net, 
+				policy_noguide, 
 				self.actor, 
 				dataset.normalizer, 
-				self.hparams.plan_freq if isinstance(self.hparams.plan_freq, int) else max(int(self.hparams.plan_freq * dataset.kwargs["horizon"]),1),
+				# self.hparams.plan_freq if isinstance(self.hparams.plan_freq, int) else max(int(self.hparams.plan_freq * dataset.kwargs["horizon"]),1),
+				5,
 			) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
+			episodes_full_rollout = safefill_rollout(episodes_full_rollout)
+			
+			### cals rollout metric
+			LOG_PREFIX = "value"
+			LOG_SUB_PREFIX = "full_rollout"
+			MAXSTEP = 200
+			r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
+			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+			states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
+			to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb.Image(
+				self.renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
+			)]
 
 
 		### log

@@ -32,7 +32,7 @@
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
 				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
-				"datamodule.dataset.env=walker2d-mixed",
+				"datamodule.dataset.env=halfcheetah-mixed",
 				"datamodule.dataset.mode=interpolation",
 				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "+trainer.enable_progress_bar=False",

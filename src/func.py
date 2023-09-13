@@ -87,7 +87,7 @@ def full_rollout_once(
 
 	# assert actor.horizon >= plan_freq, "plan_freq should be smaller than horizon"
 	assert actor.training == False, "actor should be in eval mode"
-	assert planner.training == False, "planner should be in eval mode"
+	# assert planner.training == False, "planner should be in eval mode"
 	print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
 	res = {
 		"act": [],
@@ -194,6 +194,29 @@ def gen_with_same_cond(policy, episodes_ds):
 		res.append(ep_i)
 	return res
 
+def safefill_rollout(episodes_rollout):
+	"""
+	episodes_rollout:
+		[{
+			"s": (T, obs_dim),
+			"act": (T, act_dim),
+			"r": (T),
+		}]]
+	they could have different length, fill with the last frame to 
+	make all have the same with the maximum length one
+	for "s" and "act", repeat the last frame
+	for "r", fill with 0
+	"""
+	max_len = max([len(ep["s"]) for ep in episodes_rollout])
+	for i in range(len(episodes_rollout)):
+		ep = episodes_rollout[i]
+		for key in ["s", "act"]:
+			if len(ep[key]) < max_len:
+				ep[key] = np.concatenate([ep[key], np.repeat(ep[key][-1:], max_len - len(ep[key]), axis=0)], axis=0)
+		if len(ep["r"]) < max_len:
+			ep["r"] = np.concatenate([ep["r"], np.zeros(max_len - len(ep["r"]))], axis=0)
+		episodes_rollout[i] = ep
+	return episodes_rollout
 
 """others"""
 

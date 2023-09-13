@@ -161,13 +161,16 @@ class EvalRunner:
 		if cfg.controller.turn_on:
 			episodes_ds_rollout = [rollout_ref(self.env, episodes_ds[i], self.actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
 			episodes_diffuser_rollout = [rollout_ref(self.env, episodes_diffuser[i], self.actor, dataset.normalizer) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
-			episodes_full_rollout = [self.full_rollout_once(
+			episodes_full_rollout = [full_rollout_once(
 				self.env, 
 				self.policy, 
 				self.actor, 
 				dataset.normalizer, 
 				cfg.plan_freq if isinstance(cfg.plan_freq, int) else max(int(cfg.plan_freq * self.model.horizon),1),
 			) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
+			episodes_ds_rollout = safefill_rollout(episodes_ds_rollout)
+			episodes_diffuser_rollout = safefill_rollout(episodes_diffuser_rollout)
+			episodes_full_rollout = safefill_rollout(episodes_full_rollout)
 
 		### distill state
 		states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
