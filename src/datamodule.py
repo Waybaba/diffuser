@@ -10,11 +10,14 @@ from pytorch_lightning import LightningDataModule
 from typing import Any, Dict, Optional, Tuple
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
+from scipy.interpolate import interp1d
 import torch
 import os
 import random
 from copy import deepcopy
+import torch.nn.functional as F
 import hashlib
+from src.func import *
 
 Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
@@ -38,57 +41,6 @@ class DatasetNormalizerW:
 
 	def unnormalize(self, x, key):
 		return self.normalizers[key].unnormalize(x)
-
-def load_kuka(env, custom_ds_path=None):
-	""" load kuka env 
-	"""
-	from glob import glob
-	assert "kuka" in env, "only support kuka env"
-	if custom_ds_path is None:
-		custom_ds_path = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/"
-		print(f"using kuka default dataset path {custom_ds_path}")
-	from gym_stacking.env import StackEnv
-	env = StackEnv()
-	dataset = custom_ds_path + "/*.npy"
-	# dataset = "/data/models/diffuser/d4rl_dataset/kuka/kuka_dataset/*.npy" # DEBUG
-	datasets = sorted(glob(dataset))
-	print(f"found {len(datasets)} datasets at {dataset}")
-	datasets = [np.load(dataset) for dataset in tqdm(
-		datasets[:100] if os.environ.get("DEBUG", "false").lower()=="true" else datasets,
-	)] # read from file
-	if os.environ.get("DEBUG", "false").lower()=="true":
-		print("\n### debug mode is on, only load 100 datasets !!!\n")
-	datasets = [dataset[::2] for dataset in datasets]
-	ep_lengths = [len(dataset) for dataset in datasets]
-	qstates = np.concatenate(datasets, axis=0)
-
-	# qstates = np.zeros((max_n_episodes, max_path_length, obs_dim))
-	# path_lengths = np.zeros(max_n_episodes, dtype=np.int)
-
-	# for i, dataset in enumerate(datasets):
-	# 	qstate = np.load(dataset)
-	# 	qstate = qstate[::2]
-	# 	print(qstate.max(), qstate.min())
-	# 	# qstate[np.isnan(qstate)] = 0.0
-	# 	path_length = len(qstate)
-
-	# 	if path_length > max_path_length:
-	# 		qstates[i, :max_path_length] = qstate[:max_path_length]
-	# 		path_length = max_path_length
-	# 	else:
-	# 		qstates[i, :path_length] = qstate
-	# 	path_lengths[i] = path_length
-	# qstates = qstates[:i+1]
-	# path_lengths = path_lengths[:i+1]
-	# return qstates, path_lengths
-	terminals = np.zeros_like(qstates[:,0])
-	terminals[np.cumsum(ep_lengths)-1] = 1
-	dataset = {
-		"observations": qstates,
-		"actions": np.random.randn(*qstates.shape)[:,:11], # act_dim = 11
-		"terminals": terminals
-	}
-	return env, dataset
 
 
 ### dataset
@@ -348,6 +300,22 @@ class EnvEpisodeDataset(EnvDataset):
 						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
 					ep_start = dones_idxes[i] + 1
 			indices = torch.tensor(indices)
+		elif self.kwargs["mode"].startswith("interpolation"):
+			"""
+				indices: [(ep_start, ep_end)]
+			"""
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			indices = []
+			ep_start = 0
+			print("making indexes ...")
+			for i in tqdm(range(len(dones_idxes))):
+				if dones_idxes[i] > ep_start: 
+					indices.append([ep_start, dones_idxes[i]])
+					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+					ep_start = dones_idxes[i] + 1
+			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("multi_step"):
 			""" make indices with different values of interval
 			for each episode, 
@@ -409,12 +377,11 @@ class EnvEpisodeDataset(EnvDataset):
 			
 			print("making indexes for valid episode-based multi-step ...")
 			ep_start = 0
-			max_gap = multi_step * self.kwargs["horizon"]
 			for ep_end in tqdm(dones_idxes):
 				for i in range(ep_start, ep_end):
 					for inter in range(1, multi_step + 1):
 						item_end = i + self.kwargs["horizon"] * inter
-						invalid_start = max((ep_end-i)//inter, self.kwargs["horizon"]-1)
+						invalid_start = ((ep_end-i) // inter) + 1
 						indices.append([i, item_end, inter, invalid_start])
 				ep_start = ep_end + 1  # Move to the start of the next episode
 				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
@@ -451,7 +418,19 @@ class EnvEpisodeDataset(EnvDataset):
 			# if np.random.rand() > 0.5:
 			# 	observations = self.flip_trajectory(observations)
 			# 	actions = self.flip_trajectory(actions)
-
+			conditions = self.get_conditions(observations)
+			trajectories = torch.cat([actions, observations], axis=-1)
+			batch = EpisodeBatch(trajectories, conditions)
+		elif self.kwargs["mode"].startswith("interpolation"):
+			"""
+			interpolation to make length == horizon
+			"""
+			start, end = self.indices[idx]
+			observations = self.dataset["observations"][start:end] # (T, obs_dim)
+			actions = self.dataset["actions"][start:end]
+			T = observations.shape[0]
+			observations = self.interpolate_data(observations, self.kwargs["horizon"])
+			actions = self.interpolate_data(actions, self.kwargs["horizon"])
 			conditions = self.get_conditions(observations)
 			trajectories = torch.cat([actions, observations], axis=-1)
 			batch = EpisodeBatch(trajectories, conditions)
@@ -471,7 +450,6 @@ class EnvEpisodeDataset(EnvDataset):
 			conditions = self.get_conditions(observations)
 			trajectories = torch.cat([actions, observations], axis=-1)
 			batch = EpisodeValidBatch(trajectories, conditions, valids)
-
 		return batch
 
 	def flip_trajectory(self, observations):
@@ -487,6 +465,18 @@ class EnvEpisodeDataset(EnvDataset):
 		observations = observations.flip(0)
 		return observations
 
+	def interpolate_data(self, data, T):
+		"""
+		data: (T_, obs_dim)
+		B, C, W, H
+		"""
+		res = data.unsqueeze(0) # (1, T_, obs_dim)
+		res = res.permute(0,2,1) # (1, obs_dim, T_)
+		res = F.interpolate(res, size=(T,), mode="linear", align_corners=False) # (1, obs_dim, T)
+		res = res.squeeze(0) # (obs_dim, T)
+		res = res.permute(1,0) # (T, obs_dim)
+		return res
+		
 class EnvTransitionDataset(EnvDataset):
 
 	def __init__(self, *args, **kwargs):

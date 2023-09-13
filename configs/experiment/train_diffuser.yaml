@@ -83,7 +83,7 @@ datamodule:
     seed: ${seed}
     clip_denoised: false # ! removed but in paper # maze:true mujoco:true
     use_padding: true # ! removed but in paper # maze:false mujoco:true
-    mode: valid_multi_step%10 # ! multi_step%{step_num}, default, valid_multi_step%{step_num}
+    mode: interpolation # ! multi_step%{step_num}, default, valid_multi_step%{step_num},interpolation%1
     lazyload: true # would lazy make indices
     forcesave: false # ! would not replace if already exists a file even when remake to avoid WRITE conflicts
 
@@ -108,6 +108,12 @@ trainer:
     log_every_n_steps: 100
     num_sanity_val_steps: 2
 
+controller:
+  # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
+  # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
+  turn_on: true
+  dir: /output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0
+  epoch: last
 
 ### common - for all tasks (task_name, tags, output_dir, device)
 algorithm_name: "DefaultAlgName"

@@ -21,7 +21,7 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				// "wandb.mode=disabled",
+				"wandb.mode=disabled",
 				// #### maze
 				// "experiment=train_diffuser",
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
@@ -33,6 +33,7 @@
 				"experiment=train_diffuser_locomotion",
 				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
 				"datamodule.dataset.env=walker2d-mixed",
+				"datamodule.dataset.mode=interpolation",
 				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout

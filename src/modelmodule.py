@@ -10,8 +10,9 @@ import wandb
 import inspect
 import einops
 from diffuser.utils.arrays import batch_to_device, to_np, to_device, apply_dict
-from src.datamodule import EpisodeBatch
+from src.datamodule import EpisodeBatch, EpisodeValidBatch
 import random
+from src.func import *
 
 
 """functions"""
@@ -39,7 +40,6 @@ def safefill_rollout(episodes_rollout):
 		episodes_rollout[i] = ep
 	return episodes_rollout
 
-	
 def collect_parameters(model, set="all"):
 	""" Collect parameters from model depending on set.
 	Args: 
@@ -751,7 +751,6 @@ class FillActModelModule(DefaultModule):
 		"""
 		assume s, s_ are unnormalized
 		"""
-		
 
 class EnvModelModule(FillActModelModule):
 	def step(self, batch: Any):
@@ -799,7 +798,7 @@ class EnvModelModule(FillActModelModule):
 			self.render_composite(states_rollout[:4], self.dynamic_cfg["renderer"](),steps=80)
 		)])
 
-### Diffuser
+# Diffuser
 class DiffuserModule(DefaultModule):
 	def step(self, batch: Any):
 		""" process the batch from dataloader and return the res_batch
@@ -877,7 +876,7 @@ class DiffuserModule(DefaultModule):
 			## get a single datapoint
 			batch = [dataset[random.randint(0, len(dataset)-1)]]
 			batch = recursive_collate(batch) # stack another dim
-			batch = EpisodeBatch(*batch)
+			batch = EpisodeValidBatch(*batch) if len(batch) == 3 else EpisodeBatch(*batch)
 			conditions = batch.conditions
 			refs = to_np(batch.trajectories)
 
@@ -929,5 +928,3 @@ class DiffuserModule(DefaultModule):
 			
 
 		return ref_res, img_res, None if len(chain_res) == 0 else chain_res
-
-### Planner

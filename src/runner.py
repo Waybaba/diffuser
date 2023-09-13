@@ -7,64 +7,16 @@ from omegaconf import OmegaConf
 from pathlib import Path
 from copy import deepcopy
 from collections import namedtuple
-
 import numpy as np
 import torch
 from .modelmodule import rollout_ref
 from tqdm import tqdm
 from diffuser.sampling import DummyGuide
-
-OPEN_LARGE = \
-		"############\\"+\
-		"#OOOOOOOOOO#\\"+\
-		"#OOOOOOOOOO#\\"+\
-		"#OOOOOOOOOO#\\"+\
-		"#OOOOOGOOOO#\\"+\
-		"#OOOOOOOOOO#\\"+\
-		"#OOOOOOOOOO#\\"+\
-		"#OOOOOOOOOO#\\"+\
-		"############"
-
-register(
-	id='maze2d-openlarge-v0',
-	entry_point='d4rl.pointmaze:MazeEnv',
-	max_episode_steps=800,
-	kwargs={
-		'maze_spec':OPEN_LARGE,
-		'reward_type':'sparse',
-		'reset_target': False,
-		'ref_min_score': 6.7,
-		'ref_max_score': 273.99,
-		'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-large-sparse-v1.hdf5'
-	}
-)
-
-OPEN55 = \
-        "#######\\"+\
-        "#OOOOO#\\"+\
-        "#OOOOO#\\"+\
-        "#OOGOO#\\"+\
-        "#OOOOO#\\"+\
-        "#OOOOO#\\"+\
-        "#######"
-
-register(
-    id='maze2d-open55-v0',
-    entry_point='d4rl.pointmaze:MazeEnv',
-    max_episode_steps=10000, # ! the origin value is 150
-    kwargs={
-        'maze_spec':OPEN55,
-        'reward_type':'sparse',
-        'reset_target': False,
-        'ref_min_score': 0.01,
-        'ref_max_score': 20.66,
-        'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-open-sparse.hdf5'
-    }
-)
+from src.func import *
+import numpy as np
 
 
-
-
+"""Runner"""
 class TrainDiffuserRunner:
 	
 	def start(self, cfg):
@@ -170,9 +122,9 @@ class EvalRunner:
 
 		# load
 		print("Loading modules ...")
-		diffuser = self.load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
+		diffuser = load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
 		if cfg.controller.turn_on:
-			controller = self.load_controller(cfg.controller.dir, cfg.controller.epoch)
+			controller = load_controller(cfg.controller.dir, cfg.controller.epoch)
 			assert diffuser.dynamic_cfg["dataset"].env_name.split("-")[0] == controller.dynamic_cfg["dataset"].env_name.split("-")[0], \
 				f"diffuser and controller should be trained on the same environment, while got {diffuser.dynamic_cfg['dataset'].env_name} and {controller.dynamic_cfg['dataset'].env_name}"
 		print(f"\n\n\n### diffuser env loaded!: {diffuser.dynamic_cfg['dataset'].env_name}")
@@ -310,114 +262,6 @@ class EvalRunner:
 			ep_i["s_"] = np.concatenate([obs_gen[0][1:], obs_gen[0][-1:]], axis=0)
 			res.append(ep_i)
 		return res
-	
-	def load_diffuser(self, dir_, epoch_):
-		print("\n\n\n### loading diffuser ...")
-		from src.modelmodule import DiffuserModule
-		diffuser_cfg = OmegaConf.load(Path(dir_)/"hydra_config.yaml")
-		assert "DiffuserModule" in diffuser_cfg.modelmodule._target_, f"Load config of DiffuserModule with error target {diffuser_cfg.modelmodule._target_}"
-		datamodule = hydra.utils.instantiate(diffuser_cfg.datamodule)()
-		modelmodule = DiffuserModule.load_from_checkpoint(
-			Path(dir_)/"checkpoints"/f"{epoch_}.ckpt",
-			dataset_info=datamodule.info,
-		)
-		return modelmodule
-
-	def load_controller(self, dir_, epoch_):
-		print("\n\n\n### loading controller ...")
-		from src.modelmodule import FillActModelModule
-		diffuser_cfg = OmegaConf.load(Path(dir_)/"hydra_config.yaml")
-		assert "FillActModelModule" in diffuser_cfg.modelmodule._target_, f"Load config of FillActModelModule with error target {diffuser_cfg.modelmodule._target_}"
-		datamodule = hydra.utils.instantiate(diffuser_cfg.datamodule)()
-		modelmodule = FillActModelModule.load_from_checkpoint(
-			Path(dir_)/"checkpoints"/f"{epoch_}.ckpt",
-			dataset_info=datamodule.info,
-		)
-		return modelmodule
-	
-	def full_rollout_once(
-			self, 
-			env, 
-			planner, 
-			actor, 
-			normalizer, 
-			plan_freq=1,
-			len_max=1000
-		):
-		"""
-			env: 
-			time: 
-		"""
-		assert self.model.horizon >= plan_freq, "plan_freq should be smaller than horizon"
-		print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
-		res = {
-			"act": [],
-			"s": [],
-			"s_": [],
-			"r": [],
-		}
-		env_step = 0
-
-		t_madeplan = -99999
-		
-		s = env.reset()
-		while True: 
-			if env_step - t_madeplan >= plan_freq:
-				plan = self.make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
-				t_madeplan = env_step
-			a = self.make_act(actor, res["s"]+[s], plan, t_madeplan, normalizer)
-			s_, r, done, info = env.step(a)
-			s = s_
-			
-			res["act"].append(a)
-			res["s"].append(s)
-			res["s_"].append(s_)
-			res["r"].append(r)
-			env_step += 1
-			if done or env_step > len_max: break
-		
-		# stack
-		for k in res.keys():
-			res[k] = np.stack(res[k], axis=0)
-		
-		print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
-		return res
-			
-	def make_act(self, actor, history, plan, t_madeplan, normalizer):
-		"""
-		actor: would generate act, different for diff methods
-		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
-		"""
-		s = history[-1]
-		s_ = plan[len(history)-1-t_madeplan] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
-		model = actor
-		device = next(actor.parameters()).device
-		model.to(device)
-		act = model(torch.cat([
-			torch.tensor(normalizer.normalize(
-				s,
-				"observations"
-			)).to(device), 
-			torch.tensor(normalizer.normalize(
-				s_,
-				"observations"
-			)).to(device)
-		], dim=-1).float().to(device))
-		act = act.detach().cpu().numpy()
-		act = normalizer.unnormalize(act, "actions")
-		return act
-
-	def make_plan(self, planner, history):
-		"""
-		TODO: use history in guide
-		"""
-		cond = {
-			0: history[-1]
-		}
-		actions, samples = planner(cond, batch_size=1,verbose=False)
-		plan = samples.observations[0] # (T, obs_dim)
-		return plan
-
 
 
 def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
@@ -467,8 +311,6 @@ def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
 	trainer.load(epoch)
 
 	return trainer.ema_model, dataset, render
-
-import numpy as np
 
 class PlanGuidedRunner:
 	CUSTOM_TARGET = {
