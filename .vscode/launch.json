@@ -47,6 +47,31 @@
 				// "experiment=train_diffuser_kuka",
 			],
 		},
+		// entry.py
+		{
+			"name": "train_diffuser_mujoco",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"args": [
+				// "wandb.mode=disabled",
+				// #### mujoco
+				"experiment=train_diffuser_locomotion",
+				"datamodule.dataset.env=walker2d-mixed",
+				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				// "datamodule.dataset.env=halfcheetah-mixed",
+				// "+trainer.enable_progress_bar=False",
+				// "trainer.save_freq=10000", // save model and rollout
+				// "trainer.sample_freq=1000", // sample and redering
+				// "policy.scale_grad_by_std=true",
+				// "wandb.buf_dir=null",
+				// "env.delay=0",
+				// #### kuka
+				// "experiment=train_diffuser_kuka",
+			],
+		},
 		{
 			"name": "plan_guided",
 			"type": "python",
@@ -104,9 +129,9 @@
 			"justMyCode": true,
 			"noDebug": false,
 			"args": [
-				// "experiment=train_controller",
-				"experiment=train_envmodel",
-				"datamodule.dataset.multi_step=1",
+				"experiment=train_controller",
+				// "experiment=train_envmodel",
+				"datamodule.dataset.multi_step=5",
 				// ### controller
 				// 
 				"wandb.mode=disabled",
@@ -114,9 +139,9 @@
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// ### mujoco
-				"datamodule.dataset.env=halfcheetah-mixed",
-				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
-				// "datamodule.dataset.env=walker2d-medium-expert-v2",
+				// "datamodule.dataset.env=halfcheetah-mixed",
+				"datamodule.dataset.env=walker2d-medium-expert-v2",
+				// "datamodule.dataset.env=walker2d-mixed",
 				// "datamodule.dataset.env=kuka",
 			],
 		},
@@ -130,16 +155,16 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=eval",
-				// "wandb.mode=disabled",
-				"wandb.mode=online",
+				"wandb.mode=disabled",
+				// "wandb.mode=online",
 				// ### maze
 				// "guide._target_=diffuser.sampling.NoTrainGuideXLower",
-				"guide._target_=diffuser.sampling.Maze2dTargetGuide",
+				// "guide._target_=diffuser.sampling.Maze2dTargetGuide",
 				// "+guide.target",
 				"policy.scale=1.0",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-07_21-01-11_183716/0",
-				"diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-10_13-54-48_692127/0",
-				"controller.turn_on=false",
+				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-10_13-54-48_692127/0",
+				"controller.turn_on=true",
 				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
 				// ### mujoco
 				// "guide._target_=diffuser.sampling.MujocoFaster",

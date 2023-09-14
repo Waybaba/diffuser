@@ -123,7 +123,7 @@ class EnvDataset:
 		self.dataset = self.preprocess_fn(self.dataset)
 		
 		### remove keys
-		KEYS_NEED = ["observations", "actions", "terminals", "timeouts"]
+		KEYS_NEED = ["observations", "actions", "terminals", "timeouts", "rewards"]
 		KEYS_NEED += ["infos/qpos", "infos/qvel", "infos/action_lop_probs"] # TOODO for controller reset position
 		keys_to_delete = [k for k in self.dataset.keys() if k not in KEYS_NEED]
 		for k in keys_to_delete: del self.dataset[k]
@@ -204,7 +204,8 @@ class EnvDataset:
 			episode_data = {
 				"s": dataset["observations"][start_idx:end_idx-1],
 				"act": dataset["actions"][start_idx:end_idx-1],
-				"s_": dataset["observations"][start_idx + 1:end_idx -1 + 1]
+				"s_": dataset["observations"][start_idx + 1:end_idx -1 + 1],
+				"r": dataset["rewards"][start_idx:end_idx-1],
 			}
 			
 			# Include additional keys starting with "infos/"
@@ -305,7 +306,7 @@ class EnvEpisodeDataset(EnvDataset):
 			dones = dataset["terminals"]
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
 			dones_idxes = torch.where(dones)[0]
-			MIN, MAX, INTER = 20, 250, 5
+			MIN, MAX, INTER = 20, 200, 5
 			lengths = list(range(MIN, MAX, INTER))
 			indices = []
 			for i_start in tqdm(range(len(dones)-MAX-1)):
@@ -534,7 +535,7 @@ class EnvTransitionDataset(EnvDataset):
 					indices.append([i, end_idx])
 					break
 				indices.append([i, end_idx])
-				if DEBUG_MODE and len(indices) > 10000: return np.array(indices)
+				# if DEBUG_MODE and len(indices) > 10000: return np.array(indices)
 		
 		return np.array(indices)
 	

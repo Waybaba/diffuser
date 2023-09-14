@@ -203,6 +203,9 @@ class EvalRunner:
 		### cals rollout metric
 		if cfg.controller.turn_on:
 			LOG_PREFIX = "value"
+			LOG_SUB_PREFIX = "ds"
+			r_sum = np.mean([each["r"].sum() for each in episodes_ds_rollout])
+			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
 			LOG_SUB_PREFIX = "ds_rollout"
 			r_sum = np.mean([each["r"].sum() for each in episodes_ds_rollout])
 			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
