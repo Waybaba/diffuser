@@ -15,7 +15,7 @@ import random
 from src.func import *
 from diffuser.sampling.guides import DummyGuide
 from diffuser.sampling.policies import GuidedPolicy
-from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel
+from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel, n_step_guided_p_sample
 
 
 """functions"""
@@ -824,7 +824,7 @@ class DiffuserModule(DefaultModule):
 		dataset = self.dynamic_cfg["dataset"]
 		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
 		# ! TODO get full ep
-		N_FULLROLLOUT = 4
+		N_FULLROLLOUT = 1
 		if self.hparams.controller.turn_on:
 			self.actor = self.controller.net
 			self.actor.to(self.device)
@@ -836,7 +836,7 @@ class DiffuserModule(DefaultModule):
 				preprocess_fns=[],
 				scale=1.0,
 				n_guide_steps=1, # ! does not used, only use one step + time travel
-				sample_fn=n_step_guided_p_sample_freedom_timetravel,
+				sample_fn=n_step_guided_p_sample,
 				t_stopgrad=2, # positive: grad[t < t_stopgrad] = 0; bigger is noise
 				scale_grad_by_std=True,
 				travel_repeat=1, # time travel
@@ -848,7 +848,7 @@ class DiffuserModule(DefaultModule):
 				self.actor, 
 				dataset.normalizer, 
 				# self.hparams.plan_freq if isinstance(self.hparams.plan_freq, int) else max(int(self.hparams.plan_freq * dataset.kwargs["horizon"]),1),
-				5,
+				2,
 			) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
 			episodes_full_rollout = safefill_rollout(episodes_full_rollout)
 			
@@ -860,11 +860,11 @@ class DiffuserModule(DefaultModule):
 			to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
 			states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
 			to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb.Image(
-				self.renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
+				self.dynamic_cfg["dataset"].renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
 			)]
 
-
 		### log
+		LOG_PREFIX="val_ep_end"
 		to_log["ref"] = [wandb.Image(_) for _ in ref_samples]
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb.Video(_) for _ in chain_samples]

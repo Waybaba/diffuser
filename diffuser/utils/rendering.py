@@ -278,7 +278,8 @@ class Maze2dRenderer(MazeRenderer):
     def renders(self, observations, conditions=None, **kwargs):
         bounds = MAZE_BOUNDS[self.env_name]
 
-        observations = observations + 0.5
+        # observations = observations + 0.5 # only for maze 9*12
+        observations += 0.0
         if len(bounds) == 2:
             _, scale = bounds
             observations /= scale

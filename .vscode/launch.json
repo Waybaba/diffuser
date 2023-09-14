@@ -21,19 +21,21 @@
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [
-				"wandb.mode=disabled",
+				// "wandb.mode=disabled",
 				// #### maze
-				// "experiment=train_diffuser",
+				"experiment=train_diffuser",
+				"datamodule.dataset.mode=special%maze",
+				"datamodule.dataset.env=maze2d-open55-v0",
+				"modelmodule.controller.turn_on=false",
+				// "datamodule.dataset.mode=interpolation",
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
-				// "datamodule.dataset.env=maze2d-open55-v0",
-				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-open55-v0-10000000-onlytwo.hdf5",
+				"datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-open55-v0-10000000-onlytwo.hdf5",
 				// "global_cfg.horizon=100",
 				// #### mujoco
-				"experiment=train_diffuser_locomotion",
+				// "experiment=train_diffuser_locomotion",
 				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
-				"datamodule.dataset.env=halfcheetah-mixed",
-				"datamodule.dataset.mode=interpolation",
+				// "datamodule.dataset.env=halfcheetah-mixed",
 				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout

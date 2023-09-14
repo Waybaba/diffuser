@@ -131,7 +131,7 @@ class EvalRunner:
 
 		### distill
 		N_EPISODES = 4
-		N_FULLROLLOUT = 4
+		N_FULLROLLOUT = 1
 		diffusion, dataset, self.renderer = diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
 		self.policy = cfg.policy(
 			guide=cfg.guide,

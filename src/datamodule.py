@@ -147,7 +147,7 @@ class EnvDataset:
 		if gpu:
 			for k in self.dataset.keys():
 				# if double, turn to float
-				if self.dataset[k].dtype == np.float64:
+				if self.dataset[k].dtype == np.float64: 
 					self.dataset[k] = self.dataset[k].astype(np.float32)
 				self.dataset[k] = torch.tensor(self.dataset[k]).cuda()
 		
@@ -284,6 +284,7 @@ class EnvEpisodeDataset(EnvDataset):
 			(N, 2)
 			each element is (start, end)
 		"""
+		DEBUG_MODE = os.environ.get("DEBUG", "false").lower()=="true"
 		dataset = self.dataset
 		# fast_idx_making = True
 		if self.kwargs["mode"] == "default":
@@ -297,8 +298,20 @@ class EnvEpisodeDataset(EnvDataset):
 				if dones_idxes[i] > ep_start: 
 					if dones_idxes[i] - ep_start >= self.kwargs["horizon"]:
 						indices.append([ep_start, dones_idxes[i]])
-						if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+						if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
 					ep_start = dones_idxes[i] + 1
+			indices = torch.tensor(indices)
+		elif self.kwargs["mode"] == "special%maze":
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			MIN, MAX, INTER = 20, 500, 5
+			lengths = list(range(MIN, MAX, INTER))
+			indices = []
+			for i_start in tqdm(range(len(dones)-MAX-1)):
+				for l in lengths:
+					indices.append([i_start, i_start + l])
+					if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("interpolation"):
 			"""
@@ -313,7 +326,7 @@ class EnvEpisodeDataset(EnvDataset):
 			for i in tqdm(range(len(dones_idxes))):
 				if dones_idxes[i] > ep_start: 
 					indices.append([ep_start, dones_idxes[i]])
-					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+					if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
 					ep_start = dones_idxes[i] + 1
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("multi_step"):
@@ -336,7 +349,7 @@ class EnvEpisodeDataset(EnvDataset):
 			for ep_start in tqdm(range(0, len(dones) - max_gap)):
 				for inter in range(1, int(multi_step) + 1):
 					indices.append([ep_start, ep_start + self.kwargs["horizon"] * inter, inter])
-					if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+					if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("ep_multi_step"):
 			"""
@@ -358,7 +371,7 @@ class EnvEpisodeDataset(EnvDataset):
 					for inter in range(1, multi_step + 1):
 						indices.append([i, i + self.kwargs["horizon"] * inter, inter])
 				ep_start = ep_end + 1  # Move to the start of the next episode
-				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+				if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
 				
 			indices = torch.tensor(indices)
 		elif self.kwargs["mode"].startswith("valid_multi_step"):
@@ -374,6 +387,7 @@ class EnvEpisodeDataset(EnvDataset):
 			dones = dataset["terminals"]
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
 			dones_idxes = torch.where(dones)[0]
+			full_len = len(dataset["terminals"])
 			
 			print("making indexes for valid episode-based multi-step ...")
 			ep_start = 0
@@ -382,9 +396,10 @@ class EnvEpisodeDataset(EnvDataset):
 					for inter in range(1, multi_step + 1):
 						item_end = i + self.kwargs["horizon"] * inter
 						invalid_start = ((ep_end-i) // inter) + 1
-						indices.append([i, item_end, inter, invalid_start])
+						if item_end < full_len:
+							indices.append([i, item_end, inter, invalid_start])
 				ep_start = ep_end + 1  # Move to the start of the next episode
-				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return torch.tensor(indices)
+				if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
 			
 			indices = torch.tensor(indices)
 		else:
@@ -421,7 +436,7 @@ class EnvEpisodeDataset(EnvDataset):
 			conditions = self.get_conditions(observations)
 			trajectories = torch.cat([actions, observations], axis=-1)
 			batch = EpisodeBatch(trajectories, conditions)
-		elif self.kwargs["mode"].startswith("interpolation"):
+		elif self.kwargs["mode"].startswith("interpolation") or self.kwargs["mode"].startswith("special%maze"):
 			"""
 			interpolation to make length == horizon
 			"""
@@ -445,6 +460,7 @@ class EnvEpisodeDataset(EnvDataset):
 			start, end, inter, invalid_start = self.indices[idx]
 			observations = self.dataset["observations"][start:end:inter]
 			actions = self.dataset["actions"][start:end:inter]
+			assert observations.shape[0] == self.kwargs["horizon"], f"Invalid horizon The related information is {start, end, inter, invalid_start, self.kwargs['horizon']}"
 			valids = torch.ones_like(observations[:,0])
 			valids[invalid_start:] = 0
 			conditions = self.get_conditions(observations)
@@ -499,6 +515,7 @@ class EnvTransitionDataset(EnvDataset):
 		  indices: (N*multi_step, 2)
 		  	[start, end) does not include any dones==True
 		"""
+		DEBUG_MODE = os.environ.get("DEBUG", "false").lower()=="true"
 		dataset, multi_step = self.dataset, self.kwargs["multi_step"]
 
 		num_data = len(dataset["observations"])
@@ -517,9 +534,8 @@ class EnvTransitionDataset(EnvDataset):
 					indices.append([i, end_idx])
 					break
 				indices.append([i, end_idx])
-				if os.environ.get("DEBUG", "false").lower()=="true" and len(indices) > 10000: return np.array(indices)
-
-
+				if DEBUG_MODE and len(indices) > 10000: return np.array(indices)
+		
 		return np.array(indices)
 	
 	def __getitem__(self, idx):

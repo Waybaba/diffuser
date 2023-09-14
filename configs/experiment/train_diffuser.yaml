@@ -5,7 +5,7 @@ defaults:
 
 ### shared by modelmodule, datamodule, runner, trainer ...
 global_cfg:
-  horizon: 20 # ! DEBUG to 64 for efficiency
+  horizon: 64 # ! DEBUG to 64 for efficiency
 
 ### main
 
@@ -90,7 +90,7 @@ datamodule:
     seed: ${seed}
     clip_denoised: false # ! removed but in paper # maze:true mujoco:true
     use_padding: true # ! removed but in paper # maze:false mujoco:true
-    mode: interpolation # ! multi_step%{step_num}, default, valid_multi_step%{step_num},interpolation%1
+    mode: valid_multi_step%1 # ! multi_step%{step_num}, default, valid_multi_step%{step_num},interpolation%1
     lazyload: true # would lazy make indices
     forcesave: false # ! would not replace if already exists a file even when remake to avoid WRITE conflicts
 
