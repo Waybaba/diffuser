@@ -169,7 +169,8 @@ def load_kuka(env, custom_ds_path=None):
 	dataset = {
 		"observations": qstates,
 		"actions": np.random.randn(*qstates.shape)[:,:11], # act_dim = 11
-		"terminals": terminals
+		"terminals": terminals,
+		"rewards": np.zeros_like(terminals),
 	}
 	return env, dataset
 

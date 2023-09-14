@@ -258,7 +258,9 @@ class StackEnv(gym.Env):
 
     def step(self, action):
         err_msg = f"{action!r} ({type(action)}) invalid"
-        assert self.action_space.contains(action), err_msg
+        # assert self.action_space.contains(action), err_msg
+        # clip action to action space
+        action = np.clip(action, self.action_space.low, self.action_space.high)
 
         joint_delta = action[:7]
         deltas = action[7:11]

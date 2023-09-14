@@ -535,7 +535,7 @@ class EnvTransitionDataset(EnvDataset):
 					indices.append([i, end_idx])
 					break
 				indices.append([i, end_idx])
-				# if DEBUG_MODE and len(indices) > 10000: return np.array(indices)
+				if DEBUG_MODE and len(indices) > 10000: return np.array(indices)
 		
 		return np.array(indices)
 	
