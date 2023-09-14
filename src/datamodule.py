@@ -514,7 +514,12 @@ class EnvTransitionDataset(EnvDataset):
 		- np.array
 		  A NumPy array containing valid index pairs.
 		  indices: (N*multi_step, 2)
-		  	[start, end) does not include any dones==True
+			! do not cross episodes
+			for each episode
+				for each step in [ep_start, ep_end)
+					for each interval in [1, min(multi_step, steps_to_end_of_this_episodes)]
+						indices append (step, step+interval)
+			return indices
 		"""
 		DEBUG_MODE = os.environ.get("DEBUG", "false").lower()=="true"
 		dataset, multi_step = self.dataset, self.kwargs["multi_step"]
@@ -523,21 +528,19 @@ class EnvTransitionDataset(EnvDataset):
 		dones = dataset.get("terminals", np.zeros(num_data, dtype=bool))
 		if "timeouts" in dataset: dones |= dataset["timeouts"]
 
-		valid_indices = torch.where(dones == 0)[0]
-		
+		ep_done_idxes = torch.where(dones == 1)[0]
+		ep_start_idxes = torch.cat([torch.tensor([0]).to(ep_done_idxes.device), ep_done_idxes[:-1] + 1])
+
 		indices = []
 		print("making indices ...")
-		for i in tqdm(valid_indices.cpu().numpy()):
-			for j in range(1, multi_step + 1):
-				end_idx = i + j
-				if end_idx >= num_data: break
-				if dones[end_idx]:
-					indices.append([i, end_idx])
-					break
-				indices.append([i, end_idx])
-				if DEBUG_MODE and len(indices) > 10000: return np.array(indices)
-		
-		return np.array(indices)
+		for ep_start, ep_end in tqdm(zip(ep_start_idxes, ep_done_idxes), total=len(ep_start_idxes)):
+			for i in range(ep_start, ep_end):
+				steps_to_end_of_this_episode = ep_end - i
+				for interval in range(1, min(multi_step, steps_to_end_of_this_episode) + 1):
+					indices.append([i, i + interval])
+					if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
+		indices = torch.tensor(indices)
+		return indices
 	
 	def __getitem__(self, idx):
 		start, end = self.indices[idx]

@@ -141,9 +141,9 @@
 				// ### mujoco
 				// "datamodule.dataset.env=halfcheetah-mixed",
 				// "datamodule.dataset.env=walker2d-medium-expert-v2",
-				// "datamodule.dataset.env=walker2d-mixed",
+				"datamodule.dataset.env=walker2d-mixed",
 				// ### act
-				"datamodule.dataset.env=kuka",
+				// "datamodule.dataset.env=kuka",
 			],
 		},
 		// eval
