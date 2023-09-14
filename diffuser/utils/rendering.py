@@ -168,8 +168,8 @@ MAZE_BOUNDS = {
     'maze2d-medium-v1': (0, 8, 0, 8),
     'maze2d-large-v1': (0, 9, 0, 12),
     'maze2d-openlarge-v0': (0, 9, 0, 12),
-    'maze2d-open-v0': (0, 5, 0, 5),
-    'maze2d-open55-v0': (0, 5, 0, 5)
+    'maze2d-open-v0': (0, 7, 0, 7),
+    'maze2d-open55-v0': (0, 7, 0, 7)
 }
 
 class MazeRenderer(Renderer):
@@ -278,8 +278,12 @@ class Maze2dRenderer(MazeRenderer):
     def renders(self, observations, conditions=None, **kwargs):
         bounds = MAZE_BOUNDS[self.env_name]
 
-        # observations = observations + 0.5 # only for maze 9*12
-        observations += 0.0
+        observations = observations + 0.5
+        # if "open55" in self.env.unwrapped.name: # ! dont know why we need to shift the obs to render
+        #     observations -= 0.5
+        # else:
+            # observations += 0.5
+        
         if len(bounds) == 2:
             _, scale = bounds
             observations /= scale

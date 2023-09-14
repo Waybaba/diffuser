@@ -305,7 +305,7 @@ class EnvEpisodeDataset(EnvDataset):
 			dones = dataset["terminals"]
 			if "timeouts" in dataset: dones |= dataset["timeouts"]
 			dones_idxes = torch.where(dones)[0]
-			MIN, MAX, INTER = 20, 500, 5
+			MIN, MAX, INTER = 20, 250, 5
 			lengths = list(range(MIN, MAX, INTER))
 			indices = []
 			for i_start in tqdm(range(len(dones)-MAX-1)):
