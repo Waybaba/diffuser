@@ -687,7 +687,7 @@ class FillActModelModule(DefaultModule):
 			episodes_rollout: a list of rollout episodes [(T_i, obs_dim)]
 			return a dict of metrics
 		"""
-		return {
+		to_log = {
 			# "mean_l1_shift_total": np.mean([
 			# 	L1DistanceMetric()(torch.tensor(episodes_ref[i]["s"]), torch.tensor(episodes_rollout[i]["s"])) \
 			# 		for i in range(len(episodes_ref))
@@ -713,6 +713,12 @@ class FillActModelModule(DefaultModule):
 				for i in range(len(episodes_ref))
 			]),
 		}
+		if "r" in episodes_ref[0]:
+			to_log["sum_reward_total_ref"] = np.mean([
+				np.sum(episodes_ref[i]["r"]) \
+				for i in range(len(episodes_ref))
+			])
+		return to_log
 
 	def render_composite(self, states, renderer, path=None,steps=40):
 		"""
