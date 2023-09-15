@@ -156,7 +156,7 @@
 			"justMyCode": true,
 			"args": [
 				"experiment=eval",
-				"wandb.mode=disabled",
+				// "wandb.mode=disabled",
 				// "wandb.mode=online",
 				"policy.scale=1.0",
 				// ### maze
@@ -170,8 +170,9 @@
 				"guide._target_=diffuser.sampling.DummyGuide",
 				"diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/runs/2023-09-15_07-09-23_899677",
-				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
-				"controller.dir=/output/hydra_log/RL_Diffuser_Debug/multirun/2023-09-08_08-08-10_899220/0",
+				"controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
+				// "controller.dir=/output/hydra_log/RL_Diffuser_Debug/multirun/2023-09-08_08-08-10_899220/0",
+				// "controller.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-15_08-05-19_648761"
 			],
 		},
 		{

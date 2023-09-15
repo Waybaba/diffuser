@@ -828,8 +828,8 @@ class DiffuserModule(DefaultModule):
 		to_log = {}
 
 		### get render data # TODO spilt well
-		env = self.dynamic_cfg["env"]
 		dataset = self.dynamic_cfg["dataset"]
+		env = dataset.env
 		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
 		# ! TODO get full ep
 		N_FULLROLLOUT = 1
@@ -844,7 +844,7 @@ class DiffuserModule(DefaultModule):
 				preprocess_fns=[],
 				scale=0.0,
 				n_guide_steps=1, # ! does not used, only use one step + time travel
-				sample_fn=n_step_guided_p_sample,
+				sample_fn=n_step_guided_p_sample_freedom_timetravel,
 				t_stopgrad=2, # positive: grad[t < t_stopgrad] = 0; bigger is noise
 				scale_grad_by_std=True,
 				travel_repeat=1, # time travel
