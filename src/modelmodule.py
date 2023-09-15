@@ -842,7 +842,7 @@ class DiffuserModule(DefaultModule):
 				diffusion_model=self.net.diffusion, 
 				normalizer=dataset.normalizer,
 				preprocess_fns=[],
-				scale=1.0,
+				scale=0.0,
 				n_guide_steps=1, # ! does not used, only use one step + time travel
 				sample_fn=n_step_guided_p_sample,
 				t_stopgrad=2, # positive: grad[t < t_stopgrad] = 0; bigger is noise
@@ -850,6 +850,7 @@ class DiffuserModule(DefaultModule):
 				travel_repeat=1, # time travel
 				travel_interval=[0.0,1.0], # if float, would use [horizon*travel_interval, horizon]
 			)
+			policy_noguide.diffusion_model.eval()
 			episodes_full_rollout = [full_rollout_once(
 				env, 
 				policy_noguide, 
