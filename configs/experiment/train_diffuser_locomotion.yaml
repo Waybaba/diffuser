@@ -18,3 +18,11 @@ modelmodule:
       # clip_denoised: true # ! different from maze in original paper
     net: 
       dim_mults: [1, 2, 4, 8]
+  controller:
+    # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
+    # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
+    turn_on: true
+    dir: /output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0
+    epoch: last
+  plan_freq: 1.0
+

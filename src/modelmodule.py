@@ -661,7 +661,7 @@ class FillActModelModule(DefaultModule):
 		super().validation_epoch_end(outputs)
 		
 		### rollout -> [(T, obs_dim)]
-		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(num_episodes=4)
+		episodes_ref = self.dynamic_cfg["dataset"].get_episodes_ref(num_episodes=1)
 		episodes_rollout = [rollout_ref(self.dynamic_cfg["env"], ep_ref, self.net, self.dynamic_cfg["dataset"].normalizer) for ep_ref in episodes_ref]
 		episodes_rollout = safefill_rollout(episodes_rollout)
 
@@ -712,9 +712,11 @@ class FillActModelModule(DefaultModule):
 				np.sum(episodes_rollout[i]["r"][:80]) \
 				for i in range(len(episodes_ref))
 			]),
+			"len_rollout": episodes_rollout[0]["r"].shape[0],
+			"len_ds": episodes_ref[0]["r"].shape[0],
 		}
 		if "r" in episodes_ref[0]:
-			to_log["sum_reward_total_ref"] = np.mean([
+			to_log["sum_reward_total_ds"] = np.mean([
 				np.sum(episodes_ref[i]["r"]) \
 				for i in range(len(episodes_ref))
 			])
@@ -854,7 +856,7 @@ class DiffuserModule(DefaultModule):
 				self.actor, 
 				dataset.normalizer, 
 				# self.hparams.plan_freq if isinstance(self.hparams.plan_freq, int) else max(int(self.hparams.plan_freq * dataset.kwargs["horizon"]),1),
-				2,
+				self.hparams.plan_freq if isinstance(self.hparams.plan_freq, int) else max(int(self.hparams.plan_freq * dataset.kwargs["horizon"]),1),
 			) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
 			episodes_full_rollout = safefill_rollout(episodes_full_rollout)
 			

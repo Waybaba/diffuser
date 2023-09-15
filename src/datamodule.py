@@ -195,7 +195,7 @@ class EnvDataset:
 		
 		# Randomly select {num_episodes} starting indices for the episodes
 		random_start_indices = np.random.randint(0, len(termination_indices) - 3, num_episodes)
-		episode_boundaries = torch.stack([termination_indices[random_start_indices], 
+		episode_boundaries = torch.stack([termination_indices[random_start_indices]+1,
 										termination_indices[random_start_indices + 1]], dim=1)
 		
 		# Construct the list of reference episodes

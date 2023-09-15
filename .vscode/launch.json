@@ -59,8 +59,8 @@
 				// "wandb.mode=disabled",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
-				"datamodule.dataset.env=walker2d-mixed",
-				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				// "datamodule.dataset.env=walker2d-mixed",
+				"datamodule.dataset.env=halfcheetah-expert-v2",
 				// "datamodule.dataset.env=halfcheetah-mixed",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
@@ -131,7 +131,7 @@
 			"args": [
 				"experiment=train_controller",
 				// "experiment=train_envmodel",
-				"datamodule.dataset.multi_step=5",
+				"datamodule.dataset.multi_step=10",
 				// ### controller
 				// 
 				// "wandb.mode=disabled",
@@ -140,8 +140,8 @@
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// ### mujoco
 				// "datamodule.dataset.env=halfcheetah-mixed",
-				// "datamodule.dataset.env=walker2d-medium-expert-v2",
-				"datamodule.dataset.env=walker2d-mixed",
+				"datamodule.dataset.env=walker2d-expert-v2",
+				// "datamodule.dataset.env=walker2d-mixed",
 				// ### act
 				// "datamodule.dataset.env=kuka",
 			],
@@ -158,20 +158,19 @@
 				"experiment=eval",
 				"wandb.mode=disabled",
 				// "wandb.mode=online",
+				"policy.scale=1.0",
 				// ### maze
 				// "guide._target_=diffuser.sampling.NoTrainGuideXLower",
 				// "guide._target_=diffuser.sampling.Maze2dTargetGuide",
 				// "+guide.target",
-				"policy.scale=1.0",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-07_21-01-11_183716/0",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-10_13-54-48_692127/0",
-				"controller.turn_on=true",
-				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
+				// "controller.turn_on=true",
 				// ### mujoco
-				// "guide._target_=diffuser.sampling.MujocoFaster",
-				// "diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
+				"guide._target_=diffuser.sampling.MujocoFaster",
+				"diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
 				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
-
+				"controller.dir=/output/hydra_log/RL_Diffuser_Debug/multirun/2023-09-08_08-08-10_899220/0",
 			],
 		},
 		{
