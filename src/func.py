@@ -8,8 +8,14 @@ import hydra
 import os
 from tqdm import tqdm
 import torch
+import wandb
+from diffuser.sampling.guides import DummyGuide
+from diffuser.sampling.policies import GuidedPolicy
+from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel, n_step_guided_p_sample
+
 
 """Functions"""
+
 def load_diffuser(dir_, epoch_):
 	print("\n\n\n### loading diffuser ...")
 	from src.modelmodule import DiffuserModule
