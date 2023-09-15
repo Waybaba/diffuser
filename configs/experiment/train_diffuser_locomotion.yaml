@@ -45,5 +45,4 @@ modelmodule:
     plan_freq: 1.0
     guide:
       _target_: diffuser.sampling.DummyGuide
-  plan_freq: 1.0
 
