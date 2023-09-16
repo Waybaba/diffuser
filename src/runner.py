@@ -12,6 +12,7 @@ from src.func import *
 import numpy as np
 from src.modelmodule import eval_pair, rollout_ref
 
+
 """functions"""
 
 """Runner"""
@@ -134,6 +135,90 @@ class EvalRunner:
 			to_log = eval_pair(diffuser, None, cfg.policy, cfg.plan_freq, cfg.guide)
 		wandb.log(to_log, commit=True)
 
+class PlotMazeRunner:
+	"""
+	diffuser
+	guide
+	controller
+	1. only generating 
+	2. generating with guide
+	3. control
+	4. control with guide
+	ps. everything is unnormlized in this class
+	"""
+	def start(self, cfg):
+		import matplotlib.pyplot as plt
+		self.cfg = cfg
+
+		# load data or generate data
+		print("Loading modules ...")
+		diffuser = load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
+
+
+		### generating
+		obs_list = None # [(T_i, 4)] # a list of trajectories
+		policy_func = cfg.policy
+		guide_ = cfg.guide
+		# create demo lines
+		N_EPISODES = 1
+		N_FULLROLLOUT = 1
+		device = next(diffuser.net.parameters()).device
+		diffusion, dataset, renderer= diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
+		policy = policy_func(
+			guide=guide_,
+			diffusion_model=diffusion,
+			normalizer=dataset.normalizer,
+		)
+		policy_noguide = policy_func(
+			guide=DummyGuide(),
+			diffusion_model=diffusion, 
+			normalizer=dataset.normalizer,
+		)
+		model = policy.diffusion_model
+		model.to(device)
+		model.eval()
+		env = dataset.env
+
+		to_log = {}
+
+		### episodes - generate
+		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES) # [{"s": ...}]
+		episodes_diffuser = gen_with_same_cond(policy, episodes_ds) # [{"s": ...}]
+		obs_list = [each["s"] for each in episodes_diffuser]
+
+		### plot
+		obs_list_normed = None
+		# TODO plot background
+		for obs in obs_list_normed:
+			# TODO plot line
+			pass
+        plt.clf()
+        fig = plt.gcf()
+        fig.set_size_inches(5, 5)
+        
+        plt.imshow(self._background * .5,
+            extent=self._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
+
+        path_length = len(observations)
+        colors = plt.cm.jet(np.linspace(0,1,path_length))
+        plt.plot(observations[:,1], observations[:,0], c='black', zorder=10)
+        plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20)
+        
+        if conditions is not None:
+            # plot a green at the start and red at the end
+            # conditions = {0: np.array(4), path_length-1: np.array(4)}
+            if 0 in conditions:
+                plt.scatter(conditions[0][1], conditions[0][0], c='green', zorder=30, s=400, marker='o', edgecolors='black')
+            for k, v in conditions.items():
+                if k == 0: continue
+                if k < 10: continue
+                if type(k) == int:
+                    plt.scatter(v[1], v[0], c='red', zorder=30, s=400, marker='*',edgecolors='black')
+                    break
+        
+        plt.axis('off')
+        plt.title(title)
+        img = plot2img(fig, remove_margins=self._remove_margins)
 
 def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
 	""" parse diffusion model from 

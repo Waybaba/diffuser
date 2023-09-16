@@ -203,7 +203,6 @@ class MazeRenderer(Renderer):
                 if k == 0: continue
                 if k < 10: continue
                 if type(k) == int:
-                    # plt.scatter(conditions[path_length-1][1], conditions[path_length-1][0], c='red', zorder=30, s=600, marker='*',edgecolors='black')
                     plt.scatter(v[1], v[0], c='red', zorder=30, s=400, marker='*',edgecolors='black')
                     break
         
@@ -211,13 +210,6 @@ class MazeRenderer(Renderer):
         plt.title(title)
         img = plot2img(fig, remove_margins=self._remove_margins)
         return img
-
-    # def _renders(self, observations, **kwargs):
-    #     images = []
-    #     for observation in observations:
-    #         img = self.renders(observation, **kwargs)
-    #         images.append(img)
-    #     return np.stack(images, axis=0)
     
     def render_to_gif(self, observation, savepath, conditions=None, title=None, **kwargs):
         # Define function for animation

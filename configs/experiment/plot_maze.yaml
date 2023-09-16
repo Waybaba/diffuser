@@ -9,13 +9,6 @@ guide:
   _target_: diffuser.sampling.Maze2dTargetGuide
   target: [0,0]
 
-controller:
-  # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
-  # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
-  turn_on: true
-  dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-08_08-08-06_932140/0
-  epoch: last
-
 policy:
   _target_: diffuser.sampling.GuidedPolicy
   _partial_: true
@@ -37,11 +30,17 @@ policy:
 
 plan_freq: 1.0
 
+
+save_dir: ./debug/plot_maze
+
 runner:
-  _target_: src.runner.EvalRunner
+  _target_: src.runner.PlotMazeRunner
   _partial_: true
+
+wandb:
+  mode: disabled
 
 # common - for all tasks (task_name, tags, output_dir, device)
 algorithm_name: "DefaultAlgName"
-task_name: "EvalDiffuser"
+task_name: "PlotMaze"
 tags: ["debug"]
