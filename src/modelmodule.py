@@ -945,7 +945,7 @@ class DiffuserModule(DefaultModule):
 		# if self.hparams.eval.turn_on:
 		if self.hparams.controller.turn_on:
 			to_log_ = eval_pair(self, self.controller, self.hparams.controller.policy, plan_freq=self.hparams.controller.plan_freq, guide_=self.hparams.controller.guide)
-			to_log.update(to_log_)
+			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
 		if False:
 			### full rollout
 			self.actor = self.controller.net
