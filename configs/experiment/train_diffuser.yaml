@@ -63,7 +63,9 @@ modelmodule:
         interval: step
         frequency: 1
   optimization_first: ${modelmodule.optimizations.0} # for wandb log
-
+  controller:
+    turn_on: false
+    
 datamodule: 
   _target_: src.datamodule.EnvDatamodule
   _partial_: true
