@@ -185,6 +185,12 @@ class EnvDataset:
 		dones = dataset["terminals"]
 		if "timeouts" in dataset: dones |= dataset["timeouts"]
 		termination_indices = torch.where(dones)[0]
+		# remove consecutive ones
+		tmp = []
+		for i in range(len(termination_indices)):
+			if i == 0 or termination_indices[i] != termination_indices[i-1] + 1:
+				tmp.append(termination_indices[i])
+		termination_indices = torch.tensor(tmp)
 		
 		# Randomly select {num_episodes} starting indices for the episodes
 		random_start_indices = np.random.randint(0, len(termination_indices) - 3, num_episodes)

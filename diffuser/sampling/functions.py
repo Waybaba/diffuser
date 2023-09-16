@@ -41,7 +41,7 @@ def n_step_guided_p_sample(
 
 def n_step_guided_p_sample_freedom_timetravel(
     model, x, cond, t, guide, scale=0.001, t_stopgrad=0, n_guide_steps=1, scale_grad_by_std=True,
-    horizon=None, travel_interval=[0.0, 1.0], travel_repeat=1, betas=None, **kwargs
+    horizon=None, travel_interval=[0.0, 1.0], travel_repeat=1, betas=None, grad_interval=None, **kwargs
 ):
     """
     !!! UNFINISHED
@@ -55,6 +55,9 @@ def n_step_guided_p_sample_freedom_timetravel(
     elif isinstance(travel_interval[0], float):
         assert travel_interval[1] > travel_interval[0] and travel_interval[1] <= 1.0, "travel_interval should be [0.0, 1.0]"
         travel_interval = [int(travel_interval[0]*horizon), int(travel_interval[1]*horizon)]
+    if grad_interval is not None:
+        if isinstance(grad_interval[0], float):
+            grad_interval = [int(grad_interval[0]*horizon), int(grad_interval[1]*horizon)]
     
     model_log_variance = extract(model.posterior_log_variance_clipped, t, x.shape)
     model_std = torch.exp(0.5 * model_log_variance)
@@ -68,8 +71,12 @@ def n_step_guided_p_sample_freedom_timetravel(
         if scale_grad_by_std:
             grad = model_var * grad
 
-        grad[t < t_stopgrad] = 0 # use this to cancel the effect of guide
     
+        if grad_interval is not None:
+            grad[~((grad_interval[0]<=t) & (t<grad_interval[1]))] = 0
+        else:
+            grad[t < t_stopgrad] = 0 # use this to cancel the effect of guide
+        
         x = x + scale * grad
 
         if travel_i < travel_repeat-1:

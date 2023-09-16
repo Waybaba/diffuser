@@ -127,7 +127,7 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 	### distill
 	N_EPISODES = 1
 	N_FULLROLLOUT = 1
-	device = next(diffuser.net.parameters()).device
+	device = torch.device("cuda")
 	diffusion, dataset, renderer= diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
 	policy = policy_func(
 		guide=guide_,

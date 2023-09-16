@@ -387,7 +387,7 @@ class Maze2dTargetGuide(NoTrainGuide):
 			we only use x, y to calculate distance
 		"""
 		value = self.cal_value(x)
-		return value
+		return - value
 	
 	def cal_value(self, x):
 		"""

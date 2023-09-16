@@ -203,7 +203,7 @@ def gen_with_same_cond(policy, episodes_ds):
 		del ep_i["act"] # to avoid misuse
 		del ep_i["s"]
 		del ep_i["s_"]
-		_, samples = policy(cond, batch_size=1)
+		_, samples = policy(cond, batch_size=1, verbose=False)
 		obs_gen = samples.observations
 		ep_i["s"] = obs_gen[0] # (T, obs_dim)
 		ep_i["s_"] = np.concatenate([obs_gen[0][1:], obs_gen[0][-1:]], axis=0)

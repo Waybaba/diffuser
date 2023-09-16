@@ -189,6 +189,8 @@
 			"noDebug": false,
 			"args": [
 				"experiment=plot_maze",
+				"wandb.mode=online",
+				"mode=default", // would rendering the grid search
 			],
 		},
 		{

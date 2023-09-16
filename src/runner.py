@@ -11,7 +11,7 @@ from diffuser.sampling import DummyGuide
 from src.func import *
 import numpy as np
 from src.modelmodule import eval_pair, rollout_ref
-
+from diffuser.sampling.guides import *
 
 """functions"""
 
@@ -147,78 +147,112 @@ class PlotMazeRunner:
 	ps. everything is unnormlized in this class
 	"""
 	def start(self, cfg):
-		import matplotlib.pyplot as plt
 		self.cfg = cfg
+		DEVICE = torch.device("cuda")
 
-		# load data or generate data
+		### load modules
 		print("Loading modules ...")
 		diffuser = load_diffuser(cfg.diffuser.dir, cfg.diffuser.epoch)
-
-
-		### generating
-		obs_list = None # [(T_i, 4)] # a list of trajectories
 		policy_func = cfg.policy
 		guide_ = cfg.guide
-		# create demo lines
-		N_EPISODES = 1
-		N_FULLROLLOUT = 1
-		device = next(diffuser.net.parameters()).device
+		guide_ = NoTrainGuideXLower()
 		diffusion, dataset, renderer= diffuser.net.diffusion, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
 		policy = policy_func(
 			guide=guide_,
 			diffusion_model=diffusion,
 			normalizer=dataset.normalizer,
 		)
-		policy_noguide = policy_func(
-			guide=DummyGuide(),
-			diffusion_model=diffusion, 
-			normalizer=dataset.normalizer,
-		)
 		model = policy.diffusion_model
-		model.to(device)
+		model.to(DEVICE)
 		model.eval()
-		env = dataset.env
 
-		to_log = {}
+		### generate with condition
+		if cfg.mode == "local":
+			for scale in cfg.scale_list:
+				for guide in cfg.guide_list:
+					policy.guide = guide
+					policy.sample_kwargs["scale"] = scale
+					f_name = "maze"+ \
+						f"-guide#{guide.__class__.__name__}" + \
+						f"-scale#{str(scale)}"
+					print("generating ", f_name)
+					obs_list = self.generate(policy, cond={
+						0: np.array([1.,4.,0.,0.])
+					}, batch_size=cfg.sample_num)
+					obs_list = self.norm(obs_list, renderer.env_name)
+					self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
+					print(f"save to {Path(cfg.save_dir)/f'{f_name}.png'}")
+		elif cfg.mode == "default":
+			guide = cfg.guide
+			scale = cfg.scale
+			policy.guide = guide
+			policy.sample_kwargs["scale"] = scale
+			f_name = "maze"+ \
+				f"-guide#{guide.__class__.__name__}" + \
+				f"-scale#{str(scale)}"
+			print("generating ", f_name)
+			obs_list = self.generate(policy, cond={
+				0: np.array([1.,4.,0.,0.])
+			}, batch_size=cfg.sample_num)
+			obs_list = self.norm(obs_list, renderer.env_name)
+			img = self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
+			self.observations2fig(obs_list, Path(cfg.output_dir)/f"{f_name}.png", renderer)
+			print(f"save to {Path(cfg.save_dir)/f'{f_name}.png'}")
+			wandb.log({"maze": wandb.Image(img)}, commit=True)
+		
 
-		### episodes - generate
-		episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES) # [{"s": ...}]
-		episodes_diffuser = gen_with_same_cond(policy, episodes_ds) # [{"s": ...}]
-		obs_list = [each["s"] for each in episodes_diffuser]
+	def generate(self, policy, cond, batch_size):
+		_, samples = policy(cond, batch_size=batch_size, verbose=False)
+		obs_list = samples.observations
+		return obs_list
 
-		### plot
-		obs_list_normed = None
-		# TODO plot background
-		for obs in obs_list_normed:
-			# TODO plot line
-			pass
-        plt.clf()
-        fig = plt.gcf()
-        fig.set_size_inches(5, 5)
-        
-        plt.imshow(self._background * .5,
-            extent=self._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
+	def norm(self, obs_list, env_name):
+		obs_list_normed = []
+		from diffuser.utils.rendering import MAZE_BOUNDS
+		bounds = MAZE_BOUNDS[env_name]
+		for observations in obs_list:
+			observations = observations + 0.5
+			if len(bounds) == 2:
+				_, scale = bounds
+				observations /= scale
+			elif len(bounds) == 4:
+				_, iscale, _, jscale = bounds
+				observations[:, 0] /= iscale
+				observations[:, 1] /= jscale
+			else:
+				raise RuntimeError(f'Unrecognized bounds for {self.env_name}: {bounds}')
+			obs_list_normed.append(observations)
+		return obs_list_normed
+	
+	def observations2fig(self, obs_list, save_path, renderer):
+		import matplotlib.pyplot as plt
+		plt.clf()
+		fig = plt.gcf()
+		fig.set_size_inches(5, 5)
+		plt.ioff()
+		plt.imshow(renderer._background * .5,
+			extent=renderer._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
+		for observations in obs_list:
+			path_length = len(observations)
+			colors = plt.cm.jet(np.linspace(0,1,path_length))
+			plt.plot(observations[:,1], observations[:,0], c='grey', zorder=10, alpha=0.1, lw=5.0)
+			# plot last point
+			# plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20)
+		# plot start and end
+		starts = [obs[0] for obs in obs_list]
+		ends = [obs[-1] for obs in obs_list]
+		plt.scatter(np.array(ends)[:,1], np.array(ends)[:,0], c='red', zorder=20, s=20, alpha=0.9)
+		plt.scatter(np.array(starts)[:,1], np.array(starts)[:,0], c='green', zorder=30, s=20)
+		# save
+		plt.axis('off')
+		# make dir for save_path parent if not exist
+		save_dir = Path(save_path).parent
+		save_dir.mkdir(parents=True, exist_ok=True)
+		plt.savefig(save_path, bbox_inches='tight', pad_inches=0)	
+		# return rgb array
+		from diffuser.utils.rendering import plot2img
+		return plot2img(fig, remove_margins=False)
 
-        path_length = len(observations)
-        colors = plt.cm.jet(np.linspace(0,1,path_length))
-        plt.plot(observations[:,1], observations[:,0], c='black', zorder=10)
-        plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20)
-        
-        if conditions is not None:
-            # plot a green at the start and red at the end
-            # conditions = {0: np.array(4), path_length-1: np.array(4)}
-            if 0 in conditions:
-                plt.scatter(conditions[0][1], conditions[0][0], c='green', zorder=30, s=400, marker='o', edgecolors='black')
-            for k, v in conditions.items():
-                if k == 0: continue
-                if k < 10: continue
-                if type(k) == int:
-                    plt.scatter(v[1], v[0], c='red', zorder=30, s=400, marker='*',edgecolors='black')
-                    break
-        
-        plt.axis('off')
-        plt.title(title)
-        img = plot2img(fig, remove_margins=self._remove_margins)
 
 def parse_diffusion(diffusion_dir, epoch, device, dataset_seed):
 	""" parse diffusion model from 
