@@ -134,6 +134,7 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 		diffusion_model=diffusion,
 		normalizer=dataset.normalizer,
 	)
+	normalizer_actor = controller.dynamic_cfg["dataset"].normalizer
 	policy_noguide = policy_func(
 		guide=DummyGuide(),
 		diffusion_model=diffusion, 
@@ -155,13 +156,13 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 	episodes_diffuser = gen_with_same_cond(policy, episodes_ds) # [{"s": ...}]
 	### episodes - rollout
 	if controller is not None:
-		episodes_ds_rollout = [rollout_ref(env, episodes_ds[i], actor, dataset.normalizer) for i in range(len(episodes_ds))]  # [{"s": ...}]
-		episodes_diffuser_rollout = [rollout_ref(env, episodes_diffuser[i], actor, dataset.normalizer) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
+		episodes_ds_rollout = [rollout_ref(env, episodes_ds[i], actor, normalizer_actor) for i in range(len(episodes_ds))]  # [{"s": ...}]
+		episodes_diffuser_rollout = [rollout_ref(env, episodes_diffuser[i], actor, normalizer_actor) for i in range(len(episodes_diffuser))]  # [{"s": ...}]
 		episodes_full_rollout = [full_rollout_once(
 			env, 
 			policy, 
 			actor, 
-			dataset.normalizer, 
+			normalizer_actor, 
 			plan_freq if isinstance(plan_freq, int) else max(int(plan_freq * model.horizon),1),
 		) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
 		episodes_ds_rollout = safefill_rollout(episodes_ds_rollout)

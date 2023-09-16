@@ -53,7 +53,7 @@ def full_rollout_once(
 		env, 
 		planner, 
 		actor, 
-		normalizer, 
+		normalizer_actor, 
 		plan_freq=1,
 		len_max=1000
 	):
@@ -64,7 +64,7 @@ def full_rollout_once(
 		call actor(obs, obs_, batch_size=1, verbose=False) and return act
 	"""
 		
-	def make_act(actor, history, plan, t_madeplan, normalizer):
+	def make_act(actor, history, plan, t_madeplan, normalizer_actor):
 		"""
 		actor: would generate act, different for diff methods
 		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
@@ -75,17 +75,17 @@ def full_rollout_once(
 		device = next(actor.parameters()).device
 		model.to(device)
 		act = model(torch.cat([
-			torch.tensor(normalizer.normalize(
+			torch.tensor(normalizer_actor.normalize(
 				s,
 				"observations"
 			)).to(device), 
-			torch.tensor(normalizer.normalize(
+			torch.tensor(normalizer_actor.normalize(
 				s_,
 				"observations"
 			)).to(device)
 		], dim=-1).float().to(device))
 		act = act.detach().cpu().numpy()
-		act = normalizer.unnormalize(act, "actions")
+		act = normalizer_actor.unnormalize(act, "actions")
 		return act
 
 	def make_plan(planner, history):
@@ -119,7 +119,7 @@ def full_rollout_once(
 		if env_step - t_madeplan >= plan_freq:
 			plan = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
 			t_madeplan = env_step
-		a = make_act(actor, res["s"]+[s], plan, t_madeplan, normalizer)
+		a = make_act(actor, res["s"]+[s], plan, t_madeplan, normalizer_actor)
 		s_, r, done, info = env.step(a)
 		s = s_
 		

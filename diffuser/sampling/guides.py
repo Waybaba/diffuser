@@ -378,6 +378,9 @@ class MujocoLower(SingleValueGuide):
 
 ## Mujoco Height
 class Maze2dTargetGuide(NoTrainGuide):
+	def __init__(self, target=[0.0457, 0.0458], **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
 
 	def forward(self, x, cond, t):
 		"""

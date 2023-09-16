@@ -171,6 +171,7 @@
 				// ### mujoco
 				"guide._target_=diffuser.sampling.DummyGuide",
 				"diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
+				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/runs/2023-09-16_10-09-38_991193/",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-15_12-01-26_063200/",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/runs/2023-09-15_07-09-23_899677",
 				// "controller.dir=/output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0",
