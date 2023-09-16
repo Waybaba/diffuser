@@ -944,6 +944,7 @@ class DiffuserModule(DefaultModule):
 		N_FULLROLLOUT = 1
 		# if self.hparams.eval.turn_on:
 		if self.hparams.controller.turn_on:
+			print("Start eval_pair")
 			to_log_ = eval_pair(self, self.controller, self.hparams.controller.policy, plan_freq=self.hparams.controller.plan_freq, guide_=self.hparams.controller.guide)
 			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
 		### log
@@ -954,7 +955,7 @@ class DiffuserModule(DefaultModule):
 		to_log["samples"] = [wandb.Image(_) for _ in img_samples]
 		wandb.log({
 			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
-		}, commit=False)
+		}, commit=True)
 		super().validation_epoch_end(outputs)
 
 	def render_samples(self):
