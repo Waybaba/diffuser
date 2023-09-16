@@ -19,7 +19,7 @@
 		"ms-python.python",
 		"GitHub.copilot",
 		"GitHub.vscode-pull-request-github",
-		"ms-azuretools.vscode-docker",
+		// "ms-azuretools.vscode-docker",
 	],
 	"settings": {
 		"lldb.adapterType": "native",

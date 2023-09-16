@@ -19,13 +19,6 @@ import torch.nn.functional as F
 import hashlib
 from src.func import *
 
-Batch = namedtuple('Batch', 'trajectories conditions')
-ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
-TransitionBatch = namedtuple('TransitionBatch', 's s_ act')
-EpisodeBatch = namedtuple('EpisodeBatch', 'trajectories conditions')
-EpisodeValidBatch = namedtuple('EpisodeValidBatch', 'trajectories conditions valids')
-MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
-
 ### functions
 
 class DatasetNormalizerW:

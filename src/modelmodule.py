@@ -16,6 +16,112 @@ from src.func import *
 from diffuser.sampling.guides import DummyGuide
 from diffuser.sampling.policies import GuidedPolicy
 from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel, n_step_guided_p_sample
+# from src.runner import eval_pair, rollout_ref
+import functools
+
+
+"""functions"""
+def collect_parameters(model, set="all"):
+	""" Collect parameters from model depending on set.
+	Args: 
+		model: model to collect parameters from
+		set: "all" or "backbone"
+			e.g.
+			"all": all parameters
+			"backbone": only backbone parameters
+			"head": only head parameters
+			"decoder": only decoder parameters
+			"encoder": only encoder parameters
+			"bn": only batch normalization parameters
+			"default": depends on the model
+		lr: learning rate for the parameters # TODO
+	"""
+	# assert is wrapper (even when custom model is used)
+	assert isinstance(model, ModelWrapperBase)
+	# collect parameters
+	if set == "all": params = model.parameters()
+	elif set in ["backbone", "head", "decoder", "decode_head", "special"]:
+		params = model.select_param_group(set)
+	elif set in ["decoder","decode_head"]: 
+		params = model.decode_head.parameters()
+	elif set == "bn": 
+		params = []
+		for name, p in model.named_parameters():
+			if "bn" in name: params.append(p)
+		if len(params) == 0: raise ValueError("No batch normalization parameters found")
+	elif set == "default": params = model.parameters()
+	elif set == "10xforhead":
+		# 10x learning rate for classification head, 1x for other layers in decoder
+		# para_head_names = ["conv_seg.weight", "conv_seg.bias"]
+		# classification_head = list(filter(lambda kv: kv[0] in para_head_names, model.decode_head.named_parameters()))
+		# other_decoder_layers = list(filter(lambda kv: kv[0] not in para_head_names, model.decode_head.named_parameters()))
+		# classification_head = [i[1] for i in classification_head]
+		# other_decoder_layers = [i[1] for i in other_decoder_layers]
+		# params = [{"params": classification_head, "lr": lr * 10}, {"params": other_decoder_layers, "lr": lr}]
+		raise NotImplementedError("10xforhead is deprecated, use two sets instead")
+	elif set in ["generator", "discriminator"]:
+		params = model.select_param_group(set)
+	else: raise ValueError(f"set {set} is not supported")
+	# set requires_grad
+	# for p in model.parameters(): p.requires_grad = False
+	# params = [i for i in params]
+	# for p in params:
+	# 	if isinstance(p, dict): 
+	# 		for p_ in p["params"]: p_.requires_grad = True
+	# 	else: p.requires_grad = True
+	return params
+
+class L1DistanceMetric(Metric):
+	"""Metric to calculate L1 distance."""
+	
+	def __init__(self):
+		super().__init__()
+		# Initialize the state variables to store the sum and the count of samples.
+		self.add_state("sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+		self.add_state("count", default=torch.tensor(0.0), dist_reduce_fx="sum")
+		
+	def update(self, preds: torch.Tensor, target: torch.Tensor):
+		"""
+			Receives the output of the model and the target.
+			return mean l1 distance of a dimmension
+		"""
+		assert preds.shape == target.shape, "preds and target should have the same shape"
+		# assert len(preds.shape) == 2, "preds and target should be 2D"
+		with torch.no_grad():
+			l1_distance = torch.abs(preds - target).sum()
+			self.sum += l1_distance
+			self.count += target.numel()
+		return l1_distance / target.numel()
+	
+	def compute(self):
+		"""Compute the metric."""
+		return self.sum / self.count
+
+class Controller:
+	""" Include a series of controlle which can be init then give actions
+	mode:
+		str which indicate the controller type
+		1. random: random action
+		2. ss2a###{controller_run_dir}:
+			predict P(a|s,s')
+		3. mpc###{contoller_run_dir}
+			use a P(s'|s,a) model and MPC algorithm to act
+	act:
+		would take all kinds of input for all usages
+	"""
+	def __init__(self, mode, *args, **kwargs):
+		self.args, self.kwargs = args, kwargs
+		self.mode = mode
+		if self.mode == "random":
+			assert "act_dim" in kwargs, "act_dim should be in kwargs"
+		else:
+			raise ValueError(f"mode {mode} not supported")
+
+	def act(self, *args, **kwargs):
+		if self.mode == "random":
+			return torch.random.randint(0, self.kwargs["act_dim"], size=(1,))
+		else:
+			raise ValueError(f"mode {self.mode} not supported")
 
 def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide_=None):
 	### distill
@@ -129,114 +235,96 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 		)]
 	return to_log
 
-
-"""functions"""
-
-
-def collect_parameters(model, set="all"):
-	""" Collect parameters from model depending on set.
-	Args: 
-		model: model to collect parameters from
-		set: "all" or "backbone"
-			e.g.
-			"all": all parameters
-			"backbone": only backbone parameters
-			"head": only head parameters
-			"decoder": only decoder parameters
-			"encoder": only encoder parameters
-			"bn": only batch normalization parameters
-			"default": depends on the model
-		lr: learning rate for the parameters # TODO
+def rollout_ref(env, ep_ref, model, normalizer):
+	""" rollout reference episodes
+		TODO support different type of model, now it is
+		env: the environment
+		ep_ref: 
+			1. {
+				"s": (T, obs_dim),
+				"s_": (T, obs_dim),
+				"qpos": # optional for mujoco reset
+				"qvel": # 
+			} 
+			2. (T, obs_dim)
+				would be convert to 1.
+			
+		model: (obs_cur, obs_next) -> act
+		for each step i, use current obs as obs_cur, use ep_ref[i] as obs_next
+		act = model(obs_cur, obs_next)
+		then return the rollout episodes with shape shape as ep_ref (T, obs_dim)
+	! TODO there is error for last obs
 	"""
-	# assert is wrapper (even when custom model is used)
-	assert isinstance(model, ModelWrapperBase)
-	# collect parameters
-	if set == "all": params = model.parameters()
-	elif set in ["backbone", "head", "decoder", "decode_head", "special"]:
-		params = model.select_param_group(set)
-	elif set in ["decoder","decode_head"]: 
-		params = model.decode_head.parameters()
-	elif set == "bn": 
-		params = []
-		for name, p in model.named_parameters():
-			if "bn" in name: params.append(p)
-		if len(params) == 0: raise ValueError("No batch normalization parameters found")
-	elif set == "default": params = model.parameters()
-	elif set == "10xforhead":
-		# 10x learning rate for classification head, 1x for other layers in decoder
-		# para_head_names = ["conv_seg.weight", "conv_seg.bias"]
-		# classification_head = list(filter(lambda kv: kv[0] in para_head_names, model.decode_head.named_parameters()))
-		# other_decoder_layers = list(filter(lambda kv: kv[0] not in para_head_names, model.decode_head.named_parameters()))
-		# classification_head = [i[1] for i in classification_head]
-		# other_decoder_layers = [i[1] for i in other_decoder_layers]
-		# params = [{"params": classification_head, "lr": lr * 10}, {"params": other_decoder_layers, "lr": lr}]
-		raise NotImplementedError("10xforhead is deprecated, use two sets instead")
-	elif set in ["generator", "discriminator"]:
-		params = model.select_param_group(set)
-	else: raise ValueError(f"set {set} is not supported")
-	# set requires_grad
-	# for p in model.parameters(): p.requires_grad = False
-	# params = [i for i in params]
-	# for p in params:
-	# 	if isinstance(p, dict): 
-	# 		for p_ in p["params"]: p_.requires_grad = True
-	# 	else: p.requires_grad = True
-	return params
+	# convert if not dict
+	if not isinstance(ep_ref, dict):
+		raise ValueError("ep_ref should be a dict")
+		ep_ref = {
+			"s": np.stack(ep_ref),
+			"s_": np.concatenate([ep_ref[1:], ep_ref[-1:]], axis=0),
+		}
+	# reset env with qpos, qvel
+	if "qpos" in ep_ref:
+		init_qpos = ep_ref["qpos"][0]
+		init_qvel = ep_ref["qvel"][0]
+		env.reset()
+		env.set_state(init_qpos, init_qvel)
+		s = env._get_obs()
+		# env.sim.set_state(sim_state)
+		# ss = env.state_vector()
+		# # ss = env.reset()
+		# print(ss)
+		# s = ep_ref["s"][0]
+		# s_ =  ep_ref["s_"][0]
+		# print(s)
+		# print(s_)
+		# ! TODO have a check about this if equal
+	else:
+		s = env.reset()
 
-class L1DistanceMetric(Metric):
-	"""Metric to calculate L1 distance."""
-	
-	def __init__(self):
-		super().__init__()
-		# Initialize the state variables to store the sum and the count of samples.
-		self.add_state("sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
-		self.add_state("count", default=torch.tensor(0.0), dist_reduce_fx="sum")
-		
-	def update(self, preds: torch.Tensor, target: torch.Tensor):
-		"""
-			Receives the output of the model and the target.
-			return mean l1 distance of a dimmension
-		"""
-		assert preds.shape == target.shape, "preds and target should have the same shape"
-		# assert len(preds.shape) == 2, "preds and target should be 2D"
-		with torch.no_grad():
-			l1_distance = torch.abs(preds - target).sum()
-			self.sum += l1_distance
-			self.count += target.numel()
-		return l1_distance / target.numel()
-	
-	def compute(self):
-		"""Compute the metric."""
-		return self.sum / self.count
+	# run
+	ep_s = []
+	ep_a = []
+	ep_r = []
+	for env_i in tqdm(range(len(ep_ref["s"]))):
+		device = next(model.parameters()).device
+		model.to(device)
+		if isinstance(model, FillActWrapper):
+			act = model(torch.cat([
+				torch.tensor(normalizer.normalize(
+					s,
+					"observations"
+				)).to(device), 
+				torch.tensor(normalizer.normalize(
+					ep_ref["s_"][env_i],
+					"observations"
+				)).to(device)
+			], dim=-1).float().to(device))
+			act = act.detach().cpu().numpy()
+		elif isinstance(model, EnvModelWrapper):
+			act = model.act(
+				torch.tensor(normalizer.normalize(
+					s,
+					"observations"
+				)).to(device).float(),
+				torch.tensor(normalizer.normalize(
+					ep_ref["s_"][env_i],
+					"observations"
+				)).to(device).float()
+			)
+		act = normalizer.unnormalize(act, "actions")
+		# act = ep_ref["act"][env_i] # ! DEBUG
+		s_, r, done, info = env.step(act)
+		ep_s.append(s)
+		ep_a.append(act)
+		ep_r.append(r)
+		s = s_
+		if done: break
 
-class Controller:
-	""" Include a series of controlle which can be init then give actions
-	mode:
-		str which indicate the controller type
-		1. random: random action
-		2. ss2a###{controller_run_dir}:
-			predict P(a|s,s')
-		3. mpc###{contoller_run_dir}
-			use a P(s'|s,a) model and MPC algorithm to act
-	act:
-		would take all kinds of input for all usages
-	"""
-	def __init__(self, mode, *args, **kwargs):
-		self.args, self.kwargs = args, kwargs
-		self.mode = mode
-		if self.mode == "random":
-			assert "act_dim" in kwargs, "act_dim should be in kwargs"
-		else:
-			raise ValueError(f"mode {mode} not supported")
-
-	def act(self, *args, **kwargs):
-		if self.mode == "random":
-			return torch.random.randint(0, self.kwargs["act_dim"], size=(1,))
-		else:
-			raise ValueError(f"mode {self.mode} not supported")
-
-import functools
-
+	return {
+		"s": np.stack(ep_s),
+		"act": np.stack(ep_a),
+		"r": np.stack(ep_r),
+	}
 
 """model wrapper"""
 class ModelWrapperBase(nn.Module):
@@ -854,10 +942,10 @@ class DiffuserModule(DefaultModule):
 		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
 		# ! TODO get full ep
 		N_FULLROLLOUT = 1
-		if self.hparams.eval.turn_on:
-			to_log_ = eval_pair(self.controller, self, self.hparams.controller.policy, plan_freq=self.hparams.controller.plan_freq, guide_=self.hparams.controller.guide)
+		# if self.hparams.eval.turn_on:
+		if self.hparams.controller.turn_on:
+			to_log_ = eval_pair(self, self.controller, self.hparams.controller.policy, plan_freq=self.hparams.controller.plan_freq, guide_=self.hparams.controller.guide)
 			to_log.update(to_log_)
-		# if self.hparams.controller.turn_on:
 		if False:
 			### full rollout
 			self.actor = self.controller.net

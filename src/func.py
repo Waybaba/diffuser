@@ -12,6 +12,15 @@ import wandb
 from diffuser.sampling.guides import DummyGuide
 from diffuser.sampling.policies import GuidedPolicy
 from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel, n_step_guided_p_sample
+from collections import namedtuple
+
+"""names"""
+Batch = namedtuple('Batch', 'trajectories conditions')
+ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
+TransitionBatch = namedtuple('TransitionBatch', 's s_ act')
+EpisodeBatch = namedtuple('EpisodeBatch', 'trajectories conditions')
+EpisodeValidBatch = namedtuple('EpisodeValidBatch', 'trajectories conditions valids')
+MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
 
 
 """Functions"""

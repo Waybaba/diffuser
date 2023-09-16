@@ -55,6 +55,7 @@
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
+			"noDebug": true,
 			"args": [
 				"wandb.mode=disabled",
 				// #### mujoco
