@@ -177,7 +177,7 @@ class PlotMazeRunner:
 						f"-scale#{str(scale)}"
 					print("generating ", f_name)
 					obs_list = self.generate(policy, cond={
-						0: np.array([1.,4.,0.,0.])
+						0: np.array([3.,3.,0.,0.])
 					}, batch_size=cfg.sample_num)
 					obs_list = self.norm(obs_list, renderer.env_name)
 					self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)

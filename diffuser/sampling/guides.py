@@ -139,74 +139,74 @@ class DummyGuide(NoTrainGuideShorter):
 ## Average coordinate
 
 class NoTrainGuideAvgCoordinate(NoTrainGuide):
-    """
-    Base class to make the average coordinate (x or y) lower or higher
-    """
-    LOWER = None
-    COORDINATE = None
+	"""
+	Base class to make the average coordinate (x or y) lower or higher
+	"""
+	LOWER = None
+	COORDINATE = None
 
-    def forward(self, x, cond, t):
-        """
-        Calculate average coordinate (x or y)
-        x: (batch_size, trace_length, 6)
-            the last dim is [act_x, act_y, x, y, vx, vy]
-            we only use x or y to calculate average coordinate
-        """
-        avg_coordinate = self.cal_average_coordinate(x)
+	def forward(self, x, cond, t):
+		"""
+		Calculate average coordinate (x or y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x or y to calculate average coordinate
+		"""
+		avg_coordinate = self.cal_average_coordinate(x)
 
-        if self.LOWER is None: raise NotImplementedError("LOWER is not defined")
-        if self.COORDINATE is None: raise NotImplementedError("COORDINATE is not defined")
-        if self.LOWER: return - avg_coordinate
-        else: return avg_coordinate
+		if self.LOWER is None: raise NotImplementedError("LOWER is not defined")
+		if self.COORDINATE is None: raise NotImplementedError("COORDINATE is not defined")
+		if self.LOWER: return - avg_coordinate
+		else: return avg_coordinate
 
-    def cal_average_coordinate(self, x):
-        """
-        Calculate average coordinate (x or y)
-        x: (batch_size, trace_length, 6)
-            the last dim is [act_x, act_y, x, y, vx, vy]
-            we only use x or y to calculate average coordinate
-        """
-        # Extract x or y coordinate
-        coord = x[:, :, self.COORDINATE+2]
+	def cal_average_coordinate(self, x):
+		"""
+		Calculate average coordinate (x or y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x or y to calculate average coordinate
+		"""
+		# Extract x or y coordinate
+		coord = x[:, :, self.COORDINATE+2]
 
-        # Compute average coordinate
-        avg_coordinate = coord.mean(dim=1)
+		# Compute average coordinate
+		avg_coordinate = coord.mean(dim=1)
 
-        return avg_coordinate
+		return avg_coordinate
 
-    def metrics(self, x, **kwargs):
-        """
-        Calculate average coordinate (x and y)
-        x: (batch_size, trace_length, 6)
-            the last dim is [x, y, vx, vy, act_x, act_y]
-            we use x and y to calculate average coordinates
-        """
-        # if x is numpy array, convert it to torch tensor
-        if isinstance(x, np.ndarray): x = torch.from_numpy(x)
-        
-        avg_x = x[:, :, 0].mean(dim=1)
-        avg_y = x[:, :, 1].mean(dim=1)
+	def metrics(self, x, **kwargs):
+		"""
+		Calculate average coordinate (x and y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we use x and y to calculate average coordinates
+		"""
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		
+		avg_x = x[:, :, 0].mean(dim=1)
+		avg_y = x[:, :, 1].mean(dim=1)
 
-        return {
-            "avg_x": avg_x,
-            "avg_y": avg_y
-        }
+		return {
+			"avg_x": avg_x,
+			"avg_y": avg_y
+		}
 
 class NoTrainGuideXLower(NoTrainGuideAvgCoordinate):
-    LOWER = True
-    COORDINATE = 0
+	LOWER = True
+	COORDINATE = 0
 
 class NoTrainGuideXHigher(NoTrainGuideAvgCoordinate):
-    LOWER = False
-    COORDINATE = 0
+	LOWER = False
+	COORDINATE = 0
 
 class NoTrainGuideYLower(NoTrainGuideAvgCoordinate):
-    LOWER = True
-    COORDINATE = 1
+	LOWER = True
+	COORDINATE = 1
 
 class NoTrainGuideYHigher(NoTrainGuideAvgCoordinate):
-    LOWER = False
-    COORDINATE = 1
+	LOWER = False
+	COORDINATE = 1
 
 class NoTrainGuideRepeat(NoTrainGuide):
 	"""
@@ -376,7 +376,7 @@ class MujocoLower(SingleValueGuide):
 	INDEX = 6
 	NAME = "height"
 
-## Mujoco Height
+## Maze
 class Maze2dTargetGuide(NoTrainGuide):
 	def __init__(self, target=[0.0457, 0.0458], **kwargs):
 		kwargs["target"] = target
@@ -407,8 +407,56 @@ class Maze2dTargetGuide(NoTrainGuide):
 		pos_x = x[:, -1, ACT_DIM+0]
 		pos_y = x[:, -1, ACT_DIM+1]
 		total_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
-		# total_distance = total_distance.sqrt() # comment this would lead to l2
+		total_distance = total_distance.sqrt() # comment this would lead to l2
 		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+class Maze2dAvoidGuide(NoTrainGuide):
+	def __init__(self, target=[0.0457, 0.0458], **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		ACT_DIM = 2
+		RADIUS = 0.1
+
+		# Extract x, y coordinates for all time steps
+		pos_x = x[:, :, ACT_DIM+0]
+		pos_y = x[:, :, ACT_DIM+1]
+
+		# Calculate squared distance from the target for all time steps
+		squared_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
+
+		# Calculate the distance (L2 norm) for all time steps
+		total_distance = squared_distance.sqrt() # (B, T)
+
+		# Only apply loss for positions within radius R of the target
+		mask = (squared_distance <= RADIUS ** 2)
+		
+		# Make sure the mask is float type
+		mask = mask.float()
+
+		# Apply the mask to compute the effective loss for all time steps
+		effective_loss = total_distance * mask
+
+		return effective_loss.sum()
 	
 	def metrics(self, x, **kwargs):
 		# if x is numpy array, convert it to torch tensor
