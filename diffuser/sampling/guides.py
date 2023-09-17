@@ -4,6 +4,8 @@ import pdb
 from abc import abstractclassmethod
 import numpy as np
 
+
+
 class Guide(nn.Module):
 	"""
 	Abstract class for guide
@@ -24,6 +26,20 @@ class Guide(nn.Module):
 	def metrics(self, x, **kwargs):
 		raise NotImplementedError
 
+class MultiGuide(Guide):
+	def __init__(self, guides):
+		super().__init__()
+		self.guides = guides
+	
+	def gradients(self, x, *args):
+		"""
+		return the gradients of the guide, input: x
+		"""
+		grads = []
+		for guide in self.guides:
+			grads.append(guide.gradients(x, *args))
+		return grads
+
 class ValueGuide(Guide):
 
 	def __init__(self, model):
@@ -40,7 +56,6 @@ class ValueGuide(Guide):
 		grad = torch.autograd.grad([y.sum()], [x])[0]
 		x.detach_()
 		return y, grad
-
 
 class NoTrainGuide(Guide):
 	
@@ -376,6 +391,25 @@ class MujocoLower(SingleValueGuide):
 	INDEX = 6
 	NAME = "height"
 
+class CheetahFaster(MujocoFaster):
+	INDEX = 14
+
+class CheetahSlower(MujocoSlower):
+	INDEX = 14
+
+class HopperFaster(MujocoFaster):
+	INDEX = 8
+
+class HopperSlower(MujocoSlower):
+	INDEX = 8
+
+class Walker2DFaster(MujocoFaster):
+	INDEX = 14
+
+class Walker2DSlower(MujocoFaster):
+	INDEX = 14
+
+
 ## Maze
 class Maze2dTargetGuide(NoTrainGuide):
 	def __init__(self, target=[0.0457, 0.0458], **kwargs):
@@ -435,20 +469,20 @@ class Maze2dAvoidGuide(NoTrainGuide):
 	
 	def cal_value(self, x):
 		ACT_DIM = 2
-		RADIUS = 0.1
+		RADIUS = 0.3
 
 		# Extract x, y coordinates for all time steps
 		pos_x = x[:, :, ACT_DIM+0]
 		pos_y = x[:, :, ACT_DIM+1]
 
 		# Calculate squared distance from the target for all time steps
-		squared_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
+		total_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
 
 		# Calculate the distance (L2 norm) for all time steps
-		total_distance = squared_distance.sqrt() # (B, T)
+		total_distance = total_distance.sqrt() # (B, T)
 
 		# Only apply loss for positions within radius R of the target
-		mask = (squared_distance <= RADIUS ** 2)
+		mask = (total_distance <= RADIUS ** 2)
 		
 		# Make sure the mask is float type
 		mask = mask.float()
@@ -456,7 +490,7 @@ class Maze2dAvoidGuide(NoTrainGuide):
 		# Apply the mask to compute the effective loss for all time steps
 		effective_loss = total_distance * mask
 
-		return effective_loss.sum()
+		return effective_loss.mean(dim=1)
 	
 	def metrics(self, x, **kwargs):
 		# if x is numpy array, convert it to torch tensor

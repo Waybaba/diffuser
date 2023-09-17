@@ -190,7 +190,7 @@
 			"noDebug": false,
 			"args": [
 				"experiment=plot_maze",
-				"wandb.mode=online",
+				"wandb.mode=disabled",
 				"mode=local", // would rendering the grid search
 			],
 		},

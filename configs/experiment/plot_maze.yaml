@@ -38,14 +38,15 @@ guide:
   # target: [-0.4172, -0.8800] # (2, 1)
   # target: [0.9714, -0.4171] # (5, 2)
   # target: [0.5086, 0.9714] # (4, 5)
-scale_list: [0.1, 1.0, 10.0, 100, 400, 1000,10000, -0.1, -1.0, -10.0, -100, -400, -1000, -10000]
+# scale_list: [0.1, 1.0, 10.0, 100, 400, 1000,10000, -0.1, -1.0, -10.0, -100, -400, -1000, -10000]
 # scale_list: [ 100, 200, 300, 400, 1000]
-# scale_list: [10000, -10000]
+# scale_list: [100000, -100000]
+scale_list: [0]
 guide_list: 
   # - _target_: diffuser.sampling.Maze2dTargetGuide
-  #   target: [-0.4172, -0.8800] # (2, 1)
-  - _target_: diffuser.sampling.Maze2dAvoidGuide
-    target: [-0.8800, 0.5086] # (1, 4)
+  #   target: [0.5086, 0.9714] # (4, 5)
+  - _target_: diffuser.sampling.Maze2dTargetGuide
+    target: [0.0457, 0.0458] # (3, 3)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [-0.8800, 0.5086] # (1, 4)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
