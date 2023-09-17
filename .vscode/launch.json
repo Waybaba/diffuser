@@ -187,11 +187,11 @@
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
-			"noDebug": false,
+			"noDebug": true,
 			"args": [
 				"experiment=plot_maze",
 				"wandb.mode=online",
-				"mode=default", // would rendering the grid search
+				"mode=local", // would rendering the grid search
 			],
 		},
 		{

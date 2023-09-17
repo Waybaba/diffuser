@@ -20,7 +20,7 @@ policy:
   n_guide_steps: 1 # ! does not used, only use one step + time travel
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   # grad_interval: [0.4,0.7]
-  grad_interval: [0.0, 1.0]
+  grad_interval: [0.0, 0.5]
   scale_grad_by_std: true
   travel_repeat: 1 # time travel
   travel_interval: [0.0,1.0] # if float, would use [horizon*travel_interval, horizon]
@@ -30,7 +30,7 @@ mode: default # default: would only run once. local: would sweep over scale_list
 sample_num: 1000
 save_dir: ./debug/plot_maze
 # scale_list: [0.1, 1.0, 10.0, 100, 400, 1000, -0.1, -1.0, -10.0, -100, -400, -1000]
-scale: 100
+scale: 1000
 guide: 
   _target_: diffuser.sampling.Maze2dTargetGuide
   # target: [0.0457, 0.0458] # (3, 3)
