@@ -177,7 +177,7 @@ class PlotMazeRunner:
 						f"-scale#{str(scale)}"
 					print("generating ", f_name)
 					obs_list = self.generate(policy, cond={
-						0: np.array([2.,1.,0.,0.])
+						0: np.array([3.,1.,0.,0.])
 					}, batch_size=cfg.sample_num)
 					obs_list = self.norm(obs_list, renderer.env_name)
 					self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
@@ -202,8 +202,8 @@ class PlotMazeRunner:
 		
 
 	def generate(self, policy, cond, batch_size):
-		_, samples = policy(cond, batch_size=batch_size*10, verbose=False)
-		obs_list = samples.observations[:10]
+		_, samples = policy(cond, batch_size=batch_size, verbose=False)
+		obs_list = samples.observations[:batch_size]
 		return obs_list
 
 	def norm(self, obs_list, env_name):
@@ -235,7 +235,7 @@ class PlotMazeRunner:
 		for observations in obs_list:
 			path_length = len(observations)
 			colors = plt.cm.jet(np.linspace(0,1,path_length))
-			plt.plot(observations[:,1], observations[:,0], c='pink', zorder=10, alpha=0.5, lw=5.0)
+			plt.plot(observations[:,1], observations[:,0], c='black', zorder=10, alpha=0.5, lw=1.0)
 			# plot last point
 			# plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20)
 		# plot start and end

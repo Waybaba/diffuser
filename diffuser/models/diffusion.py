@@ -254,6 +254,40 @@ class GaussianDiffusion(nn.Module):
     def forward(self, cond, *args, **kwargs):
         return self.conditional_sample(cond, *args, **kwargs)
 
+class ScoreBasedDiffusion(GaussianDiffusion):
+    def p_losses(self, x_start, cond, t, **kwargs):
+        noise = torch.randn_like(x_start)
+        if APPLY_CONDITION == False:
+            cond = {} # ! DEBUG
+
+        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        x_noisy = apply_conditioning(x_noisy, cond, self.action_dim)
+
+        score = self.model(x_noisy, cond, t)
+
+        x_recon = apply_conditioning(x_recon, cond, self.action_dim)
+        assert noise.shape == x_recon.shape
+
+
+        # ! DEBUG
+        if self.loss_beta_weight: 
+            weight = extract(self.sqrt_one_minus_alphas_cumprod, t, [1]).to(x_start.device)
+        else:
+            weight = None
+        # ! DEBUG
+
+        if self.predict_epsilon:
+            loss, info = self.loss_fn(x_recon, noise, weight, **kwargs)
+        else:
+            loss, info = self.loss_fn(x_recon, x_start, weight, **kwargs)
+
+        return loss, info
+
+
+    def loss(self, x, *args, **kwargs):
+        batch_size = len(x)
+        t = torch.rand(batch_size, device=x.device) * (1. - 1e-5) + 1e-5
+        return self.p_losses(x, *args, t, **kwargs)
 
 
 class ValueDiffusion(GaussianDiffusion):

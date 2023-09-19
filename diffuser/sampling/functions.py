@@ -46,6 +46,7 @@ def n_step_guided_p_sample_freedom_timetravel(
     """
     !!! UNFINISHED
     travel_interval: [0.0,1.0]
+    
     travel_repeat: 1 # 1 means no travel
     betas = []
     horizon = 
@@ -82,10 +83,10 @@ def n_step_guided_p_sample_freedom_timetravel(
         if travel_i < travel_repeat-1:
             rand = torch.rand_like(x)
             travel_weight_x = (1-betas[t]).sqrt()
-            travel_weight_x[~(travel_interval[0]<=t<travel_interval[1])] = 1.0 # use this to cancel the effect of travel
+            travel_weight_x[~((travel_interval[0]<=t) & (t<travel_interval[1]))] = 1.0 # use this to cancel the effect of travel
             travel_weight_noise = betas[t].sqrt()
-            travel_weight_noise[~(travel_interval[0]<=t<travel_interval[1])] = 0.0 # use this to cancel the effect of travel
-            x = x * travel_weight_x + rand * travel_weight_noise
+            travel_weight_noise[~((travel_interval[0]<=t) & (t<travel_interval[1]))] = 0.0 # use this to cancel the effect of travel
+            x = x * travel_weight_x.unsqueeze(-1).unsqueeze(-1) + travel_weight_noise.unsqueeze(-1).unsqueeze(-1) * rand
             
         x = apply_conditioning(x, cond, model.action_dim)
 

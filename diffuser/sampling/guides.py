@@ -26,20 +26,6 @@ class Guide(nn.Module):
 	def metrics(self, x, **kwargs):
 		raise NotImplementedError
 
-class MultiGuide(Guide):
-	def __init__(self, guides):
-		super().__init__()
-		self.guides = guides
-	
-	def gradients(self, x, *args):
-		"""
-		return the gradients of the guide, input: x
-		"""
-		grads = []
-		for guide in self.guides:
-			grads.append(guide.gradients(x, *args))
-		return grads
-
 class ValueGuide(Guide):
 
 	def __init__(self, model):
@@ -69,6 +55,32 @@ class NoTrainGuide(Guide):
 		grad = torch.autograd.grad([y.sum()], [x])[0]
 		x.detach_()
 		return y, grad
+
+class MultiGuide(NoTrainGuide):
+	"""
+	guides: 
+		[{
+			weight:
+			guide: a Guide class
+		}]
+	"""
+	def __init__(self, guides):
+		super().__init__()
+		self.guides = guides
+	
+	def forward(self, x, cond, t):
+		output = 0.
+		weight_sum = sum([guide.weight for guide in self.guides])
+		for guide in self.guides:
+			output += guide.weight/weight_sum * guide.guide(x, cond, t)
+		return output
+
+	def metrics(self, x, **kwargs):
+		metrics = {}
+		for guide in self.guides:
+			metrics.update(guide.metrics(x, **kwargs))
+		return metrics
+
 
 ## Distance
 
