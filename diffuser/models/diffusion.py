@@ -163,7 +163,7 @@ class GaussianDiffusion(nn.Module):
 
         model_mean, posterior_variance, posterior_log_variance = self.q_posterior(
                 x_start=x_recon, x_t=x, t=t)
-        return model_mean, posterior_variance, posterior_log_variance
+        return model_mean, posterior_variance, posterior_log_variance, x_recon
 
     @torch.no_grad()
     def p_sample_loop(self, shape, cond, verbose=False, return_chain=False, sample_fn=default_sample_fn, **sample_kwargs):

@@ -64,6 +64,9 @@ def n_step_guided_p_sample_freedom_timetravel(
     model_std = torch.exp(0.5 * model_log_variance)
     model_var = torch.exp(model_log_variance)
 
+    model_mean, _, model_log_variance, x_recon = model.p_mean_variance(x=x, cond=cond, t=t)
+    x = x_recon.detach()
+
     for travel_i in range(travel_repeat):
         with torch.enable_grad():
             # x0_e = (1/np.sqrt(alphas_cumprod[t])) * (x+(1-alphas_cumprod[t]))
@@ -89,8 +92,10 @@ def n_step_guided_p_sample_freedom_timetravel(
             x = x * travel_weight_x.unsqueeze(-1).unsqueeze(-1) + travel_weight_noise.unsqueeze(-1).unsqueeze(-1) * rand
             
         x = apply_conditioning(x, cond, model.action_dim)
-
-    model_mean, _, model_log_variance = model.p_mean_variance(x=x, cond=cond, t=t)
+    
+    model_mean += scale * grad
+    
+    # model_mean, _, model_log_variance, x_recon = model.p_mean_variance(x=x, cond=cond, t=t)
 
     # no noise when t == 0
     noise = torch.randn_like(x)

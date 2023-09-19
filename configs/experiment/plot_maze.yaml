@@ -21,54 +21,69 @@ policy:
   n_guide_steps: 1 # ! does not used, only use one step + time travel
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   # grad_interval: [0.4,0.7]
-  # grad_interval: [0.1, 0.6]
-  grad_interval: [0.0, 0.3]
+  grad_interval: [0.0, 1.0]
+  # grad_interval: [0.0, 0.3]
   scale_grad_by_std: true
-  travel_repeat: 2 # time travel
+  travel_repeat: 1 # time travel
   travel_interval: [0.4,0.6] # if float, would use [horizon*travel_interval, horizon]
 
 mode: default # default: would only run once. local: would sweep over scale_list and guide_list
 
-sample_num: 1000
+sample_num: 100
 save_dir: ./debug/plot_maze
 scale: 100
 guide: 
-  _target_: diffuser.sampling.Maze2dTargetGuide
-  target: [0.0457, 0.0458] # (3, 3)
+  _target_: diffuser.sampling.Maze2dAvoidGuide
+  target: [0.0, .0] # (3, 3)
+  radius: 1.0
+  # target: [0.0457, 0.0458] # (3, 3)
   # target: [-0.8800, 0.5086] # (1, 4)
   # target: [-0.4172, -0.8800] # (2, 1)
   # target: [0.9714, -0.4171] # (5, 2)
   # target: [0.5086, 0.9714] # (4, 5)
-scale_list: [0.1, 1.0, 10.0, 100, 400, 1000,10000, -0.1, -1.0, -10.0, -100, -400, -1000, -10000]
+scale_list: [10.0, 100, 400, 1000, -10.0, -100, -400, -1000]
 # scale_list: [ 100, 200, 300, 400, 1000]
 # scale_list: [100000, -100000]
 # scale_list: [0]
 guide_list: 
-  - _target_: diffuser.sampling.Maze2dTargetGuide
-    target: [0.5086, 0.9714] # (4, 5)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
-  #   target: [0.0457, 0.0458] # (3, 3)
+  #   target: [0.5086, 0.9714] # (4, 5)
+  # - _target_: diffuser.sampling.Maze2dTargetGuide
+  #   target: [4.57, 4.58] # (3, 3)
+  - _target_: diffuser.sampling.Maze2dAvoidGuide
+    target: [0.0, .0] # (3, 3)
+    radius: 1.0
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [-0.8800, 0.5086] # (1, 4)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [0.9714, -0.4171] # (5, 2)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [0.5086, 0.9714] # (4, 5)
-  - _target_: diffuser.sampling.NoTrainGuideXLower
+  # - _target_: diffuser.sampling.NoTrainGuideXLower
   # - _target_: diffuser.sampling.NoTrainGuideXHigher
-  - _target_: diffuser.sampling.NoTrainGuideYLower
+  # - _target_: diffuser.sampling.NoTrainGuideYLower
   # - _target_: diffuser.sampling.NoTrainGuideYHigher
-  - _target_: diffuser.sampling.NoTrainGuideShorter
+  # - _target_: diffuser.sampling.NoTrainGuideShorter
   # - _target_: diffuser.sampling.NoTrainGuideLonger
   # - _target_: diffuser.sampling.DummyGuide
   # - _target_: diffuser.sampling.MultiGuide
   #   guides:
-  #     - weight: 1.0
-  #       guide:
-  #         _target_: diffuser.sampling.NoTrainGuideXHigher
-  #     - weight: 1.0
-  #       guide:
-  #         _target_: diffuser.sampling.NoTrainGuideYHigher
+      # - weight: 1.0
+      #   guide:
+      #     _target_: diffuser.sampling.NoTrainGuideXHigher
+      # - weight: 1.0
+      #   guide:
+      #     _target_: diffuser.sampling.NoTrainGuideYHigher
+      # - weight: 1.0
+      #   guide:
+      #     - _target_: diffuser.sampling.Maze2dTargetGuide
+      #     target: [1.0, 0.0] # (3, 3)
+      # - weight: 1.0
+      #   guide:
+      #     - _target_: diffuser.sampling.Maze2dAvoidGuide
+      #       target: [4.57, 4.58] # (3, 3)
+
+
 
 runner:
   _target_: src.runner.PlotMazeRunner

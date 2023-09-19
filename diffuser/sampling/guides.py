@@ -481,7 +481,7 @@ class Maze2dAvoidGuide(NoTrainGuide):
 	
 	def cal_value(self, x):
 		ACT_DIM = 2
-		RADIUS = 0.3
+		RADIUS = self.kwargs["radius"]
 
 		# Extract x, y coordinates for all time steps
 		pos_x = x[:, :, ACT_DIM+0]
@@ -494,7 +494,7 @@ class Maze2dAvoidGuide(NoTrainGuide):
 		total_distance = total_distance.sqrt() # (B, T)
 
 		# Only apply loss for positions within radius R of the target
-		mask = (total_distance <= RADIUS ** 2)
+		mask = (total_distance <= RADIUS)
 		
 		# Make sure the mask is float type
 		mask = mask.float()
