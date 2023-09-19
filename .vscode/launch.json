@@ -141,10 +141,10 @@
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
 				// ### mujoco
 				// "datamodule.dataset.env=halfcheetah-mixed",
-				"datamodule.dataset.env=walker2d-expert-v2",
+				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "datamodule.dataset.env=walker2d-mixed",
 				// ### act
-				// "datamodule.dataset.env=kuka",
+				"datamodule.dataset.env=kuka",
 			],
 		},
 		// eval

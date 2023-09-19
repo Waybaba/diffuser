@@ -28,7 +28,7 @@ def n_step_guided_p_sample(
         x = x + scale * grad
         x = apply_conditioning(x, cond, model.action_dim)
 
-    model_mean, _, model_log_variance = model.p_mean_variance(x=x, cond=cond, t=t)
+    model_mean, _, model_log_variance, _ = model.p_mean_variance(x=x, cond=cond, t=t)
 
     # no noise when t == 0
     noise = torch.randn_like(x)
