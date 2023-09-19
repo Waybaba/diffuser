@@ -52,7 +52,7 @@ guide_list:
   #   target: [4.57, 4.58] # (3, 3)
   - _target_: diffuser.sampling.Maze2dAvoidGuide
     target: [0.0, .0] # (3, 3)
-    radius: 1.0
+    # radius: 1.0
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [-0.8800, 0.5086] # (1, 4)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
