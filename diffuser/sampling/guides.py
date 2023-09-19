@@ -453,7 +453,10 @@ class Maze2dTargetGuide(NoTrainGuide):
 		pos_x = x[:, -1, ACT_DIM+0]
 		pos_y = x[:, -1, ACT_DIM+1]
 		total_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
-		total_distance = total_distance.sqrt() # comment this would lead to l2
+		if self.kwargs["distance_type"] == "l1":
+			total_distance = total_distance.sqrt() # comment this would lead to l2
+		else:
+			total_distance = total_distance.abs()
 		return total_distance
 	
 	def metrics(self, x, **kwargs):
