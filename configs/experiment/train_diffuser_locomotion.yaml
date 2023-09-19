@@ -40,8 +40,9 @@ modelmodule:
       n_guide_steps: 1 # ! does not used, only use one step + time travel
       t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
       scale_grad_by_std: true
-      travel_repeat: 1 # time travel
-      travel_interval: [0.0,1.0] # if float, would use [horizon*travel_interval, horizon]
+      grad_interval: [0.1, 1.0]
+      travel_repeat: 2 # time travel
+      travel_interval: [0.1,0.9] # if float, would use [horizon*travel_interval, horizon]
     plan_freq: 1.0
     guide:
       _target_: diffuser.sampling.DummyGuide

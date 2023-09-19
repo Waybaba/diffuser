@@ -24,8 +24,8 @@ policy:
   grad_interval: [0.0, 1.0]
   # grad_interval: [0.0, 0.3]
   scale_grad_by_std: true
-  travel_repeat: 1 # time travel
-  travel_interval: [0.4,0.6] # if float, would use [horizon*travel_interval, horizon]
+  travel_repeat: 2 # time travel
+  travel_interval: [0.1,0.9] # if float, would use [horizon*travel_interval, horizon]
 
 mode: default # default: would only run once. local: would sweep over scale_list and guide_list
 
@@ -36,23 +36,37 @@ guide:
   _target_: diffuser.sampling.Maze2dAvoidGuide
   target: [0.0, .0] # (3, 3)
   radius: 1.0
+  distance_type: l2
   # target: [0.0457, 0.0458] # (3, 3)
   # target: [-0.8800, 0.5086] # (1, 4)
   # target: [-0.4172, -0.8800] # (2, 1)
   # target: [0.9714, -0.4171] # (5, 2)
   # target: [0.5086, 0.9714] # (4, 5)
-scale_list: [10.0, 100, 400, 1000, -10.0, -100, -400, -1000]
-# scale_list: [ 100, 200, 300, 400, 1000]
+# scale_list: [10.0, 100, 400, 1000, -10.0, -100, -400, -1000]
+scale_list: [ 0.0, 100, 200, 300, 400, 1000]
 # scale_list: [100000, -100000]
 # scale_list: [0]
 guide_list: 
   # - _target_: diffuser.sampling.Maze2dTargetGuide
+  #   target: [0.0457, 0.0458] # (3, 3)
+  #   distance_type: l2
+  # - _target_: diffuser.sampling.Maze2dTargetGuide
+  #   target: [-0.8800, 0.5086] # (1, 4)
+  #   distance_type: l2
+  # - _target_: diffuser.sampling.Maze2dTargetGuide
+  #   target: [-0.4172, -0.8800] # (2, 1)
+  #   distance_type: l2
+  - _target_: diffuser.sampling.Maze2dTargetGuide
+    target: [0.9714, -0.4171] # (5, 2)
+    distance_type: l2
+  # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [0.5086, 0.9714] # (4, 5)
+  #   distance_type: l2
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [4.57, 4.58] # (3, 3)
-  - _target_: diffuser.sampling.Maze2dAvoidGuide
-    target: [0.0, .0] # (3, 3)
-    radius: 1.0
+  # - _target_: diffuser.sampling.Maze2dAvoidGuide
+  #   target: [0.0, .0] # (3, 3)
+  #   radius: 1.0
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [-0.8800, 0.5086] # (1, 4)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
