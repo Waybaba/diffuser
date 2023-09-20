@@ -177,7 +177,7 @@ class PlotMazeRunner:
 						f"-scale#{str(scale)}"
 					print("generating ", f_name)
 					obs_list = self.generate(policy, cond={
-						0: np.array([3.,3.,-2.,-2.])
+						0: np.array([5.,2.,-0.,-0.])
 					}, batch_size=cfg.sample_num)
 					obs_list = self.norm(obs_list, renderer.env_name)
 					self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
@@ -192,7 +192,7 @@ class PlotMazeRunner:
 				f"-scale#{str(scale)}"
 			print("generating ", f_name)
 			obs_list = self.generate(policy, cond={
-				0: np.array([1.,4.,0.,0.])
+				0: np.array([2.,5.,0.,0.])
 			}, batch_size=cfg.sample_num)
 			obs_list = self.norm(obs_list, renderer.env_name)
 			img = self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
@@ -230,38 +230,50 @@ class PlotMazeRunner:
 		fig = plt.gcf()
 		fig.set_size_inches(5, 5)
 		plt.ioff()
-		plt.imshow(renderer._background * .5,
+		plt.imshow(renderer._background * 0.95,
 			extent=renderer._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
 		# for each grid, plot a square which is slightly smaller than the grid
 		# the total size is [-1, 1] for both x and y
 		SIZE = 7
+		GRID_LEN = 1 / SIZE
+		GRID_FILL = 0.9
 		for i in range(SIZE):
 			for j in range(SIZE):
 				# Calculate grid corner coordinates assuming total size is [-1, 1] for both x and y
-				x_min = i / SIZE
-				y_min = j / SIZE
-				
+				x_min = i * GRID_LEN + (1 - GRID_FILL) * GRID_LEN / 2
+				y_min = j * GRID_LEN + (1 - GRID_FILL) * GRID_LEN / 2
 				# Plot square that is slightly smaller than the grid (0.38x0.38)
-				rect = plt.Rectangle((x_min, y_min), 0.9 / SIZE, 0.9 / SIZE, linewidth=0, edgecolor='none', facecolor='black', alpha=0.1)
+				rect = plt.Rectangle((x_min, y_min), GRID_FILL * GRID_LEN, GRID_FILL * GRID_LEN, linewidth=0, edgecolor='none', facecolor='black', alpha=0.1)
 				plt.gca().add_patch(rect)
 
-		for observations in obs_list:
+		# random select 10
+		NUM_LINE = 20
+		for observations in np.array(obs_list)[np.random.choice(len(obs_list), NUM_LINE, replace=False)]:
 			path_length = len(observations)
-			colors = plt.cm.jet(np.linspace(0,1,path_length))
-			plt.plot(observations[:,1], observations[:,0], c='black', zorder=10, alpha=0.5, lw=1.0)
+			colors = plt.cm.jet(np.linspace(1,0,path_length))
+			# colors =sns.color_palette("husl", 8)
+			# import seaborn as sns
+			# colors = sns.color_palette("Paired", 12)
+			plt.plot(observations[:,1], observations[:,0], c='white', zorder=10, alpha=1.0, lw=10.0) # bg
+			# plt.plot(observations[:,1], observations[:,0], c='black', zorder=11, alpha=1.0, lw=5.0)
+			# plt.plot(observations[:,1], observations[:,0], c='black', zorder=11, alpha=1.0, lw=5.0)
+			plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20, s=60, alpha=1.0, edgecolors='none') # colorful
 			# plot last point
-			# plt.scatter(observations[:,1], observations[:,0], c=colors, zorder=20)
+			
 		# plot start and end
 		starts = [obs[0] for obs in obs_list]
 		ends = [obs[-1] for obs in obs_list]
-		plt.scatter(np.array(ends)[:,1], np.array(ends)[:,0], c='none', zorder=20, s=20, alpha=0.5, edgecolors='red')
-		plt.scatter(np.array(starts)[:,1], np.array(starts)[:,0], c='green', zorder=30, s=20)
+		plt.scatter(np.array(ends)[:,1], np.array(ends)[:,0], c='red', zorder=50, s=100, alpha=1.0, edgecolors='white', linewidths=2, marker="o")
+		plt.scatter(np.array(starts)[:,1], np.array(starts)[:,0], c='green', zorder=50, s=300, edgecolors="white", linewidths=2, marker="*")
 		# save
+		MARGIN = 0.02
+		plt.xlim(GRID_LEN-MARGIN, 1-GRID_LEN+MARGIN)
+		plt.ylim(GRID_LEN-MARGIN, 1-GRID_LEN+MARGIN)
 		plt.axis('off')
 		# make dir for save_path parent if not exist
 		save_dir = Path(save_path).parent
 		save_dir.mkdir(parents=True, exist_ok=True)
-		plt.savefig(save_path, bbox_inches='tight', pad_inches=0)	
+		plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
 		# return rgb array
 		from diffuser.utils.rendering import plot2img
 		return plot2img(fig, remove_margins=False)
