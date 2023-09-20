@@ -24,7 +24,7 @@ policy:
   grad_interval: [0.0, 1.0]
   # grad_interval: [0.0, 0.3]
   scale_grad_by_std: true
-  travel_repeat: 2 # time travel
+  travel_repeat: 1 # time travel
   travel_interval: [0.1,0.9] # if float, would use [horizon*travel_interval, horizon]
 
 mode: default # default: would only run once. local: would sweep over scale_list and guide_list
@@ -56,17 +56,17 @@ guide_list:
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [-0.4172, -0.8800] # (2, 1)
   #   distance_type: l2
-  - _target_: diffuser.sampling.Maze2dTargetGuide
-    target: [0.9714, -0.4171] # (5, 2)
-    distance_type: l2
+  # - _target_: diffuser.sampling.Maze2dTargetGuide
+  #   target: [0.9714, -0.4171] # (5, 2)
+  #   distance_type: l2
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [0.5086, 0.9714] # (4, 5)
   #   distance_type: l2
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [4.57, 4.58] # (3, 3)
-  # - _target_: diffuser.sampling.Maze2dAvoidGuide
-  #   target: [0.0, .0] # (3, 3)
-  #   radius: 1.0
+  - _target_: diffuser.sampling.Maze2dAvoidGuide
+    target: [-0.8800, 0.5086] # (1, 4)
+    radius: 0.5
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [-0.8800, 0.5086] # (1, 4)
   # - _target_: diffuser.sampling.Maze2dTargetGuide

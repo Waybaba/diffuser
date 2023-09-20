@@ -177,7 +177,7 @@ class PlotMazeRunner:
 						f"-scale#{str(scale)}"
 					print("generating ", f_name)
 					obs_list = self.generate(policy, cond={
-						0: np.array([3.,1.,0.,0.])
+						0: np.array([3.,3.,-2.,-2.])
 					}, batch_size=cfg.sample_num)
 					obs_list = self.norm(obs_list, renderer.env_name)
 					self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
@@ -232,6 +232,19 @@ class PlotMazeRunner:
 		plt.ioff()
 		plt.imshow(renderer._background * .5,
 			extent=renderer._extent, cmap=plt.cm.binary, vmin=0, vmax=1)
+		# for each grid, plot a square which is slightly smaller than the grid
+		# the total size is [-1, 1] for both x and y
+		SIZE = 7
+		for i in range(SIZE):
+			for j in range(SIZE):
+				# Calculate grid corner coordinates assuming total size is [-1, 1] for both x and y
+				x_min = i / SIZE
+				y_min = j / SIZE
+				
+				# Plot square that is slightly smaller than the grid (0.38x0.38)
+				rect = plt.Rectangle((x_min, y_min), 0.9 / SIZE, 0.9 / SIZE, linewidth=0, edgecolor='none', facecolor='black', alpha=0.1)
+				plt.gca().add_patch(rect)
+
 		for observations in obs_list:
 			path_length = len(observations)
 			colors = plt.cm.jet(np.linspace(0,1,path_length))

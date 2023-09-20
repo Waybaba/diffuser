@@ -436,12 +436,27 @@ class EnvEpisodeDataset(EnvDataset):
 			conditions = self.get_conditions(observations)
 			trajectories = torch.cat([actions, observations], axis=-1)
 			batch = EpisodeBatch(trajectories, conditions)
-		elif self.kwargs["mode"].startswith("interpolation") or self.kwargs["mode"].startswith("special%maze"):
+		elif self.kwargs["mode"].startswith("interpolation"):
 			"""
 			interpolation to make length == horizon
 			"""
 			start, end = self.indices[idx]
 			observations = self.dataset["observations"][start:end] # (T, obs_dim)
+			actions = self.dataset["actions"][start:end]
+			T = observations.shape[0]
+			observations = self.interpolate_data(observations, self.kwargs["horizon"])
+			actions = self.interpolate_data(actions, self.kwargs["horizon"])
+			conditions = self.get_conditions(observations)
+			trajectories = torch.cat([actions, observations], axis=-1)
+			batch = EpisodeBatch(trajectories, conditions)
+		elif self.kwargs["mode"].startswith("special%maze"):
+			"""
+			interpolation to make length == horizon
+			"""
+			start, end = self.indices[idx]
+			observations = self.dataset["observations"][start:end] # (T, obs_dim)
+			# turn the last 2 dim of obs to zero
+			observations[:, -2:] = 0. # ! Turn vel to zero for diverse predict
 			actions = self.dataset["actions"][start:end]
 			T = observations.shape[0]
 			observations = self.interpolate_data(observations, self.kwargs["horizon"])
