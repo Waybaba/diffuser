@@ -149,8 +149,6 @@ def n_step_guided_p_sample_freedom_timetravel(
 
         if grad_interval is not None:
             grad[~((grad_interval[0]<=t) & (t<grad_interval[1]))] = 0
-        else:
-            grad[t < t_stopgrad] = 0 # use this to cancel the effect of guide
         
         # ! DEBUG # add this would make the first and target step have no gradient? really? only make the first step more fixed
         model_mean = apply_conditioning(model_mean, cond, model.action_dim)

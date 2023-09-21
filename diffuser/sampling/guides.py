@@ -149,20 +149,6 @@ class NoTrainGuideHalfLonger(NoTrainGuideDistance):
 	SHORTER = False
 	HALF = True
 
-class DummyGuide(NoTrainGuideShorter):
-	"""
-	always return 0
-	"""
-	SHORTER = False
-	HALF = False
-
-	def forward(self, x, cond, t):
-		total_distance = self.cal_distance(x)
-		
-		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
-		if self.SHORTER: return -total_distance * 0
-		else: return total_distance *  0.0
-
 ## Average coordinate
 
 class NoTrainGuideAvgCoordinate(NoTrainGuide):
@@ -422,6 +408,28 @@ class Walker2DSlower(MujocoFaster):
 	INDEX = 14
 
 
+class DummyGuide(SingleValueGuide):
+	"""
+	always return 0
+	"""
+	LOWER = True
+	INDEX = 0
+	NAME = "none"
+
+	def forward(self, x, cond, t):
+		return super().forward(x, cond, t) * 0
+	
+	def metrics(self, x, **kwargs):
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		res = {}
+		if x.shape[2] >= 14:
+			res["speed"] = x[:, :, 14].mean(dim=1)
+		if x.shape[2] >= 6:
+			res["height"] = x[:, :, 6].mean(dim=1)
+		if x.shape[2] >= 15:
+			res["vz"] = x[:, :, 15].mean(dim=1)
+		return res
+
 ## Maze
 class Maze2dTargetGuide(NoTrainGuide):
 	def __init__(self, target=[0.0457, 0.0458], **kwargs):
@@ -453,6 +461,94 @@ class Maze2dTargetGuide(NoTrainGuide):
 		pos_x = x[:, -1, ACT_DIM+0]
 		pos_y = x[:, -1, ACT_DIM+1]
 		total_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
+		if self.kwargs["distance_type"] == "l1":
+			total_distance = total_distance.sqrt() # comment this would lead to l2
+		else:
+			total_distance = total_distance.abs()
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+class Maze2dTargetXGuide(NoTrainGuide):
+	def __init__(self, target=0.0457, **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		ACT_DIM = 2
+		# z = x[:, :, ACT_DIM+0] # height
+		# vx = x[:, :, ACT_DIM+8] # v horizontal
+		# vz = x[:, :, ACT_DIM+9] # v vertical/height
+		pos_x = x[:, -1, ACT_DIM+0]
+		pos_y = x[:, -1, ACT_DIM+1]
+		total_distance = (pos_x - self.kwargs["target"]) ** 2
+		if self.kwargs["distance_type"] == "l1":
+			total_distance = total_distance.sqrt() # comment this would lead to l2
+		else:
+			total_distance = total_distance.abs()
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+class Maze2dTargetYGuide(NoTrainGuide):
+	def __init__(self, target=0.0457, **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		ACT_DIM = 2
+		# z = x[:, :, ACT_DIM+0] # height
+		# vx = x[:, :, ACT_DIM+8] # v horizontal
+		# vz = x[:, :, ACT_DIM+9] # v vertical/height
+		pos_x = x[:, -1, ACT_DIM+0]
+		pos_y = x[:, -1, ACT_DIM+1]
+		total_distance = (pos_y - self.kwargs["target"]) ** 2
 		if self.kwargs["distance_type"] == "l1":
 			total_distance = total_distance.sqrt() # comment this would lead to l2
 		else:

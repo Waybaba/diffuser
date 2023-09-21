@@ -198,7 +198,9 @@ class PlotMazeRunner:
 			img = self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
 			self.observations2fig(obs_list, Path(cfg.output_dir)/f"{f_name}.png", renderer)
 			print(f"save to {Path(cfg.save_dir)/f'{f_name}.png'}")
-			wandb.log({"maze": wandb.Image(img)}, commit=True)
+			# wandb.log({"maze": wandb.Image(img)}, commit=True)
+			# change x,y direction
+			wandb.log({"maze": wandb.Image(img.transpose(1,0,2))}, commit=True)
 		
 
 	def generate(self, policy, cond, batch_size):
@@ -263,8 +265,8 @@ class PlotMazeRunner:
 		# plot start and end
 		starts = [obs[0] for obs in obs_list]
 		ends = [obs[-1] for obs in obs_list]
-		plt.scatter(np.array(ends)[:,1], np.array(ends)[:,0], c='red', zorder=50, s=100, alpha=1.0, edgecolors='white', linewidths=2, marker="o")
-		plt.scatter(np.array(starts)[:,1], np.array(starts)[:,0], c='green', zorder=50, s=300, edgecolors="white", linewidths=2, marker="*")
+		plt.scatter(np.array(ends)[:,1], np.array(ends)[:,0], c='red', zorder=50, s=100, alpha=0.9, edgecolors='white', linewidths=2, marker="o") # end
+		plt.scatter(np.array(starts)[:,1], np.array(starts)[:,0], c='green', zorder=50, s=300, edgecolors="white", linewidths=2, marker="*") # start
 		# save
 		MARGIN = 0.02
 		plt.xlim(GRID_LEN-MARGIN, 1-GRID_LEN+MARGIN)

@@ -456,7 +456,7 @@ class EnvEpisodeDataset(EnvDataset):
 			start, end = self.indices[idx]
 			observations = self.dataset["observations"][start:end] # (T, obs_dim)
 			# turn the last 2 dim of obs to zero
-			observations[:, -2:] = 0. # ! Turn vel to zero for diverse predict
+			# observations[:, -2:] = 0. # ! Turn vel to zero for diverse predict
 			actions = self.dataset["actions"][start:end]
 			T = observations.shape[0]
 			observations = self.interpolate_data(observations, self.kwargs["horizon"])
