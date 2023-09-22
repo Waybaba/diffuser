@@ -407,7 +407,6 @@ class Walker2DFaster(MujocoFaster):
 class Walker2DSlower(MujocoFaster):
 	INDEX = 14
 
-
 class DummyGuide(SingleValueGuide):
 	"""
 	always return 0

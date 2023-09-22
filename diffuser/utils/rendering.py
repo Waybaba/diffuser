@@ -34,6 +34,8 @@ def env_map(env_name):
         return 'HopperFullObs-v2'
     elif 'walker2d' in env_name:
         return 'Walker2dFullObs-v2'
+    elif 'kitchen' in env_name:
+        return "FrankaKitchen-v1"
     else:
         return env_name
 
@@ -345,6 +347,8 @@ class MuJoCoRenderer(Renderer):
     def __init__(self, env):
         if type(env) is str:
             env = env_map(env)
+            if env.lower().startswith("kitchen"):
+                import gymnasium as gym
             self.env = gym.make(env)
         else:
             self.env = env

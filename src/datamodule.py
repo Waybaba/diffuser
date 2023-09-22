@@ -79,19 +79,22 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert "maze" in env or "halfcheetah" in env or "kuka" in env or "walker2d" in env or "hopper" in env, "maze envs not supported, since d4rl does not provide terminal"
+		assert [env.startswith(v) for v in ["maze", "walker2d", "hopper", "halfcheetah", "kitchen"]].count(True) == 1, f"env {env} not supported"
 
 		### get dataset (setup self.dataset, self.env)
 		self.env_name = env
 		if "kuka" in self.env_name:
 			self.env, self.dataset = load_kuka(self.env_name, custom_ds_path)
-		elif self.env_name.endswith("mixed"):
-			# e.g. halfcheetah-mixed
+		elif [self.env_name.endswith(suf) for suf in ["mixed", "random-expert"]].count(True) == 1:
+			# e.g. halfcheetah-mixed -> use all, halfcheetah-random-expert -> use random and expert
+			if self.env_name.endswith("mixed"):
+				ds_suffix_list = ["random", "medium", "expert"]
+			elif self.env_name.endswith("random-expert"):
+				ds_suffix_list = ["random", "expert"]
 			base_name = self.env_name.split("-")[0]
-			ds_suffix_list = ["random", "medium", "expert"]
 			ds_list = []
 			for suffix in ds_suffix_list:
-				env_name_ = base_name + "-" + suffix + "-v0"
+				env_name_ = base_name + "-" + suffix + "-v2"
 				env_ = load_environment(env_name_)
 				ds = env_.get_dataset()
 				ds_list.append(ds)
@@ -108,7 +111,7 @@ class EnvDataset:
 		### pre_process fns
 		assert preprocess_fns == "by_env", "only support by_env"
 		if "maze" in self.env_name: preprocess_fns = ["maze2d_set_terminals"]
-		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
+		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper", "kitchen"]].count(True) == 1: 
 			preprocess_fns = []
 		elif "kuka" in self.env_name: preprocess_fns = []
 		else: raise NotImplementedError("env not supported")
@@ -124,7 +127,7 @@ class EnvDataset:
 		### normalize
 		if normalizer == "by_env":
 			if "maze" in self.env_name: normalizer = "LimitsNormalizer"
-			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
+			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper", "kitchen"]].count(True) == 1: 
 				normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
 			elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
 			else: raise NotImplementedError(f"env {self.env_name} not supported")
@@ -154,6 +157,9 @@ class EnvDataset:
 		elif "kuka" in self.env_name:
 			from denoising_diffusion_pytorch.utils.rendering import KukaRenderer
 			self.renderer = KukaRenderer()
+		elif "kitchen" in self.env_name:
+			from diffuser.utils.rendering import MuJoCoRenderer
+			self.renderer = MuJoCoRenderer(self.env_name)
 		else:
 			raise NotImplementedError("env not supported")
 

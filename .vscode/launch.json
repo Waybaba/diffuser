@@ -55,13 +55,13 @@
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
-			"noDebug": true,
+			"noDebug": false,
 			"args": [
 				// "wandb.mode=disabled",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
-				"datamodule.dataset.env=walker2d-mixed",
-				// "datamodule.dataset.env=halfcheetah-medium-expert-v2",
+				// "datamodule.dataset.env=kitchen-complete-v0",
+				"datamodule.dataset.env=halfcheetah-random-expert",
 				// "datamodule.dataset.env=halfcheetah-mixed",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
