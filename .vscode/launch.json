@@ -170,7 +170,7 @@
 				// ### kuka
 				// "datamodule.dataset.env=kuka",
 				// ### minari
-				"datamodule.dataset.env=hammer-human-v1",
+				"datamodule.dataset.env=pen-human-v1",
 			],
 		},
 		// eval

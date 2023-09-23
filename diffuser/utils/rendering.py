@@ -596,6 +596,7 @@ class MarinaRenderer(MuJoCoRenderer):
         q_dim = qs_cur["qpos"].shape[0]
         qs_cur["qpos"] = np.concatenate([np.array([0.0]), observation[:q_dim-1]], axis=0)
         # qs_cur["qpos"] = np.concatenate([observation[:29], np.array([0.0])], axis=0)
+        if "target_pos" in qs_cur: del qs_cur["target_pos"]
         self.env.set_env_state(qs_cur)
 
         img = self.env.render() # h, w, 3
