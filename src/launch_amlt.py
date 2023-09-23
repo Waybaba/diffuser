@@ -96,7 +96,7 @@ target:
     name: msrresrchvc
 
 environment:
-    image: waybaba/rl:diffuser2
+    image: waybaba/rl:diffuser3
     username: waybaba
     setup:
         - echo "setup start..."
