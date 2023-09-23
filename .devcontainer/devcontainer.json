@@ -3,7 +3,7 @@
 	"context": ".",
 	"dockerFile": "Dockerfile",
 	"runArgs": [
-		"--name", "${localWorkspaceFolderBasename}--${localEnv:UDEVICEID}",
+		"--name", "${localWorkspaceFolderBasename}--${localEnv:UDEVICEID}-1",
 		"--gpus=all",
 		"--volume", "${localEnv:UDATADIR}:/data",
 		"--volume", "${localEnv:UPRJDIR}:/code",
@@ -19,7 +19,7 @@
 		"ms-python.python",
 		"GitHub.copilot",
 		"GitHub.vscode-pull-request-github",
-		// "ms-azuretools.vscode-docker",
+		"ms-azuretools.vscode-docker",
 	],
 	"settings": {
 		"lldb.adapterType": "native",

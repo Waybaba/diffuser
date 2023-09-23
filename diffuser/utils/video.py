@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import skvideo.io
+
 
 def _make_dir(filename):
     folder = os.path.dirname(filename)
@@ -10,7 +10,7 @@ def _make_dir(filename):
 def save_video(filename, video_frames, fps=60, video_format='mp4'):
     assert fps == int(fps), fps
     _make_dir(filename)
-
+    import skvideo.io
     skvideo.io.vwrite(
         filename,
         video_frames,

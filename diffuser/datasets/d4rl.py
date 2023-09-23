@@ -20,9 +20,8 @@ def suppress_output():
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
 
-with suppress_output():
-    ## d4rl prints out a variety of warnings
-    import d4rl
+
+import d4rl
 
 #-----------------------------------------------------------------------------#
 #-------------------------------- general api --------------------------------#
@@ -32,7 +31,11 @@ def load_environment(name):
     if type(name) != str:
         ## name is already an environment
         return name
-    with suppress_output():
+    if "kitchen" in name or "door" in name:
+        import gymnasium as gym
+        wrapped_env = gym.make(name)
+    else:
+        import gym
         wrapped_env = gym.make(name)
     env = wrapped_env.unwrapped
     env.max_episode_steps = wrapped_env._max_episode_steps

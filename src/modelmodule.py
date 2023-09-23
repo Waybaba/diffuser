@@ -281,6 +281,7 @@ def rollout_ref(env, ep_ref, model, normalizer):
 		# ! TODO have a check about this if equal
 	else:
 		s = env.reset()
+		if isinstance(s, tuple): s = s[0]
 
 	# run
 	ep_s = []
@@ -314,7 +315,12 @@ def rollout_ref(env, ep_ref, model, normalizer):
 			)
 		act = normalizer.unnormalize(act, "actions")
 		# act = ep_ref["act"][env_i] # ! DEBUG
-		s_, r, done, info = env.step(act)
+		tmp = env.step(act)
+		# s_, r, done, info 
+		if len(tmp) == 4: s_, r, done, info = tmp
+		else:
+			s_, r, ter, timeout, info = tmp
+			done = ter or timeout
 		ep_s.append(s)
 		ep_a.append(act)
 		ep_r.append(r)

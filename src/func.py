@@ -189,6 +189,30 @@ def load_kuka(env, custom_ds_path=None):
 	}
 	return env, dataset
 
+
+def minari_to_d4rl(dataset):
+	# ["observations", "actions", "terminals", "timeouts", "rewards"]
+	ep_list = [ep for ep in dataset.iterate_episodes()]
+	res = {}
+	if isinstance(ep_list[0].observations, dict):
+		res["observations"] = np.concatenate([ep.observations["observation"] for ep in ep_list], axis=0)
+	else:
+		res["observations"] = np.concatenate([ep.observations for ep in ep_list], axis=0)
+	res["actions"] = np.concatenate([ep.actions for ep in ep_list], axis=0)
+	res["terminals"] = np.concatenate([ep.terminations for ep in ep_list], axis=0)
+	res["timeouts"] = np.concatenate([ep.truncations for ep in ep_list], axis=0)
+	res["rewards"] = np.concatenate([ep.rewards for ep in ep_list], axis=0)
+	return res
+
+def load_minari(env):
+	import minari
+	import gymnasium as gym
+	minari.download_dataset(env)
+	dataset = minari.load_dataset(env)
+	env = dataset.recover_environment()
+	dataset = minari_to_d4rl(dataset)
+	return env, dataset
+
 def gen_with_same_cond(policy, episodes_ds):
 	"""
 	"""

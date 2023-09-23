@@ -1,0 +1,22 @@
+# @package _global_
+
+defaults:
+  - train_diffuser.yaml
+
+global_cfg:
+  horizon: 32
+
+datamodule:
+  batch_size: 256
+  dataset:
+    env: door-human-v1
+    mode: ep_multi_step%5 # ! multi_step%{step_num}, default
+
+modelmodule:
+  net:
+    diffusion:
+      n_timesteps: 20
+      # clip_denoised: true # ! different from maze in original paper
+    net: 
+      dim: 128
+      dim_mults: [1, 2, 4, 8]

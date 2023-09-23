@@ -12,6 +12,7 @@ import matplotlib.animation as animation
 import gym
 import mujoco_py as mjc
 from typing import List, Dict, Union, Any
+from copy import deepcopy
 
 # Local Application/Library Specific Imports
 from .arrays import to_np
@@ -36,6 +37,14 @@ def env_map(env_name):
         return 'Walker2dFullObs-v2'
     elif 'kitchen' in env_name:
         return "FrankaKitchen-v1"
+    elif 'door' in env_name:
+        return "AdroitHandDoor-v1"
+    elif 'hammer' in env_name:
+        return "AdroitHammer-v1"
+    elif 'pen' in env_name:
+        return "AdroitHandPen-v1"
+    elif 'relocate'in env_name:
+        return "AdroitHandRelocate-v1"
     else:
         return env_name
 
@@ -347,13 +356,16 @@ class MuJoCoRenderer(Renderer):
     def __init__(self, env):
         if type(env) is str:
             env = env_map(env)
-            if env.lower().startswith("kitchen"):
-                import gymnasium as gym
+            import gym
             self.env = gym.make(env)
         else:
             self.env = env
         ## - 1 because the envs in renderer are fully-observed
-        self.observation_dim = np.prod(self.env.observation_space.shape) - 1
+        if self.env.observation_space.shape is None:
+            obs_shape = self.env.observation_space.spaces["observation"].shape
+        else:
+            obs_shape = self.env.observation_space.shape
+        self.observation_dim = np.prod(obs_shape) - 1
         self.action_dim = np.prod(self.env.action_space.shape)
         try:
             self.viewer = mjc.MjRenderContextOffscreen(self.env.sim)
@@ -529,7 +541,128 @@ class MuJoCoRenderer(Renderer):
     def __call__(self, *args, **kwargs):
         return self.renders(*args, **kwargs)
 
+class MarinaRenderer(MuJoCoRenderer):
+    def __init__(self, env):
+        if type(env) is str:
+            env = env_map(env)
+            import gymnasium as gym
+            self.env = gym.make(env, render_mode="rgb_array")
+        else:
+            self.env = env
+        ## - 1 because the envs in renderer are fully-observed
+        if self.env.observation_space.shape is None:
+            obs_shape = self.env.observation_space.spaces["observation"].shape
+        else:
+            obs_shape = self.env.observation_space.shape
+        self.observation_dim = np.prod(obs_shape)
+        self.action_dim = np.prod(self.env.action_space.shape)
+        self.env.reset()
 
+    def render(self, observation, dim=256, partial=False, qvel=True, render_kwargs=None, conditions=None):
+
+        if type(dim) == int:
+            dim = (dim, dim)
+
+        # if self.viewer is None:
+        #     return np.zeros((*dim, 3), np.uint8)
+
+        # if render_kwargs is None:
+        #     xpos = observation[0] if not partial else 0
+        #     render_kwargs = {
+        #         'trackbodyid': 2,
+        #         'distance': 3,
+        #         'lookat': [xpos, -0.5, 1],
+        #         'elevation': -20
+        #     }
+
+        # for key, val in render_kwargs.items():
+        #     if key == 'lookat':
+        #         self.viewer.cam.lookat[:] = val[:]
+        #     else:
+        #         setattr(self.viewer.cam, key, val)
+
+        if partial:
+            state = self.pad_observation(observation)
+        else:
+            state = observation
+
+        # qpos_dim = self.env.sim.data.qpos.size
+        # if not qvel or state.shape[-1] == qpos_dim:
+        #     qvel_dim = self.env.sim.data.qvel.size
+        #     state = np.concatenate([state, np.zeros(qvel_dim)])
+
+        qs_cur = self.env.get_env_state()
+        qs_cur = deepcopy(qs_cur)
+        q_dim = qs_cur["qpos"].shape[0]
+        qs_cur["qpos"] = np.concatenate([np.array([0.0]), observation[:q_dim-1]], axis=0)
+        # qs_cur["qpos"] = np.concatenate([observation[:29], np.array([0.0])], axis=0)
+        self.env.set_env_state(qs_cur)
+
+        img = self.env.render() # h, w, 3
+        # # save img to ./debug/test.png
+        # import imageio
+        # imageio.imsave("./debug/test.png", img)
+        # print("saved img to ./debug/test.png")
+        # sample to 50,50,3
+        img = img[::5, ::5, :]
+        return img
+
+    def pad_observations(self, observations):
+        # cur_state = self.env.unwrapped.get_env_state()
+        # qpos_dim = cur_state["qvel"].size
+        # # qpos_dim = self.env.sim.data.qpos.size
+        # ## xpos is hidden
+        # xvel_dim = qpos_dim - 1
+        # xvel = observations[:, xvel_dim]
+        # xpos = np.cumsum(xvel) * self.env.dt
+        # states = np.concatenate([
+        #     xpos[:,None],
+        #     observations,
+        # ], axis=-1)
+        return observations
+
+    def renders(self, observations, **kwargs):
+        # origin fro diffuser (render n images)
+        images = [] 
+        for observation in observations:
+            img = self.render(observation, **kwargs)
+            images.append(img)
+        # return np.stack(images, axis=0)
+        images = np.concatenate(images, axis=1)
+
+
+        # if partial:
+        #     samples = self.pad_observations(samples)
+        #     partial = False
+
+        # sample_images = self._renders(observations, partial=partial, **kwargs)
+
+        # composite = np.ones_like(sample_images[0]) * 255
+
+        # for img in sample_images:
+        #     mask = get_image_mask(img)
+        #     composite[mask] = img[mask]
+
+        return images
+    
+    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
+        images_res = []
+        # for path, kw in zipkw(paths, **kwargs):
+            # img = self.renders(*path, conditions=conditions, **kw)
+        for path in paths:
+            img = self.renders(path)
+            images_res.append(img)
+        images = np.stack(images_res, axis=0)
+        
+        nrow = len(images) // ncol
+        images = einops.rearrange(images,
+            '(nrow ncol) H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
+
+        if savepath is not None:
+            imageio.imsave(savepath, images)
+            print(f'Saved {len(paths)} samples to: {savepath}')
+
+        return images
 #-----------------------------------------------------------------------------#
 #---------------------------------- rollouts ---------------------------------#
 #-----------------------------------------------------------------------------#

@@ -60,8 +60,8 @@
 				// "wandb.mode=disabled",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
-				// "datamodule.dataset.env=kitchen-complete-v0",
-				"datamodule.dataset.env=halfcheetah-random-expert",
+				// "datamodule.dataset.env=kitchen-complete-v1",
+				// "datamodule.dataset.env=halfcheetah-random-expert",
 				// "datamodule.dataset.env=halfcheetah-mixed",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
@@ -69,8 +69,32 @@
 				// "policy.scale_grad_by_std=true",
 				// "wandb.buf_dir=null",
 				// "env.delay=0",
-				// #### kuka
-				// "experiment=train_diffuser_kuka",
+			],
+		},
+		// entry.py
+		{
+			"name": "train_diffuser_minari",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"noDebug": false,
+			"args": [
+				// "wandb.mode=disabled",
+				// #### mujoco
+				"experiment=train_diffuser_minari",
+				"datamodule.dataset.env=door-human-v1",
+				"modelmodule.controller.turn_on=false",
+				// "datamodule.dataset.env=kitchen-complete-v1",
+				// "datamodule.dataset.env=halfcheetah-random-expert",
+				// "datamodule.dataset.env=halfcheetah-mixed",
+				// "+trainer.enable_progress_bar=False",
+				// "trainer.save_freq=10000", // save model and rollout
+				// "trainer.sample_freq=1000", // sample and redering
+				// "policy.scale_grad_by_std=true",
+				// "wandb.buf_dir=null",
+				// "env.delay=0",
 			],
 		},
 		{
@@ -143,8 +167,10 @@
 				// "datamodule.dataset.env=halfcheetah-mixed",
 				// "datamodule.dataset.env=walker2d-expert-v2",
 				// "datamodule.dataset.env=walker2d-mixed",
-				// ### act
-				"datamodule.dataset.env=kuka",
+				// ### kuka
+				// "datamodule.dataset.env=kuka",
+				// ### minari
+				"datamodule.dataset.env=hammer-human-v1",
 			],
 		},
 		// eval
