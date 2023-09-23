@@ -40,7 +40,7 @@ def env_map(env_name):
     elif 'door' in env_name:
         return "AdroitHandDoor-v1"
     elif 'hammer' in env_name:
-        return "AdroitHammer-v1"
+        return "AdroitHandHammer-v1"
     elif 'pen' in env_name:
         return "AdroitHandPen-v1"
     elif 'relocate'in env_name:
