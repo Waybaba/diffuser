@@ -162,6 +162,7 @@ class Renderer:
         
         for diff_t in range(0, diff_T, interval):
             chain_frames.append(self.episodes2img(chains[:, diff_t]))
+            if len(chain_frames[0].shape) == 4: return chain_frames[0] #   ! DEBUG already a video
 
         video = np.stack(chain_frames, axis=0)  # T, H, W, Ch
         video = video.transpose(0, 3, 1, 2)  # T, Ch, H, W

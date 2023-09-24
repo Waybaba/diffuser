@@ -959,9 +959,11 @@ class DiffuserModule(DefaultModule):
 		### log
 		LOG_PREFIX="val_ep_end"
 		to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
+
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb_media_wrapper(_) for _ in chain_samples]
 		to_log["samples"] = [wandb_media_wrapper(_) for _ in img_samples]
+		# to_log["sample_"] = wandb_media_wrapper(img_samples[0])
 		wandb.log({
 			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
 		}, commit=True)
