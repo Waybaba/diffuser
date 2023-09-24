@@ -792,12 +792,14 @@ class FillActModelModule(DefaultModule):
 		MAXSTEP = 100
 		states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
-		self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb_media_wrapper(
+		to_log = {}
+		to_log[f"{LOG_PREFIX}/ref"] = [wandb_media_wrapper(
 			self.dynamic_cfg["renderer"].episodes2img(states_ref[:4,:MAXSTEP])
-		)])
-		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb_media_wrapper(
+		)]
+		to_log[f"{LOG_PREFIX}/rollout"] = [wandb_media_wrapper(
 			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,:MAXSTEP])
-		)])
+		)]
+		wandb.log(to_log)
 	
 	def cal_ref_rollout_metrics(self, episodes_ref, episodes_rollout):
 		""" cal ref rollout metrics
