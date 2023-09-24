@@ -645,24 +645,38 @@ class MarinaRenderer(MuJoCoRenderer):
         #     composite[mask] = img[mask]
 
         return images
+
+    def renders_video(self, observations, **kwargs):
+        # origin fro diffuser (render n images)
+        images = [] 
+        for observation in observations:
+            img = self.render(observation, **kwargs)
+            images.append(img)
+        # return np.stack(images, axis=0)
+        images = np.stack(images, axis=0) # T, H, W, C
+        return images
     
     def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
         images_res = []
         # for path, kw in zipkw(paths, **kwargs):
             # img = self.renders(*path, conditions=conditions, **kw)
         for path in paths:
-            img = self.renders(path)
+            img = self.renders_video(path) # T, H, W, C
             images_res.append(img)
-        images = np.stack(images_res, axis=0)
+        images = np.stack(images_res, axis=0) # N, T, H, W, C
         
         nrow = len(images) // ncol
-        images = einops.rearrange(images,
-            '(nrow ncol) H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
+        # to video # (T, Ch, H, W) stack 4 in one
+        # images = einops.rearrange(images,
+        #     '(nrow ncol) T H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
+        images = einops.rearrange(images, 
+            '(nrow ncol) T H W Ch -> T Ch (nrow H) (ncol W)', nrow=nrow, ncol=ncol
+        )
 
-        if savepath is not None:
-            imageio.imsave(savepath, images)
-            print(f'Saved {len(paths)} samples to: {savepath}')
-
+        # if savepath is not None:
+        #     imageio.imsave(savepath, images)
+        #     print(f'Saved {len(paths)} samples to: {savepath}')
+        
         return images
 #-----------------------------------------------------------------------------#
 #---------------------------------- rollouts ---------------------------------#

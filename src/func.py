@@ -24,6 +24,13 @@ MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
 
 
 """Functions"""
+def wandb_media_wrapper(media):
+	if len(media.shape) == 4: # T, Ch, H, W
+		assert media.shape[1] in [3, 4], "Ch number wrong, shape is {media.shape}"
+		return wandb.Video
+	elif len(media.shape) == 3: # H, W, C
+		assert media.shape[2] in [3, 4], "Ch number wrong, shape is {media.shape}"
+		return wandb.Image
 
 def load_diffuser(dir_, epoch_):
 	print("\n\n\n### loading diffuser ...")

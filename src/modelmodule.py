@@ -21,6 +21,8 @@ import functools
 
 
 """functions"""
+
+
 def collect_parameters(model, set="all"):
 	""" Collect parameters from model depending on set.
 	Args: 
@@ -218,20 +220,20 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 	LOG_PREFIX = "val_ep_end"
 	# STEPS = min(len(episodes_rollout[0]["s"]), len(episodes_ds_rollout[0]["s"]), 32)
 	MAXSTEP = 200
-	to_log[f"{LOG_PREFIX}/states_ds"] = [wandb.Image(
+	to_log[f"{LOG_PREFIX}/states_ds"] = [wandb_media_wrapper(
 		renderer.episodes2img(states_ds[:4,:MAXSTEP])
 	)]
-	to_log[f"{LOG_PREFIX}/states_diffuser"] = [wandb.Image(
+	to_log[f"{LOG_PREFIX}/states_diffuser"] = [wandb_media_wrapper(
 		renderer.episodes2img(states_diffuser[:4,:MAXSTEP])
 	)]
 	if controller is not None:
-		to_log[f"{LOG_PREFIX}/states_ds_rollout"] = [wandb.Image(
+		to_log[f"{LOG_PREFIX}/states_ds_rollout"] = [wandb_media_wrapper(
 			renderer.episodes2img(states_ds_rollout[:4,:MAXSTEP])
 		)]
-		to_log[f"{LOG_PREFIX}/states_diffuser_rollout"] = [wandb.Image(
+		to_log[f"{LOG_PREFIX}/states_diffuser_rollout"] = [wandb_media_wrapper(
 			renderer.episodes2img(states_diffuser_rollout[:4,:MAXSTEP])
 		)]
-		to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb.Image(
+		to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb_media_wrapper(
 			renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
 		)]
 	return to_log
@@ -790,10 +792,10 @@ class FillActModelModule(DefaultModule):
 		MAXSTEP = 100
 		states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
-		self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb.Image(
+		self.wandb.log_image(f"{LOG_PREFIX}/ref", [wandb_media_wrapper(
 			self.dynamic_cfg["renderer"].episodes2img(states_ref[:4,:MAXSTEP])
 		)])
-		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb.Image(
+		self.wandb.log_image(f"{LOG_PREFIX}/rollout", [wandb_media_wrapper(
 			self.dynamic_cfg["renderer"].episodes2img(states_rollout[:4,:MAXSTEP])
 		)])
 	
@@ -956,10 +958,10 @@ class DiffuserModule(DefaultModule):
 			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
 		### log
 		LOG_PREFIX="val_ep_end"
-		to_log["ref"] = [wandb.Image(_) for _ in ref_samples]
+		to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
 		if chain_samples is not None: 
-			to_log["chain"] = [wandb.Video(_) for _ in chain_samples]
-		to_log["samples"] = [wandb.Image(_) for _ in img_samples]
+			to_log["chain"] = [wandb_media_wrapper(_) for _ in chain_samples]
+		to_log["samples"] = [wandb_media_wrapper(_) for _ in img_samples]
 		wandb.log({
 			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
 		}, commit=True)

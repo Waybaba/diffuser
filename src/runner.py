@@ -497,10 +497,10 @@ class PlanGuidedRunner:
 		guide_specific_metrics = guide.metrics(first_step_plan)
 		for key, value in guide_specific_metrics.items():
 			wandb_logs[f"final/first_step_plan_{key}"] = value[0].item()
-		wandb_logs["final/first_step_plan"] = wandb.Image(
+		wandb_logs["final/first_step_plan"] = wandb_media_wrapper(
 			self.renderer.episodes2img(first_step_plan[:4], path=Path(cfg.output_dir)/"first_step_plan.png")
 		)
-		wandb_logs["final/rollout"] = wandb.Image(img_rollout_sample)
+		wandb_logs["final/rollout"] = wandb_media_wrapper(img_rollout_sample)
 		wandb_logs["final/total_reward"] = total_reward
 		guide_specific_metrics = guide.metrics(np.stack(rollout)[None,:])
 		for key, value in guide_specific_metrics.items():

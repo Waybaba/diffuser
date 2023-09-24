@@ -159,7 +159,7 @@
 				"datamodule.dataset.multi_step=10",
 				// ### controller
 				// 
-				// "wandb.mode=disabled",
+				"wandb.mode=disabled",
 				// ### maze
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
