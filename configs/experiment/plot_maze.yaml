@@ -1,9 +1,9 @@
 # @package _global_
 
 diffuser:
-  # dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-15_04-01-29_903351/0
-  # dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-15_04-01-29_903351/0 # most often used
-  dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-16_17-16-54_339154/0
+  # dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-15_04-01-29_903351/0 # most often used, seems on 4edge
+  # dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-16_17-16-54_339154/0 # second choice
+  dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-21_04-13-28_616262/0 # after retrain with maze 100000
   epoch: last
 
 policy:
@@ -23,7 +23,7 @@ policy:
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   # grad_interval: [0.4,0.7]
   # grad_interval: [0.05, 1.0]
-  grad_interval: [0.05, 1.0]
+  grad_interval: [0.0, 1.0]
   scale_grad_by_std: true
   travel_repeat: 1 # time travel
   travel_interval: [0.4,0.6] # if float, would use [horizon*travel_interval, horizon]
@@ -44,19 +44,19 @@ guide:
   # target: [0.9714, -0.4171] # (5, 2)
   # target: [0.5086, 0.9714] # (4, 5)
 # scale_list: [10.0, 100, 400, 1000, -10.0, -100, -400, -1000]
-scale_list: [ 0.0, 100, 200, 300, 400, 1000, 2000, 4000, 10000]
+scale_list: [ 0.0, 10, 100, 200, 300, 400, 1000, 2000, 4000, 10000]
 # scale_list: [100000, -100000]
 # scale_list: [0]
 guide_list: 
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [0.0457, 0.0458] # (3, 3)
   #   distance_type: l2
-  - _target_: diffuser.sampling.Maze2dTargetGuide
-    target: [-0.9714, 0.5086] # (1, 5)
-    distance_type: l2
-  # - _target_: diffuser.sampling.Maze2dTargetXGuide
-  #   target: -1.0 # (1, 4)
+  # - _target_: diffuser.sampling.Maze2dTargetGuide
+  #   target: [-0.9714, 0.5086] # (1, 5)
   #   distance_type: l2
+  - _target_: diffuser.sampling.Maze2dTargetXGuide
+    target: -1.0 # (1, 4)
+    distance_type: l2
   # - _target_: diffuser.sampling.Maze2dTargetYGuide
   #   target: 1.0 # (1, 4)
   #   distance_type: l2
@@ -80,10 +80,10 @@ guide_list:
   #   target: [0.9714, -0.4171] # (5, 2)
   # - _target_: diffuser.sampling.Maze2dTargetGuide
   #   target: [0.5086, 0.9714] # (4, 5)
-  # - _target_: diffuser.sampling.NoTrainGuideXLower
-  # - _target_: diffuser.sampling.NoTrainGuideXHigher
+  - _target_: diffuser.sampling.NoTrainGuideXLower
+  - _target_: diffuser.sampling.NoTrainGuideXHigher
   # - _target_: diffuser.sampling.NoTrainGuideYLower
-  # - _target_: diffuser.sampling.NoTrainGuideYHigher
+  - _target_: diffuser.sampling.NoTrainGuideYHigher
   # - _target_: diffuser.sampling.NoTrainGuideShorter
   # - _target_: diffuser.sampling.NoTrainGuideLonger
   # - _target_: diffuser.sampling.DummyGuide
