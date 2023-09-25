@@ -789,7 +789,7 @@ class FillActModelModule(DefaultModule):
 		
 		### render
 		# STEPS = min(80, *[len(ep) for ep in episodes_ref])
-		MAXSTEP = 100
+		MAXSTEP = 1000
 		states_ref = np.stack([each["s"] for each in episodes_ref], axis=0)
 		states_rollout = np.stack([each["s"] for each in episodes_rollout], axis=0)
 		to_log = {}

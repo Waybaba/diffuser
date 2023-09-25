@@ -593,9 +593,9 @@ class MarinaRenderer(MuJoCoRenderer):
         #     state = np.concatenate([state, np.zeros(qvel_dim)])
 
         # ! DEBUG
-        self.env.reset()
-        s = self.env.step(self.env.action_space.sample())[0]
-        qpos = self.env.get_env_state()['qpos']
+        # self.env.reset()
+        # s = self.env.step(self.env.action_space.sample())[0]
+        # qpos = self.env.get_env_state()['qpos']
 
         qs_cur = self.env.get_env_state()
         qs_cur = deepcopy(qs_cur)
@@ -623,7 +623,7 @@ class MarinaRenderer(MuJoCoRenderer):
         # imageio.imsave("./debug/test.png", img)
         # print("saved img to ./debug/test.png")
         # sample to 50,50,3
-        img = img[::5, ::5, :]
+        img = img[::2, ::2, :]
         return img
 
     def pad_observations(self, observations):
