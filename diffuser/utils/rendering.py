@@ -592,10 +592,27 @@ class MarinaRenderer(MuJoCoRenderer):
         #     qvel_dim = self.env.sim.data.qvel.size
         #     state = np.concatenate([state, np.zeros(qvel_dim)])
 
+        # ! DEBUG
+        self.env.reset()
+        s = self.env.step(self.env.action_space.sample())[0]
+        qpos = self.env.get_env_state()['qpos']
+
         qs_cur = self.env.get_env_state()
         qs_cur = deepcopy(qs_cur)
         q_dim = qs_cur["qpos"].shape[0]
-        qs_cur["qpos"] = np.concatenate([np.array([0.0]), observation[:q_dim-1]], axis=0)
+        if 'pen' in self.env.unwrapped.spec.id.lower():
+            qs_cur["qpos"][:24] = observation[:24]
+            qs_cur["qpos"][24:] = 1e-9 # ? how about the pen position
+        elif 'hammer' in self.env.unwrapped.spec.id.lower():
+            qs_cur["qpos"][:26] = observation[:26]
+            qs_cur["qpos"][26:] = 1e-9
+        elif 'door' in self.env.unwrapped.spec.id.lower():
+            qs_cur["qpos"] = np.concatenate([np.array([0.0]), observation[:q_dim-1]], axis=0)
+        elif 'relocate' in self.env.unwrapped.spec.id.lower():
+            qs_cur["qpos"][:30] = observation[:30]
+            qs_cur["qpos"][30:q_dim] = 1e-10
+        else:
+            raise NotImplementedError(f"The mapping from s to qpos is not implemented yet. {self.env}")
         # qs_cur["qpos"] = np.concatenate([observation[:29], np.array([0.0])], axis=0)
         if "target_pos" in qs_cur: del qs_cur["target_pos"]
         self.env.set_env_state(qs_cur)
