@@ -84,7 +84,7 @@
 				// "wandb.mode=disabled",
 				// #### mujoco
 				"experiment=train_diffuser_minari",
-				"datamodule.dataset.env=pen-human-v1",
+				"datamodule.dataset.env=hammer-human-v1",
 				"modelmodule.controller.turn_on=false",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-random-expert",
@@ -187,6 +187,7 @@
 				"wandb.mode=disabled",
 				// "wandb.mode=online",
 				"policy.scale=1.0",
+				"plan_freq=1",
 				// ### maze
 				// "guide._target_=diffuser.sampling.NoTrainGuideXLower",
 				// "guide._target_=diffuser.sampling.Maze2dTargetGuide",

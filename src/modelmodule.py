@@ -165,7 +165,7 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 			policy, 
 			actor, 
 			normalizer_actor, 
-			plan_freq if isinstance(plan_freq, int) else max(int(plan_freq * model.horizon),1),
+			plan_freq if isinstance(plan_freq, int) else max(int(plan_freq * model.horizon)-1,1),
 		) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
 		episodes_ds_rollout = safefill_rollout(episodes_ds_rollout)
 		episodes_diffuser_rollout = safefill_rollout(episodes_diffuser_rollout)

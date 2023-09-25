@@ -123,7 +123,7 @@ def full_rollout_once(
 	
 	s = env.reset()
 	while True: 
-		if env_step - t_madeplan >= plan_freq:
+		if env_step - t_madeplan >= plan_freq: # note the max value is horizon - 1 instead of horizon, since the first step is current
 			plan = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
 			t_madeplan = env_step
 		a = make_act(actor, res["s"]+[s], plan, t_madeplan, normalizer_actor)

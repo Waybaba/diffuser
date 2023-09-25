@@ -28,7 +28,7 @@ policy:
     # _target_: diffuser.sampling.n_step_guided_p_sample
     _target_: diffuser.sampling.n_step_guided_p_sample_freedom_timetravel
     _partial_: true
-  scale: 1000
+  scale: 1.0
   n_guide_steps: 1 # ! does not used, only use one step + time travel
   t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
   scale_grad_by_std: true
@@ -36,7 +36,7 @@ policy:
   travel_repeat: 1 # time travel
   travel_interval: [0.0,1.0] # if float, would use [horizon*travel_interval, horizon]
 
-plan_freq: 1.0
+plan_freq: 2.0
 
 runner:
   _target_: src.runner.EvalRunner

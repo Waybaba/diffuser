@@ -595,26 +595,54 @@ class MarinaRenderer(MuJoCoRenderer):
         # ! DEBUG
         # self.env.reset()
         # s = self.env.step(self.env.action_space.sample())[0]
+        # qs = self.env.get_env_state()
         # qpos = self.env.get_env_state()['qpos']
 
         qs_cur = self.env.get_env_state()
         qs_cur = deepcopy(qs_cur)
         q_dim = qs_cur["qpos"].shape[0]
         if 'pen' in self.env.unwrapped.spec.id.lower():
-            qs_cur["qpos"][:24] = observation[:24]
-            qs_cur["qpos"][24:] = 1e-9 # ? how about the pen position
-        elif 'hammer' in self.env.unwrapped.spec.id.lower():
-            qs_cur["qpos"][:26] = observation[:26]
-            qs_cur["qpos"][26:] = 1e-9
+            qs_cur["qpos"][:-6] = observation[:q_dim-6] # qp[:-6]
+            qs_cur["qpos"][-6:-3] = observation[q_dim-6:q_dim-3]
+            qs_cur["qpos"][-3:] = observation[q_dim:q_dim+3]
+        elif 'hammer' in self.env.unwrapped.spec.id.lower(): # 33
+            qs_cur["qpos"][:-6] = observation[:q_dim-6] # qp[:-6]
+            # qs_cur["qpos"][-6:-3] = observation[q_dim:q_dim+3]#  ! TODO
+            # qs_cur["qpos"][-3:] = observation[q_dim+3:q_dim+6]#  ! TODO 
+            # qs_cur["qpos"][-6:] = observation[q_dim+3:q_dim+9]
+            qs_cur["qpos"][-6+0] = observation[q_dim+3+1]
+            qs_cur["qpos"][-6+1] = observation[q_dim+3+0]
+            qs_cur["qpos"][-6+2] = observation[q_dim+3+2]
+            qs_cur["qpos"][-6+0+3] = observation[q_dim+3+0+3]
+            qs_cur["qpos"][-6+1+3] = observation[q_dim+3+1+3]
+            qs_cur["qpos"][-6+2+3] = observation[q_dim+3+2+3]
+            # [26,27)       [33,36)     [36,42)         [42,45)
+            # nail_inser    palm_xyz    hammer_xyzrad   nail_xyz
+            # qs_cur['board_pos']
+            qs_cur['board_pos'] = observation[q_dim+9:q_dim+12]
         elif 'door' in self.env.unwrapped.spec.id.lower():
-            qs_cur["qpos"] = np.concatenate([np.array([0.0]), observation[:q_dim-1]], axis=0)
+            qs_cur["qpos"] = np.concatenate([ # 30
+                # observation[q_dim-1+1:q_dim+2], # ? seem to be some position
+                np.array([0.]),
+                observation[:q_dim-3],
+                observation[q_dim-2:q_dim-1], # door pos
+                observation[q_dim-3:q_dim-2], # latch pos
+            ], axis=0)
+            # qs_cur["door_body_pos"] = observation[q_dim-1+3:q_dim-1+3+3]
+            # [29,32)       [32,35)
+            # palm_xyz      handle_xyz
         elif 'relocate' in self.env.unwrapped.spec.id.lower():
-            qs_cur["qpos"][:30] = observation[:30]
-            qs_cur["qpos"][30:q_dim] = 1e-10
+            qs_cur["qpos"][:q_dim-6] = observation[:q_dim-6]
+            palm_minus_obj = observation[q_dim-6:q_dim-3]
+            palm_minus_tgt = observation[q_dim-3:q_dim]
+            obj_minus_tgt = observation[q_dim:q_dim+3]
+            # qs_cur["qpos"][q_dim-6:q_dim-3] no change
+            qs_cur["qpos"][q_dim-3:q_dim] = - palm_minus_obj + qs_cur["qpos"][q_dim-6:q_dim-3]
         else:
             raise NotImplementedError(f"The mapping from s to qpos is not implemented yet. {self.env}")
         # qs_cur["qpos"] = np.concatenate([observation[:29], np.array([0.0])], axis=0)
         if "target_pos" in qs_cur: del qs_cur["target_pos"]
+        if "hand_pos" in qs_cur: del qs_cur["hand_pos"]
         self.env.set_env_state(qs_cur)
 
         img = self.env.render() # h, w, 3
@@ -623,6 +651,28 @@ class MarinaRenderer(MuJoCoRenderer):
         # imageio.imsave("./debug/test.png", img)
         # print("saved img to ./debug/test.png")
         # sample to 50,50,3
+
+        ### ! DEBUG
+        # import imageio
+        # for idx in range(len(qs_cur["qpos"]))[-3:]:
+        #     for value in [-0.75,-.5,-0.25,0.0,0.25,0.5,.75,1.0]:
+        #         qtmp = deepcopy(qs_cur)
+        #         qtmp["qpos"][idx] = value
+        #         self.env.set_env_state(qtmp)
+        #         img = self.env.render() # h, w, 3
+        #         if not os.path.exists("./debug"): os.makedirs("./debug")
+        #         if not os.path.exists(f"./debug/{idx}"): os.makedirs(f"./debug/{idx}")
+        #         imageio.imsave(f"./debug/{idx}/test{value}.png", img)
+        #         print(f"./debug/{idx}/test{value}.png")
+
+        # # save img to ./debug/test.png
+        # import imageio
+        # imageio.imsave("./debug/test.png", img)
+        # print("saved img to ./debug/test.png")
+        # sample to 50,50,3
+
+
+
         img = img[::2, ::2, :]
         return img
 
