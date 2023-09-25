@@ -77,7 +77,7 @@ def full_rollout_once(
 		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
 		"""
 		s = history[-1]
-		s_ = plan[len(history)-1-t_madeplan] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
+		s_ = plan[len(history)-1-t_madeplan+1] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
 		model = actor
 		device = next(actor.parameters()).device
 		model.to(device)
