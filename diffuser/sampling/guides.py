@@ -526,7 +526,6 @@ class Walker2DFaster(MujocoFaster):
 class Walker2DSlower(MujocoSlower):
 	INDEX = 14
 
-
 class CheetahHigher(MujocoHigher):
 	INDEX = 6
 
@@ -566,6 +565,36 @@ class DummyGuide(SingleValueGuide):
 		if x.shape[2] >= 15:
 			res["vz"] = x[:, :, 15].mean(dim=1)
 		return res
+
+class DoorHingeHigher(SingleValueGuide):
+	LOWER = True
+	INDEX = 55
+	NAME = "hinge"
+
+class DoorHingeLower(SingleValueGuide):
+	LOWER = False
+	INDEX = 55
+	NAME = "hinge"
+
+class DoorOpen(SingleValueGuide):
+	LOWER = True
+	INDEX = 66
+	NAME = "open"
+
+class DoorClose(SingleValueGuide):
+	LOWER = False
+	INDEX = 66
+	NAME = "open"
+
+class DoorHandleHigher(SingleValueGuide):
+	LOWER = True
+	INDEX = 62
+	NAME = "handle"
+
+class DoorHandleLower(SingleValueGuide):
+	LOWER = False
+	INDEX = 62
+	NAME = "handle"
 
 ## Maze
 class Maze2dTargetGuide(NoTrainGuide):
