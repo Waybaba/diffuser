@@ -62,11 +62,13 @@
 				"experiment=train_diffuser_locomotion",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-random-expert",
-				// "datamodule.dataset.env=halfcheetah-mixed",
+				"datamodule.dataset.env=hopper-expert-v2",
+				"modelmodule.controller.turn_on=false",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
 				// "policy.scale_grad_by_std=true",
+				"global_cfg.horizon=512",
 				// "wandb.buf_dir=null",
 				// "env.delay=0",
 			],
@@ -159,7 +161,7 @@
 				"datamodule.dataset.multi_step=10",
 				// ### controller
 				// 
-				"wandb.mode=disabled",
+				"wandb.mode=online",
 				// ### maze
 				// "datamodule.dataset.env=maze2d-openlarge-v0",
 				// "datamodule.dataset.custom_ds_path=${paths.data_dir}/models/diffuser/d4rl_dataset/maze2d-openlarge-v0-10000000.hdf5",
@@ -197,7 +199,9 @@
 				// "controller.turn_on=true",
 				// ### mujoco
 				"guide._target_=diffuser.sampling.DummyGuide",
-				"diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
+				// /output/hydra_log/RL_Diffuser_Debug/runs/2023-09-27_00-35-01_337482
+				"diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/runs/2023-09-27_00-35-01_337482", // new hopper
+				// "diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-05_09-44-51_629629/",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/runs/2023-09-16_10-09-38_991193/",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser/runs/2023-09-15_12-01-26_063200/",
 				// "diffuser.dir=/output/hydra_log/RL_Diffuser_Debug/runs/2023-09-15_07-09-23_899677",
@@ -214,7 +218,7 @@
 			"program": "${workspaceFolder}/entry/entry.py",
 			"console": "integratedTerminal",
 			"justMyCode": true,
-			"noDebug": true,
+			"noDebug": false,
 			"args": [
 				"experiment=plot_maze",
 				"wandb.mode=disabled",

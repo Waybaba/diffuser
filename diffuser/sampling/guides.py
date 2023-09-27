@@ -221,6 +221,57 @@ class NoTrainGuideYHigher(NoTrainGuideAvgCoordinate):
 	LOWER = False
 	COORDINATE = 1
 
+class NoTrainGuideDirection(NoTrainGuide):
+	"""
+	Base class to make the average coordinate (x or y) lower or higher
+	"""
+
+	def forward(self, x, cond, t):
+		"""
+		Calculate average coordinate (x or y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x or y to calculate average coordinate
+		"""
+		avg_coordinate = self.cal_average_coordinate(x)
+
+		return avg_coordinate
+
+	def cal_average_coordinate(self, x):
+		"""
+		Calculate average coordinate (x or y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x or y to calculate average coordinate
+		"""
+		# Extract x or y coordinate
+		coord_x = x[:, :, 0+2]
+		coord_y = x[:, :, 1+2]
+		
+		# Compute average coordinate
+		avg_coordinate = - coord_x.mean(dim=1) + coord_y.mean(dim=1)
+
+		return avg_coordinate
+
+	def metrics(self, x, **kwargs):
+		"""
+		Calculate average coordinate (x and y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we use x and y to calculate average coordinates
+		"""
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		
+		avg_x = x[:, :, 0].mean(dim=1)
+		avg_y = x[:, :, 1].mean(dim=1)
+
+		return {
+			"avg_x": avg_x,
+			"avg_y": avg_y
+		}
+
+
 class NoTrainGuideRepeat(NoTrainGuide):
 	"""
 	Make two middle points become the same, so that it will go back
@@ -271,6 +322,74 @@ class NoTrainGuideRepeat(NoTrainGuide):
 			return {
 				"distance_repeat": distance
 			}
+
+class NoTrainGuideEndCoordinate(NoTrainGuide):
+	"""
+	Base class to make the average coordinate (x or y) lower or higher
+	"""
+	LOWER = None
+	COORDINATE = None
+
+	def forward(self, x, cond, t):
+		"""
+		Calculate average coordinate (x or y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x or y to calculate average coordinate
+		"""
+		avg_coordinate = self.cal_average_coordinate(x)
+
+		if self.LOWER is None: raise NotImplementedError("LOWER is not defined")
+		if self.COORDINATE is None: raise NotImplementedError("COORDINATE is not defined")
+		if self.LOWER: return - avg_coordinate
+		else: return avg_coordinate
+
+	def cal_average_coordinate(self, x):
+		"""
+		Calculate average coordinate (x or y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x or y to calculate average coordinate
+		"""
+		# Extract x or y coordinate
+		coord = x[:, -1, self.COORDINATE+2]
+
+		return coord
+
+	def metrics(self, x, **kwargs):
+		"""
+		Calculate average coordinate (x and y)
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we use x and y to calculate average coordinates
+		"""
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		
+		avg_x = x[:, :, 0].mean(dim=1)
+		avg_y = x[:, :, 1].mean(dim=1)
+
+		return {
+			"avg_x": avg_x,
+			"avg_y": avg_y
+		}
+
+class NoTrainGuideEndXLower(NoTrainGuideEndCoordinate):
+	LOWER = True
+	COORDINATE = 0
+
+class NoTrainGuideEndXHigher(NoTrainGuideEndCoordinate):
+	LOWER = False
+	COORDINATE = 0
+
+class NoTrainGuideEndYLower(NoTrainGuideEndCoordinate):
+	LOWER = True
+	COORDINATE = 1
+
+class NoTrainGuideEndYHigher(NoTrainGuideEndCoordinate):
+	LOWER = False
+	COORDINATE = 1
+
 
 ## Mujoco Distance
 class NoTrainGuideOffset(NoTrainGuide):
@@ -404,8 +523,27 @@ class HopperSlower(MujocoSlower):
 class Walker2DFaster(MujocoFaster):
 	INDEX = 14
 
-class Walker2DSlower(MujocoFaster):
+class Walker2DSlower(MujocoSlower):
 	INDEX = 14
+
+
+class CheetahHigher(MujocoHigher):
+	INDEX = 6
+
+class CheetahLower(MujocoLower):
+	INDEX = 6
+
+class HopperHigher(MujocoHigher):
+	INDEX = 3
+
+class HopperLower(MujocoLower):
+	INDEX = 3
+
+class Walker2DHigher(MujocoHigher):
+	INDEX = 7
+
+class Walker2DLower(MujocoLower):
+	INDEX = 7
 
 class DummyGuide(SingleValueGuide):
 	"""

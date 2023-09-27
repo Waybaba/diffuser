@@ -219,7 +219,7 @@ def eval_pair(diffuser, controller=None, policy_func=None, plan_freq=None, guide
 	### render
 	LOG_PREFIX = "val_ep_end"
 	# STEPS = min(len(episodes_rollout[0]["s"]), len(episodes_ds_rollout[0]["s"]), 32)
-	MAXSTEP = 200
+	MAXSTEP = 1000
 	to_log[f"{LOG_PREFIX}/states_ds"] = [wandb_media_wrapper(
 		renderer.episodes2img(states_ds[:4,:MAXSTEP])
 	)]

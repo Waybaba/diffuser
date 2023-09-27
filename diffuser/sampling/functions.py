@@ -140,13 +140,22 @@ def n_step_guided_p_sample_freedom_timetravel(
 
     for travel_i in range(travel_repeat):
         model_mean, _, model_log_variance, x_recon = model.p_mean_variance(x=x, cond=cond, t=t)
+        model_std = torch.exp(0.5 * model_log_variance)
+        model_var = torch.exp(model_log_variance)
         
         with torch.enable_grad():
             y, grad = guide.gradients(x_recon.detach(), cond, t)
 
         if scale_grad_by_std:
             grad = model_var * grad
-
+        else:
+            # grad: N, T, obs_dim
+            # model_std: N, 1, 1
+            # norm grad to have the same vector length as model_std
+            grad_mean = (grad*grad).mean(dim=[1,2], keepdim=True).sqrt()
+            grad = grad / grad_mean
+            grad = (1-torch.cumprod(betas,dim=0)[t]).sqrt().unsqueeze(-1).unsqueeze(-1) * grad
+            
         if grad_interval is not None:
             grad[~((grad_interval[0]<=t) & (t<grad_interval[1]))] = 0
         

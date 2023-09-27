@@ -400,11 +400,12 @@ class EnvEpisodeDataset(EnvDataset):
 			print("making indexes for valid episode-based multi-step ...")
 			ep_start = 0
 			for ep_end in tqdm(dones_idxes):
-				for i in range(ep_start, ep_end):
+				for i in range(ep_start, ep_end): # 101 200=doneTrue i=101
 					for inter in range(1, multi_step + 1):
-						item_end = i + self.kwargs["horizon"] * inter
-						invalid_start = ((ep_end-i) // inter) + 1
+						item_end = i + self.kwargs["horizon"] * inter # 200+101
+						invalid_start = ((ep_end-i) // inter) # 100
 						if item_end < full_len:
+							# 101, 301, 1, 100
 							indices.append([i, item_end, inter, invalid_start])
 				ep_start = ep_end + 1  # Move to the start of the next episode
 				if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)

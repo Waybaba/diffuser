@@ -15,7 +15,8 @@ from diffuser.sampling.guides import *
 
 """functions"""
 
-EVLA_START = [5.,3.,-0.,-0.]
+EVAL_START = [5.,2.,-0.,-0.]
+# EVAL_START = [3.,3.,-0.,-0.]
 
 """Runner"""
 class TrainDiffuserRunner:
@@ -179,7 +180,7 @@ class PlotMazeRunner:
 						f"-scale#{str(scale)}"
 					print("generating ", f_name)
 					obs_list = self.generate(policy, cond={
-						0: np.array(EVLA_START)
+						0: np.array(EVAL_START)
 					}, batch_size=cfg.sample_num)
 					obs_list = self.norm(obs_list, renderer.env_name)
 					self.observations2fig(obs_list, Path(cfg.save_dir)/f"{f_name}.png", renderer)
@@ -277,8 +278,8 @@ class PlotMazeRunner:
 		# make dir for save_path parent if not exist
 		save_dir = Path(save_path).parent
 		save_dir.mkdir(parents=True, exist_ok=True)
-		# plt.savefig(save_path, bbox_inches='tight', pad_inches=0, dpi=300)
-		plt.savefig(str(save_path).replace(".png", ".pdf"), bbox_inches='tight', pad_inches=0, dpi=300)
+		plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+		# plt.savefig(str(save_path).replace(".png", ".pdf"), bbox_inches='tight', pad_inches=0, dpi=300)
 		# return rgb array
 		from diffuser.utils.rendering import plot2img
 		return plot2img(fig, remove_margins=False)

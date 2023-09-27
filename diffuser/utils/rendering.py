@@ -382,6 +382,9 @@ class MuJoCoRenderer(Renderer):
         return state
 
     def pad_observations(self, observations):
+        """
+        intergrad to get the position info
+        """
         qpos_dim = self.env.sim.data.qpos.size
         ## xpos is hidden
         xvel_dim = qpos_dim - 1
@@ -394,7 +397,7 @@ class MuJoCoRenderer(Renderer):
         return states
 
     def render(self, observation, dim=256, partial=False, qvel=True, render_kwargs=None, conditions=None):
-
+        
         if type(dim) == int:
             dim = (dim, dim)
 
@@ -431,6 +434,7 @@ class MuJoCoRenderer(Renderer):
         self.viewer.render(*dim)
         data = self.viewer.read_pixels(*dim, depth=False)
         data = data[::-1, :, :]
+
         return data
 
     def _renders(self, observations, **kwargs):
@@ -440,26 +444,46 @@ class MuJoCoRenderer(Renderer):
             images.append(img)
         return np.stack(images, axis=0)
 
-    def renders(self, samples, partial=False, **kwargs):
-        if partial:
+    def renders(self, samples, partial=False, **kwargs):        
+        if partial: # True for mujoco, can add position
             samples = self.pad_observations(samples)
             partial = False
+        samples_ori = samples
 
+
+        samples = samples_ori
+        RENDER_FREQ = 16 # only render evey n steps
+        if "hopper" in self.env.unwrapped.spec.id.lower():
+            RENDER_FREQ = 8
+        elif "cheetah" in self.env.unwrapped.spec.id.lower():
+            RENDER_FREQ = 4
+        elif "walker2d" in self.env.unwrapped.spec.id.lower():
+            RENDER_FREQ = 8
+        COLOR_BASE_NUM = 10
+        samples = samples[::RENDER_FREQ]
         sample_images = self._renders(samples, partial=partial, **kwargs)
-
         composite = np.ones_like(sample_images[0]) * 255
 
-        for img in sample_images:
+        # rainbow colors
+        color_base = plt.cm.jet(np.linspace(0,1,COLOR_BASE_NUM))[:,:3] # [N, 3]
+        # colors = np.tile(color_base, (len(samples) // len(color_base)) + 1, axis=0)[:len(samples)]
+        colors = np.concatenate([color_base for _ in range((len(samples) // len(color_base)) +1)], axis=0)[:len(samples)]
+        for i, img in enumerate(sample_images): # [H, W, 3]
             mask = get_image_mask(img)
-            composite[mask] = img[mask]
-
+            color_board = np.ones_like(img)
+            color_board[:,:,0] = colors[i,0] * 255
+            color_board[:,:,1] = colors[i,1] * 255
+            color_board[:,:,2] = colors[i,2] * 255
+            composite[mask] = color_board[mask]
+        import imageio
+        imageio.imsave("./debug/render.png", composite)
         return composite
 
-    def composite(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
+    def composite(self, savepath, paths, conditions={}, dim=(4096, 256), ncol=1, **kwargs):
 
         render_kwargs = {
             'trackbodyid': 2,
-            'distance': 10,
+            'distance': 6,
             'lookat': [5, 2, 0.5],
             'elevation': 0
         }
