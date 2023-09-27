@@ -24,7 +24,7 @@ modelmodule:
     # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
     # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
     turn_on: false
-    dir: /output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0
+    dir: /output/hydra_log/RL_Diffuser_Debug/multiruns/2023-09-25_15-31-12_542816/0
     epoch: last
     policy:
       _target_: diffuser.sampling.GuidedPolicy

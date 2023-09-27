@@ -122,12 +122,17 @@ def full_rollout_once(
 	t_madeplan = -99999
 	
 	s = env.reset()
+	s = s[0] if isinstance(s, tuple) and len(s)==1 else s # for kuka env
 	while True: 
 		if env_step - t_madeplan >= plan_freq: # note the max value is horizon - 1 instead of horizon, since the first step is current
 			plan = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
 			t_madeplan = env_step
 		a = make_act(actor, res["s"]+[s], plan, t_madeplan, normalizer_actor)
-		s_, r, done, info = env.step(a)
+		env_res = env.step(a)
+		if len(env_res) == 4: s_, r, done, info = env_res
+		elif len(env_res) == 5: 
+			s_, r, terminal, timeout, info = env_res
+			done = terminal or timeout
 		s = s_
 		
 		res["act"].append(a)

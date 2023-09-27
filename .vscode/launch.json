@@ -86,8 +86,8 @@
 				// "wandb.mode=disabled",
 				// #### mujoco
 				"experiment=train_diffuser_minari",
-				"datamodule.dataset.env=hammer-human-v1",
-				"modelmodule.controller.turn_on=false",
+				"datamodule.dataset.env=door-human-v1",
+				"modelmodule.controller.turn_on=true",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-random-expert",
 				// "datamodule.dataset.env=halfcheetah-mixed",
