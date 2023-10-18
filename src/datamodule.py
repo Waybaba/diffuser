@@ -129,8 +129,11 @@ class EnvDataset:
 		### normalize
 		if normalizer == "by_env":
 			if "maze" in self.env_name: normalizer = "LimitsNormalizer"
-			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper", "hammer","door", "relocate","pen", "kitchen"]].count(True) == 1: 
+			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
 				normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
+			#  "hammer","door", "relocate","pen", "kitchen"
+			elif [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
+				normalizer = "DebugNormalizer"
 			elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
 			else: raise NotImplementedError(f"env {self.env_name} not supported")
 		else:
@@ -139,6 +142,8 @@ class EnvDataset:
 		self.action_dim = self.dataset['actions'].shape[1]
 		self.normalizer = DatasetNormalizerW(self.dataset, normalizer)
 		for k in ["observations", "actions"]:
+			# if [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
+			# 	if k == "actions": continue # ! for DEBUG
 			self.dataset[k] = self.normalizer.normalize(self.dataset[k], k)
 		
 		### put into GPU
