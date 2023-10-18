@@ -488,25 +488,34 @@ class SingleValueGuide(NoTrainGuide):
 				self.NAME: self.cal_value(x),
 			}
 
-class MujocoFaster(SingleValueGuide):
+class MujocoGuide(SingleValueGuide):
+	def cal_value(self, x):
+		if x.shape[-1] == 11: z = x[:, :, self.INDEX - 3] # hopper
+		elif x.shape[-1] == 17: z = x[:, :, self.INDEX - 6] # walker2d, helfcheetah
+		else: z = x[:, :, self.INDEX]
+		value = z.mean(dim=1)
+		return value
+
+class MujocoFaster(MujocoGuide):
 	LOWER = False
 	INDEX = 14
 	NAME = "speed"
 
-class MujocoSlower(SingleValueGuide):
+class MujocoSlower(MujocoGuide):
 	LOWER = True
 	INDEX = 14
 	NAME = "speed"
 
-class MujocoHigher(SingleValueGuide):
+class MujocoHigher(MujocoGuide):
 	LOWER = False
 	INDEX = 6
 	NAME = "height"
 
-class MujocoLower(SingleValueGuide):
+class MujocoLower(MujocoGuide):
 	LOWER = True
 	INDEX = 6
 	NAME = "height"
+
 
 class CheetahFaster(MujocoFaster):
 	INDEX = 14
@@ -539,10 +548,10 @@ class HopperLower(MujocoLower):
 	INDEX = 3
 
 class Walker2DHigher(MujocoHigher):
-	INDEX = 7
+	INDEX = 6
 
 class Walker2DLower(MujocoLower):
-	INDEX = 7
+	INDEX = 6
 
 class DummyGuide(SingleValueGuide):
 	"""
@@ -557,41 +566,89 @@ class DummyGuide(SingleValueGuide):
 	
 	def metrics(self, x, **kwargs):
 		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
-		res = {}
-		if x.shape[2] >= 14:
-			res["speed"] = x[:, :, 14].mean(dim=1)
-		if x.shape[2] >= 6:
-			res["height"] = x[:, :, 6].mean(dim=1)
-		if x.shape[2] >= 15:
-			res["vz"] = x[:, :, 15].mean(dim=1)
+		# guess vel dim
+		MUJOCO_INFOS = [
+			{
+				"name": "cheetah",
+				"a_dim": 6,
+				"s_dim": 17,
+				"v_idx": 8,
+				"h_idx": 0,
+			},
+			{
+				"name": "walker2d",
+				"a_dim": 6,
+				"s_dim": 17,
+				"v_idx": 8,
+				"h_idx": 0,
+			},
+			{
+				"name": "hopper",
+				"a_dim": 3,
+				"s_dim": 11,
+				"v_idx": 5,
+				"h_idx": 0,
+			}
+		]
+		speed_dim, height_dim = 0, 0
+
+		# normal 
+		dim_list = [_["s_dim"] for _ in MUJOCO_INFOS] # only input s
+		if x.shape[-1] in dim_list:
+			guess_idx = dim_list.index(x.shape[-1])
+			env = MUJOCO_INFOS[guess_idx]
+			speed_dim = env["v_idx"]
+			height_dim = env["h_idx"]
+		
+		dim_list = [_["s_dim"]+_["a_dim"] for _ in MUJOCO_INFOS] # input s+a
+		if x.shape[-1] in dim_list:
+			if guess_idx >= 0:
+				env = MUJOCO_INFOS[0]
+				speed_dim = env["v_idx"] + env["a_dim"]
+				height_dim = env["h_idx"] + env["a_dim"]
+
+		res = {
+			"speed": x[:, :, speed_dim].mean(dim=1),
+			"height": x[:, :, height_dim].mean(dim=1),
+		}
+
 		return res
 
-class DoorHingeHigher(SingleValueGuide):
+class DoorGuide(SingleValueGuide):
+	def cal_value(self, x):
+		if x.shape[-1] == 39: 
+			z = x[:, :, self.INDEX - 28]
+		else: z = x[:, :, self.INDEX]
+		value = z.mean(dim=1)
+		return value
+
+
+class DoorHingeHigher(DoorGuide):
 	LOWER = True
 	INDEX = 55
 	NAME = "hinge"
 
-class DoorHingeLower(SingleValueGuide):
+class DoorHingeLower(DoorGuide):
 	LOWER = False
 	INDEX = 55
 	NAME = "hinge"
 
-class DoorOpen(SingleValueGuide):
+class DoorOpen(DoorGuide):
 	LOWER = True
 	INDEX = 66
 	NAME = "open"
 
-class DoorClose(SingleValueGuide):
+class DoorClose(DoorGuide):
 	LOWER = False
 	INDEX = 66
 	NAME = "open"
 
-class DoorHandleHigher(SingleValueGuide):
+class DoorHandleHigher(DoorGuide):
 	LOWER = True
 	INDEX = 62
 	NAME = "handle"
 
-class DoorHandleLower(SingleValueGuide):
+class DoorHandleLower(DoorGuide):
 	LOWER = False
 	INDEX = 62
 	NAME = "handle"

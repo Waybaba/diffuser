@@ -26,8 +26,8 @@ policy:
   # grad_interval: [0.05, 1.0]
   grad_interval: [0.0, 1.0]
   scale_grad_by_std: true
-  travel_repeat: 2 # time travel
-  travel_interval: [0.3,0.7] # if float, would use [horizon*travel_interval, horizon]
+  travel_repeat: 1 # time travel
+  travel_interval: [0.4,0.6] # if float, would use [horizon*travel_interval, horizon]
 
 mode: default # default: would only run once. local: would sweep over scale_list and guide_list
 
@@ -91,8 +91,8 @@ guide_list:
   # - _target_: diffuser.sampling.NoTrainGuideEndXHigher
   # - _target_: diffuser.sampling.NoTrainGuideEndYLower
   # - _target_: diffuser.sampling.NoTrainGuideEndYHigher
-  # - _target_: diffuser.sampling.NoTrainGuideShorter
-  # - _target_: diffuser.sampling.NoTrainGuideLonger
+  - _target_: diffuser.sampling.NoTrainGuideShorter
+  - _target_: diffuser.sampling.NoTrainGuideLonger
   # - _target_: diffuser.sampling.DummyGuide
   - _target_: diffuser.sampling.MultiGuide
     guides:
@@ -104,7 +104,7 @@ guide_list:
           _target_: diffuser.sampling.NoTrainGuideEndYHigher
       - weight: 0.03
         guide:
-          _target_: diffuser.sampling.NoTrainGuideShorter
+          _target_: diffuser.sampling.NoTrainGuideLonger
       # - weight: 1.0
       #   guide:
       #     _target_: diffuser.sampling.NoTrainGuideXLower
