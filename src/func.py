@@ -149,6 +149,98 @@ def full_rollout_once(
 	print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
 	return res
 
+def full_rollout_once_witha(
+		env, 
+		planner, 
+		normalizer_actor, 
+		plan_freq=1,
+		len_max=1000
+	):
+	"""
+	planner: 
+		call planner(cond, batch_size=1,verbose=False) and return actions, samples
+	actor:
+		call actor(obs, obs_, batch_size=1, verbose=False) and return act
+	"""
+		
+	def make_act(history, plan, plan_act, t_madeplan, normalizer_actor):
+		"""
+		actor: would generate act, different for diff methods
+		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
+		"""
+		# s = history[-1]
+		# s_ = plan[len(history)-1-t_madeplan+1] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
+		# model = actor
+		# device = next(actor.parameters()).device
+		# model.to(device)
+		# act = model(torch.cat([
+		# 	torch.tensor(normalizer_actor.normalize(
+		# 		s,
+		# 		"observations"
+		# 	)).to(device), 
+		# 	torch.tensor(normalizer_actor.normalize(
+		# 		s_,
+		# 		"observations"
+		# 	)).to(device)
+		# ], dim=-1).float().to(device))
+		act = plan_act[len(history)-1-t_madeplan]
+		# act = act.detach().cpu().numpy()
+		act = normalizer_actor.unnormalize(act, "actions")
+		return act
+
+	def make_plan(planner, history):
+		"""
+		TODO: use history in guide
+		"""
+		cond = {
+			0: history[-1]
+		}
+		actions, samples = planner(cond, batch_size=1,verbose=False)
+		plan = samples.observations[0] # (T, obs_dim)
+		return plan, samples.actions[0] # (T, act_dim)
+
+
+	# assert planner.training == False, "planner should be in eval mode"
+	print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
+	res = {
+		"act": [],
+		"s": [],
+		"s_": [],
+		"r": [],
+	}
+	env_step = 0
+
+	t_madeplan = -99999
+	
+	s = env.reset()
+	s = s[0] if isinstance(s, tuple) and len(s)==2 else s # for kuka env
+	while True: 
+		if env_step - t_madeplan >= plan_freq: # note the max value is horizon - 1 instead of horizon, since the first step is current
+			plan, plan_act = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
+			t_madeplan = env_step
+		a = make_act(res["s"]+[s], plan, plan_act, t_madeplan, normalizer_actor)
+		env_res = env.step(a)
+		if len(env_res) == 4: s_, r, done, info = env_res
+		elif len(env_res) == 5: 
+			s_, r, terminal, timeout, info = env_res
+			done = terminal or timeout
+		s = s_
+		
+		res["act"].append(a)
+		res["s"].append(s)
+		res["s_"].append(s_)
+		res["r"].append(r)
+		env_step += 1
+		if done or env_step > len_max: break
+	
+	# stack
+	for k in res.keys():
+		res[k] = np.stack(res[k], axis=0)
+	
+	print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
+	return res
+
+
 def load_kuka(env, custom_ds_path=None):
 	""" load kuka env 
 	"""
@@ -220,6 +312,14 @@ def load_minari(env):
 	import minari
 	import gymnasium as gym
 	minari.download_dataset(env)
+	dataset = minari.load_dataset(env)
+	env = dataset.recover_environment()
+	dataset = minari_to_d4rl(dataset)
+	return env, dataset
+
+def load_custom_minari(env):
+	import minari
+	import gymnasium as gym
 	dataset = minari.load_dataset(env)
 	env = dataset.recover_environment()
 	dataset = minari_to_d4rl(dataset)

@@ -31,6 +31,8 @@ def env_map(env_name):
     '''
     if 'halfcheetah' in env_name:
         return 'HalfCheetahFullObs-v2'
+    if 'reacher' in env_name:
+        return 'Reacher-v2'
     elif 'hopper' in env_name:
         return 'HopperFullObs-v2'
     elif 'walker2d' in env_name:
@@ -73,7 +75,7 @@ def zipkw(*args, **kwargs):
         yield zipped_args, zipped_kwargs
 
 def get_image_mask(img):
-    background = (img == 255).all(axis=-1, keepdims=True)
+    background = (img == 255).all(axis=-1, keepdims=True) | (img == 0).all(axis=-1, keepdims=True) | (img == 12).all(axis=-1, keepdims=True)
     mask = ~background.repeat(3, axis=-1)
     return mask
 
@@ -413,6 +415,10 @@ class MuJoCoRenderer(Renderer):
                 'elevation': -20
             }
 
+        # ! only for reacher since it does not move
+        if "reacher" in self.env.unwrapped.spec.id.lower():
+            render_kwargs = {'elevation': 90}
+
         for key, val in render_kwargs.items():
             if key == 'lookat':
                 self.viewer.cam.lookat[:] = val[:]
@@ -435,6 +441,15 @@ class MuJoCoRenderer(Renderer):
         data = self.viewer.read_pixels(*dim, depth=False)
         data = data[::-1, :, :]
 
+        # data shape=(h,w,ch), value=0-255
+        # save to debug/img.png
+        # DEBUG = True
+        # if DEBUG:
+        #     from PIL import Image
+        #     import numpy as np
+        #     image = Image.fromarray(np.uint8(data))
+        #     image.save('debug/img.png')
+
         return data
 
     def _renders(self, observations, **kwargs):
@@ -453,13 +468,17 @@ class MuJoCoRenderer(Renderer):
 
         samples = samples_ori
         RENDER_FREQ = 16 # only render evey n steps
+        COLOR_BASE_NUM = 10
         if "hopper" in self.env.unwrapped.spec.id.lower():
             RENDER_FREQ = 8
         elif "cheetah" in self.env.unwrapped.spec.id.lower():
             RENDER_FREQ = 4
         elif "walker2d" in self.env.unwrapped.spec.id.lower():
             RENDER_FREQ = 8
-        COLOR_BASE_NUM = 10
+        elif "reacher" in self.env.unwrapped.spec.id.lower():
+            COLOR_BASE_NUM = 40
+            RENDER_FREQ = 8
+        
         samples = samples[::RENDER_FREQ]
         sample_images = self._renders(samples, partial=partial, **kwargs)
         composite = np.ones_like(sample_images[0]) * 255
@@ -470,6 +489,7 @@ class MuJoCoRenderer(Renderer):
         colors = np.concatenate([color_base for _ in range((len(samples) // len(color_base)) +1)], axis=0)[:len(samples)]
         for i, img in enumerate(sample_images): # [H, W, 3]
             mask = get_image_mask(img)
+            # mask = np.ones_like(img)
             color_board = np.ones_like(img)
             color_board[:,:,0] = colors[i,0] * 255
             color_board[:,:,1] = colors[i,1] * 255

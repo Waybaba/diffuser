@@ -49,6 +49,34 @@
 		},
 		// entry.py
 		{
+			"name": "train_diffuser_witha",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"noDebug": false,
+			"args": [
+				"wandb.mode=disabled",
+				// #### mujoco
+				"experiment=train_diffuser_witha",
+				// "datamodule.dataset.env=kitchen-complete-v1",
+				// "datamodule.dataset.env=halfcheetah-random-expert",
+				"datamodule.dataset.env=hopper-expert-v2",
+				// "datamodule.dataset.env=Reacher-v4",
+				// "datamodule.dataset.env=minari:reacher-sac_10000-v0",
+				"modelmodule.controller.turn_on=true",
+				// "+trainer.enable_progress_bar=False",
+				// "trainer.save_freq=10000", // save model and rollout
+				// "trainer.sample_freq=1000", // sample and redering
+				// "policy.scale_grad_by_std=true",
+				// "global_cfg.horizon=512",
+				// "wandb.buf_dir=null",
+				// "env.delay=0",
+			],
+		},
+		// entry.py
+		{
 			"name": "train_diffuser_mujoco",
 			"type": "python",
 			"request": "launch",
@@ -57,12 +85,14 @@
 			"justMyCode": true,
 			"noDebug": false,
 			"args": [
-				// "wandb.mode=disabled",
+				"wandb.mode=online",
 				// #### mujoco
 				"experiment=train_diffuser_locomotion",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-random-expert",
-				"datamodule.dataset.env=hopper-expert-v2",
+				// "datamodule.dataset.env=hopper-expert-v2",
+				// "datamodule.dataset.env=Reacher-v4",
+				"datamodule.dataset.env=minari:reacher-sac_10000-v0",
 				"modelmodule.controller.turn_on=false",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout

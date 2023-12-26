@@ -79,14 +79,16 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert [env.startswith(v) for v in ["maze", "walker2d", "hopper", "halfcheetah", "kitchen", "hammer", "door", "pen", "relocate"]].count(True) == 1, f"env {env} not supported"
+		assert [env.startswith(v) for v in ["minari:","maze", "walker2d", "hopper", "halfcheetah", "reacher", "kitchen", "hammer", "door", "pen", "relocate"]].count(True) == 1, f"env {env} not supported"
 
 		### get dataset (setup self.dataset, self.env)
 		self.env_name = env
 		if "kuka" in self.env_name:
 			self.env, self.dataset = load_kuka(self.env_name, custom_ds_path)
-		elif [self.env_name.startswith(v) for v in ["minari","hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
+		elif [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
 			self.env, self.dataset = load_minari(self.env_name)
+		elif self.env_name.startswith("minari:"):
+			self.env, self.dataset = load_custom_minari(self.env_name.split(":")[1])
 		elif [self.env_name.endswith(suf) for suf in ["mixed", "random-expert"]].count(True) == 1:
 			# e.g. halfcheetah-mixed -> use all, halfcheetah-random-expert -> use random and expert
 			if self.env_name.endswith("mixed"):
@@ -115,6 +117,8 @@ class EnvDataset:
 		if "maze" in self.env_name: preprocess_fns = ["maze2d_set_terminals"]
 		elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper", "hammer","door", "relocate","pen", "kitchen"]].count(True) == 1: 
 			preprocess_fns = []
+		elif self.env_name.startswith("minari:"):
+			preprocess_fns = []
 		elif "kuka" in self.env_name: preprocess_fns = []
 		else: raise NotImplementedError("env not supported")
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name) # TOODO do not use original function
@@ -128,11 +132,14 @@ class EnvDataset:
 		
 		### normalize
 		if normalizer == "by_env":
-			if "maze" in self.env_name: normalizer = "LimitsNormalizer"
+			if "maze" in self.env_name: 
+				normalizer = "LimitsNormalizer"
 			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
 				normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
 			#  "hammer","door", "relocate","pen", "kitchen"
 			elif [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
+				normalizer = "DebugNormalizer"
+			elif self.env_name.startswith("minari:"):
 				normalizer = "DebugNormalizer"
 			elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
 			else: raise NotImplementedError(f"env {self.env_name} not supported")
@@ -167,6 +174,9 @@ class EnvDataset:
 		elif [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
 			from diffuser.utils.rendering import MarinaRenderer
 			self.renderer = MarinaRenderer(self.env_name)
+		elif self.env_name.startswith("minari:"):
+			from diffuser.utils.rendering import MuJoCoRenderer
+			self.renderer = MuJoCoRenderer(self.env_name)
 		else:
 			raise NotImplementedError("env not supported")
 

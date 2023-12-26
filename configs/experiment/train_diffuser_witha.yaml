@@ -1,0 +1,35 @@
+# @package _global_
+
+defaults:
+  - train_diffuser_locomotion.yaml
+
+
+
+### main
+
+modelmodule:
+  _target_: src.modelmodule.DiffuserWithActModule
+  net:
+    diffusion:
+      ignore_action: false # ! if true, only apply loss on observations
+  controller:
+    turn_on: true
+    policy:
+      _target_: diffuser.sampling.GuidedPolicy
+      _partial_: true
+      preprocess_fns: []
+      # the following are **sample_kwargs
+      sample_fn: 
+        # _target_: diffuser.sampling.n_step_guided_p_sample
+        _target_: diffuser.sampling.n_step_guided_p_sample_freedom_timetravel
+        _partial_: true
+      scale: 10000000
+      n_guide_steps: 1 # ! does not used, only use one step + time travel
+      t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
+      scale_grad_by_std: true
+      grad_interval: [0.1, 1.0]
+      travel_repeat: 2 # time travel
+      travel_interval: [0.1,0.9] # if float, would use [horizon*travel_interval, horizon]
+    plan_freq: 0.5
+    guide:
+      _target_: diffuser.sampling.DummyGuide
