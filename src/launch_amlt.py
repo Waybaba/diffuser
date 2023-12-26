@@ -126,6 +126,8 @@ search:
     name: RL_Delayed_{experiment_name:s}_{auto:5s}
     # sku: 24G1-P40
     sku: G1
+    submit_args:
+        max_run_duration_seconds: 604800
     # submit_args:
     #   container_args:
     #     user: root
