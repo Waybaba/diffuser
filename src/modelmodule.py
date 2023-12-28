@@ -272,6 +272,7 @@ def eval_diffuser_witha(diffuser, policy_func=None, plan_freq=None, guide_=None)
 
 	### distill state
 	states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
+	states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
 	# unnormlize
 	### cals common metric
 	LOG_PREFIX = "value"
@@ -282,9 +283,10 @@ def eval_diffuser_witha(diffuser, policy_func=None, plan_freq=None, guide_=None)
 	### cals rollout metric
 	LOG_PREFIX = "value"
 	LOG_SUB_PREFIX = "ds"
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = np.mean([each["r"].sum() for each in episodes_ds])
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_length"] = states_ds.shape[1]
 	LOG_SUB_PREFIX = "full_rollout"
-	r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
-	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = np.mean([each["r"].sum() for each in episodes_full_rollout])
 	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_length"] = states_full_rollout.shape[1]
 
 	### render
