@@ -61,10 +61,10 @@
 				// #### mujoco
 				"experiment=train_diffuser_witha",
 				// "datamodule.dataset.env=kitchen-complete-v1",
-				// "datamodule.dataset.env=halfcheetah-random-expert",
+				// "datamodule.dataset.env=halfcheetah-expert-v2",
 				"datamodule.dataset.env=hopper-expert-v2",
 				// "datamodule.dataset.env=Reacher-v4",
-				// "datamodule.dataset.env=minari:reacher-sac_10000-v0",
+				// "datamodule.dataset.env=minari:reacher-sac_1000000-v0",
 				"modelmodule.controller.turn_on=true",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
@@ -118,6 +118,7 @@
 				"experiment=train_diffuser_minari",
 				"datamodule.dataset.env=door-human-v1",
 				"modelmodule.controller.turn_on=true",
+				"modelmodule.controller.plan_freq=1",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-random-expert",
 				// "datamodule.dataset.env=halfcheetah-mixed",

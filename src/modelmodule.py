@@ -285,17 +285,15 @@ def eval_diffuser_witha(diffuser, policy_func=None, plan_freq=None, guide_=None)
 	LOG_SUB_PREFIX = "full_rollout"
 	r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
 	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
-
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_length"] = states_full_rollout.shape[1]
 
 	### render
 	LOG_PREFIX = "val_ep_end"
-	# STEPS = min(len(episodes_rollout[0]["s"]), len(episodes_ds_rollout[0]["s"]), 32)
 	MAXSTEP = 1000
 	to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb_media_wrapper(
 		renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
 	)]
 	return to_log
-
 
 def rollout_ref(env, ep_ref, model, normalizer):
 	""" rollout reference episodes
@@ -1014,11 +1012,9 @@ class DiffuserModule(DefaultModule):
 		### log
 		LOG_PREFIX="val_ep_end"
 		to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
-
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb_media_wrapper(_) for _ in chain_samples]
 		to_log["samples"] = [wandb_media_wrapper(_) for _ in img_samples]
-		# to_log["sample_"] = wandb_media_wrapper(img_samples[0])
 		wandb.log({
 			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
 		}, commit=True)
@@ -1153,11 +1149,8 @@ class DiffuserWithActModule(DefaultModule):
 		dataset = self.dynamic_cfg["dataset"]
 		env = dataset.env
 		# ! TODO uncomment the following
-		# ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
-		N_FULLROLLOUT = 1
-		# if self.hparams.eval.turn_on:
+		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
 		if self.hparams.controller.turn_on:
-		# 	# ! TODO
 			to_log_ = eval_diffuser_witha(
 				self, 
 				self.hparams.controller.policy, 
@@ -1166,6 +1159,10 @@ class DiffuserWithActModule(DefaultModule):
 			)
 			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
 		### log
+		to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
+		if chain_samples is not None: 
+			to_log["chain"] = [wandb_media_wrapper(_) for _ in chain_samples]
+		to_log["samples"] = [wandb_media_wrapper(_) for _ in img_samples]
 		LOG_PREFIX="val_ep_end"
 		wandb.log({
 			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
