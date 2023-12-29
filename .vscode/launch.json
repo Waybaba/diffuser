@@ -62,7 +62,8 @@
 				"experiment=train_diffuser_witha",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-expert-v2",
-				"datamodule.dataset.env=hopper-expert-v2",
+				"datamodule.dataset.env=halfcheetah-expert-v2",
+				// "datamodule.dataset.env=hopper-expert-v2",
 				// "datamodule.dataset.env=Reacher-v4",
 				// "datamodule.dataset.env=minari:reacher-sac_1000000-v0",
 				"modelmodule.controller.turn_on=true",
@@ -73,6 +74,7 @@
 				// "global_cfg.horizon=512",
 				// "wandb.buf_dir=null",
 				// "env.delay=0",
+				"modelmodule.controller.guide._target_=diffuser.sampling.CheetahFaster",
 			],
 		},
 		// entry.py
