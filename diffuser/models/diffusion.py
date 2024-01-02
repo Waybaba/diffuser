@@ -124,7 +124,7 @@ class GaussianDiffusion(nn.Module):
         loss_weights = torch.einsum('h,t->ht', discounts, dim_weights)
 
         ## manually set a0 weight
-        loss_weights[0, :self.action_dim] = action_weight
+        loss_weights[0, :self.action_dim] = action_weight * loss_weights[0, :self.action_dim]
         if ignore_action:
             loss_weights[:, :self.action_dim] = 0.0
         return loss_weights
