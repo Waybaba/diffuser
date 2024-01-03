@@ -289,7 +289,6 @@ class ScoreBasedDiffusion(GaussianDiffusion):
         t = torch.rand(batch_size, device=x.device) * (1. - 1e-5) + 1e-5
         return self.p_losses(x, *args, t, **kwargs)
 
-
 class ValueDiffusion(GaussianDiffusion):
 
     def p_losses(self, x_start, cond, target, t):

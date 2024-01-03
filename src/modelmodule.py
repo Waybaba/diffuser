@@ -297,6 +297,58 @@ def eval_diffuser_witha(diffuser, policy_func=None, plan_freq=None, guide_=None)
 	)]
 	return to_log
 
+def eval_bc(diffuser):
+	### distill
+	N_EPISODES = 1
+	N_FULLROLLOUT = 1
+	device = torch.device("cuda")
+	bc_model, dataset, renderer = diffuser.net, diffuser.dynamic_cfg["dataset"], diffuser.dynamic_cfg["dataset"].renderer
+	# normalizer_actor = controller.dynamic_cfg["dataset"].normalizer
+	model = bc_model
+	model.to(device)
+	model.eval()
+
+	env = dataset.env
+
+	to_log = {}
+
+	### episodes - generate
+	episodes_ds = dataset.get_episodes_ref(num_episodes=N_EPISODES) # [{"s": ...}]
+	### episodes - rollout
+	episodes_full_rollout = [full_rollout_once_bc(
+		env, 
+		model, 
+		dataset.normalizer, 
+	) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
+	episodes_full_rollout = safefill_rollout(episodes_full_rollout)
+
+	### distill state
+	states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
+	states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
+	# unnormlize
+	### cals common metric
+	LOG_PREFIX = "value"
+	LOG_SUB_PREFIX = "full_rollout"
+	# for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+
+	### cals rollout metric
+	LOG_PREFIX = "value"
+	LOG_SUB_PREFIX = "ds"
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = np.mean([each["r"].sum() for each in episodes_ds])
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_length"] = states_ds.shape[1]
+	LOG_SUB_PREFIX = "full_rollout"
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = np.mean([each["r"].sum() for each in episodes_full_rollout])
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_length"] = states_full_rollout.shape[1]
+
+	### render
+	LOG_PREFIX = "val_ep_end"
+	MAXSTEP = 1000
+	to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb_media_wrapper(
+		renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
+	)]
+	return to_log
+
+
 def rollout_ref(env, ep_ref, model, normalizer):
 	""" rollout reference episodes
 		TODO support different type of model, now it is
@@ -466,17 +518,19 @@ class ModelWrapperBase(nn.Module):
 	def torch_module_init(self):
 		super().__init__()
 
-class FillActWrapper(ModelWrapperBase):
+class S2AWrapper(ModelWrapperBase):
+	"""
+	Abstract class, need to set self.in_dim, self.outdim in later class
+	"""
 	def __init__(self, dynamic_cfg, **kwargs):
+		assert hasattr(self, "in_dim") and hasattr(self, "out_dim"), "in_dim and out_dim should be set in later class"
 		self.torch_module_init()
-		in_dim = dynamic_cfg["obs_dim"] * 2
-		out_dim = dynamic_cfg["act_dim"]
 		self.net = kwargs["net"]
 		# if partial, give input dim
 		if isinstance(self.net[0], functools.partial):
-			self.net[0] = self.net[0](in_features=in_dim)
+			self.net[0] = self.net[0](in_features=self.in_dim)
 		if isinstance(self.net[-1], functools.partial):
-			self.net[-1] = self.net[-1](out_features=out_dim)
+			self.net[-1] = self.net[-1](out_features=self.out_dim)
 		if kwargs["tahn"]:
 			self.net.append(nn.Tanh())
 		self.net = torch.nn.Sequential(*self.net)
@@ -489,6 +543,22 @@ class FillActWrapper(ModelWrapperBase):
 
 	def select_param_group(self, name):
 		raise NotImplementedError
+
+class FillActWrapper(S2AWrapper):
+	""" s -> a
+	"""
+	def __init__(self, dynamic_cfg, **kwargs):
+		self.in_dim = dynamic_cfg["obs_dim"] * 2
+		self.out_dim = dynamic_cfg["act_dim"]
+		super().__init__(dynamic_cfg, **kwargs)
+
+class BCNetWrapper(S2AWrapper):
+	""" (s,s) -> a
+	"""
+	def __init__(self, dynamic_cfg, **kwargs):
+		self.in_dim = dynamic_cfg["obs_dim"]
+		self.out_dim = dynamic_cfg["act_dim"]
+		super().__init__(dynamic_cfg, **kwargs)
 
 class EnvModelWrapper(ModelWrapperBase):
 	def __init__(self, dynamic_cfg, **kwargs):
@@ -1165,6 +1235,146 @@ class DiffuserWithActModule(DefaultModule):
 		if chain_samples is not None: 
 			to_log["chain"] = [wandb_media_wrapper(_) for _ in chain_samples]
 		to_log["samples"] = [wandb_media_wrapper(_) for _ in img_samples]
+		LOG_PREFIX="val_ep_end"
+		wandb.log({
+			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()
+		}, commit=True)
+		super().validation_epoch_end(outputs)
+
+	def render_samples(self):
+		'''
+			renders samples from (ema) diffusion model
+			we sample batch_size conditions, 
+			for each one in conditions,
+			we generate n_samples trajectories with the same initial condition
+			then plot them in a grid (2x2 for maze, 4x1 for mujoco)
+			then we get batch_size images
+			then would be save as:
+				$UOURDIR/xxx/sample-{learning_step}-0.png
+				$UOURDIR/xxx/sample-{learning_step}-1.png
+				...
+				$UOURDIR/xxx/sample-{learning_step}-{batch_size-1}.png
+		'''
+		batch_size = 1
+		N_SAMPLES = 4 # would have same condition, rendered in one img
+		ref_res, img_res, chain_res = [], [], []
+		dataset = self.dynamic_cfg["data_val"][0]
+		from torch.utils.data.dataloader import default_collate
+		from collections.abc import Mapping, Sequence
+
+		def recursive_collate(batch):
+			elem = batch[0]
+			if isinstance(elem, Mapping):
+				return {key: recursive_collate([d[key] for d in batch]) for key in elem}
+			elif isinstance(elem, Sequence) and not isinstance(elem, str):
+				return [recursive_collate(samples) for samples in zip(*batch)]
+			else:
+				return default_collate(batch)  # use PyTorch's default_collate
+
+		for i in range(batch_size):
+			
+			## get a single datapoint
+			batch = [dataset[random.randint(0, len(dataset)-1)]]
+			batch = recursive_collate(batch) # stack another dim
+			batch = EpisodeValidBatch(*batch) if len(batch) == 3 else EpisodeBatch(*batch)
+			conditions = batch.conditions
+			refs = to_np(batch.trajectories)
+
+			### ! DEBUG apply noise to conditions
+			# batch.conditions[0]: B,obs_dim
+			# batch.conditions[1]: B,obs_dim
+			# batch.trajectories: [B,T,act_dim+obs_dim]
+			# applying shift to conditions and trajctories
+			# set all actions to 0
+			# shift = torch.randn_like(batch.conditions[0]) * self.condition_noise
+			# for cond_k, cond_v in batch.conditions.items():
+			#     if cond_k == 0: continue
+			#     batch.conditions[cond_k] = batch.conditions[cond_k] + shift
+			# batch.trajectories[:,:,self.dataset.action_dim:] = batch.trajectories[:,:,self.dataset.action_dim:] + shift[:,None,:]
+			# batch.trajectories[:,:,:self.dataset.action_dim] = 0.0
+			### !
+
+			## repeat each item in conditions `n_samples` times
+			conditions = apply_dict(
+				einops.repeat,
+				conditions,
+				'b ... -> (repeat b) ...', repeat=N_SAMPLES,
+			)
+			refs = einops.repeat(refs, 'b ... -> (repeat b) ...', repeat=N_SAMPLES)
+
+
+			## [ n_samples x horizon x (action_dim + observation_dim) ]
+			samples = self.net(conditions, return_chain=True) # ! ADD EMA in paper
+			trajectories = to_np(samples.trajectories) # (n_samples, T, act_dim+obs_dim)
+			chains = to_np(samples.chains) # (n_samples, diffusion_T, T, act_dim+obs_dim)
+
+			## [ n_samples x horizon x observation_dim ]
+			normed_refs = refs[:, :, self.dynamic_cfg["act_dim"]:]
+			normed_observations = trajectories[:, :, self.dynamic_cfg["act_dim"]:] # (n_samples, T, obs_dim)
+			normed_chains = chains[:, :, :, self.dynamic_cfg["act_dim"]:] # (n_samples, horizon, T, obs_dim)
+
+			## [ n_samples x (diffusion_T) x horizon + 1 x observation_dim ]
+			observations = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_observations, 'observations') # [ n_samples x horizon x observation_dim ]
+			chains = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_chains, 'observations') # [ n_samples x (diffusion_T) x horizon x observation_dim ]
+			refs = self.dynamic_cfg["dataset"].normalizer.unnormalize(normed_refs, 'observations')
+
+			## render
+			ref_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(refs))
+			img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations))
+			chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains))
+			# ref_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(refs,path=self.hparams+"/ref_latest.png"))
+			# img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations,path=self.hparams+"/ref_latest.png"))
+			# chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains,path=self.hparams+"/ref_latest.png"))
+			
+
+		return ref_res, img_res, None if len(chain_res) == 0 else chain_res
+
+class DiffuserBC(DefaultModule):
+	def __init__(
+		self,
+		**kwargs
+	):
+		super().__init__(**kwargs)
+		
+	def step(self, batch: Any):
+		""" process the batch from dataloader and return the res_batch
+		input: `batch dict` from dataloader
+		output: `res_batch` dict with "x", "y", "info", "outputs", "preds", "loss"
+		ps. note that the calcultion of "outputs", "preds", "loss" could
+			be task-specific, so we need to implement it in the subclass
+		"""
+		outputs = self.net(batch.s)
+		res_batch = {
+			"s": batch.s,
+			"s_": batch.s_,
+			"act": batch.act,
+			# "info": batch["info"],
+			"outputs": outputs,
+			"preds": outputs,
+			"loss": self.hparams.loss_func()(outputs, batch.act),
+			"y": batch.act,
+		}
+		return res_batch
+
+	def validation_epoch_end(self, outputs):
+		### init
+		assert self.net.training == False, "net should be in eval mode"
+		LOG_PREFIX = "val_ep_end"
+		to_log = {}
+
+		### get render data # TODO spilt well
+		dataset = self.dynamic_cfg["dataset"]
+		env = dataset.env
+		# ! TODO uncomment the following
+		# ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
+		if self.hparams.controller.turn_on:
+			to_log_ = eval_bc(self)
+			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
+		### log
+		# to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
+		# if chain_samples is not None: 
+		# 	to_log["chain"] = [wandb_media_wrapper(_) for _ in chain_samples]
+		# to_log["samples"] = [wandb_media_wrapper(_) for _ in img_samples]
 		LOG_PREFIX="val_ep_end"
 		wandb.log({
 			f"{LOG_PREFIX}/{k}": v for k, v in to_log.items()

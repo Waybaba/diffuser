@@ -240,6 +240,66 @@ def full_rollout_once_witha(
 	print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
 	return res
 
+def full_rollout_once_bc(
+		env, 
+		model, 
+		normalizer_actor, 
+		len_max=1000
+	):
+	"""
+	planner: 
+		call planner(cond, batch_size=1,verbose=False) and return actions, samples
+	actor:
+		call actor(obs, obs_, batch_size=1, verbose=False) and return act
+	"""
+		
+	def make_act(s, normalizer_actor):
+		stensor = normalizer_actor.normalize(s, "observations")
+		stensor = torch.tensor(stensor).to(next(model.parameters()).device)
+		# s to same type as model
+		stensor = stensor.float()
+		act = model(stensor)
+		# 
+		act = act.detach().cpu().numpy()
+		act = normalizer_actor.unnormalize(act, "actions")
+		return act
+
+	# assert planner.training == False, "planner should be in eval mode"
+	res = {
+		"act": [],
+		"s": [],
+		"s_": [],
+		"r": [],
+	}
+	env_step = 0
+
+	t_madeplan = -99999
+	
+	s = env.reset()
+	s = s[0] if isinstance(s, tuple) and len(s)==2 else s # for kuka env
+	while True: 
+		a = make_act(s, normalizer_actor)
+		env_res = env.step(a)
+		if len(env_res) == 4: s_, r, done, info = env_res
+		elif len(env_res) == 5: 
+			s_, r, terminal, timeout, info = env_res
+			done = terminal or timeout
+		s = s_
+		res["act"].append(a)
+		res["s"].append(s)
+		res["s_"].append(s_)
+		res["r"].append(r)
+		env_step += 1
+		if done or env_step > len_max: break
+	
+	# stack
+	for k in res.keys():
+		res[k] = np.stack(res[k], axis=0)
+	
+	print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
+	return res
+
+
 
 def load_kuka(env, custom_ds_path=None):
 	""" load kuka env 
