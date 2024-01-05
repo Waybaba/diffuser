@@ -135,7 +135,8 @@ class EnvDataset:
 			if "maze" in self.env_name: 
 				normalizer = "LimitsNormalizer"
 			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
-				normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
+				# normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
+				normalizer = "DebugNormalizer"
 			#  "hammer","door", "relocate","pen", "kitchen"
 			elif [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
 				normalizer = "DebugNormalizer"

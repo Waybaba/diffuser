@@ -16,7 +16,7 @@ modelmodule:
   net: 
     _target_: src.modelmodule.BCNetWrapper
     _partial_: true
-    tahn: true # only for kuka where action must be in -1,1
+    tahn: false # only for kuka where action must be in -1,1
     net:
       - _target_: torch.nn.Linear
         _partial_: true

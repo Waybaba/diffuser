@@ -103,9 +103,6 @@
 				// "trainer.sample_freq=1000", // sample and redering
 				// "policy.scale_grad_by_std=true",
 				"global_cfg.horizon=8",
-				// "wandb.buf_dir=null",
-				// "env.delay=0",
-				// "modelmodule.controller.guide._target_=diffuser.sampling.CheetahFaster",
 			],
 		},
 		// entry.py
