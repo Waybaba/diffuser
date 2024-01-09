@@ -111,12 +111,7 @@ def full_rollout_once(
 	assert actor.training == False, "actor should be in eval mode"
 	# assert planner.training == False, "planner should be in eval mode"
 	print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
-	res = {
-		"act": [],
-		"s": [],
-		"s_": [],
-		"r": [],
-	}
+	res = {"act": [],"s": [],"s_": [],"r": [],}
 	env_step = 0
 
 	t_madeplan = -99999
@@ -162,52 +157,10 @@ def full_rollout_once_witha(
 	actor:
 		call actor(obs, obs_, batch_size=1, verbose=False) and return act
 	"""
-		
-	def make_act(history, plan, plan_act, t_madeplan, normalizer_actor):
-		"""
-		actor: would generate act, different for diff methods
-		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
-		"""
-		# s = history[-1]
-		# s_ = plan[len(history)-1-t_madeplan+1] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
-		# model = actor
-		# device = next(actor.parameters()).device
-		# model.to(device)
-		# act = model(torch.cat([
-		# 	torch.tensor(normalizer_actor.normalize(
-		# 		s,
-		# 		"observations"
-		# 	)).to(device), 
-		# 	torch.tensor(normalizer_actor.normalize(
-		# 		s_,
-		# 		"observations"
-		# 	)).to(device)
-		# ], dim=-1).float().to(device))
-		act = plan_act[len(history)-1-t_madeplan]
-		# act = act.detach().cpu().numpy()
-		act = normalizer_actor.unnormalize(act, "actions")
-		return act
-
-	def make_plan(planner, history):
-		"""
-		TODO: use history in guide
-		"""
-		cond = {
-			0: history[-1]
-		}
-		actions, samples = planner(cond, batch_size=1,verbose=False)
-		plan = samples.observations[0] # (T, obs_dim)
-		return plan, samples.actions[0] # (T, act_dim)
-
 
 	# assert planner.training == False, "planner should be in eval mode"
 	print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
-	res = {
-		"act": [],
-		"s": [],
-		"s_": [],
-		"r": [],
-	}
+	res = {"act": [],"s": [],"s_": [],"r": [],}
 	env_step = 0
 
 	t_madeplan = -99999
@@ -215,10 +168,19 @@ def full_rollout_once_witha(
 	s = env.reset()
 	s = s[0] if isinstance(s, tuple) and len(s)==2 else s # for kuka env
 	while True: 
-		if env_step - t_madeplan >= plan_freq: # note the max value is horizon - 1 instead of horizon, since the first step is current
-			plan, plan_act = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
-			t_madeplan = env_step
-		a = make_act(res["s"]+[s], plan, plan_act, t_madeplan, normalizer_actor)
+		# if env_step - t_madeplan >= plan_freq: # note the max value is horizon - 1 instead of horizon, since the first step is current
+		# 	plan, plan_act = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
+		# 	t_madeplan = env_step
+		# a = make_act(res["s"]+[s], plan, plan_act, t_madeplan, normalizer_actor)
+
+		# plan, plan_act = make_plan(planner, res["s"]+[s])
+		# a = plan_act[0]
+		conditions = {0: torch.tensor(s).to("cuda")}
+		conditions = {k: planner.preprocess_fn(v) for k, v in conditions.items()}
+		samples = planner.diffusion_model(conditions, guide=planner.guide, verbose=False, **planner.sample_kwargs) # ! sample kwargs
+		a = samples.trajectories[0, 0, :planner.action_dim]
+		a = a.cpu().numpy()
+
 		env_res = env.step(a)
 		if len(env_res) == 4: s_, r, done, info = env_res
 		elif len(env_res) == 5: 
@@ -265,12 +227,7 @@ def full_rollout_once_bc(
 		return act
 
 	# assert planner.training == False, "planner should be in eval mode"
-	res = {
-		"act": [],
-		"s": [],
-		"s_": [],
-		"r": [],
-	}
+	res = {"act": [],"s": [],"s_": [],"r": [],}
 	env_step = 0
 
 	t_madeplan = -99999

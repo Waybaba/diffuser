@@ -437,10 +437,6 @@ class EnvEpisodeDataset(EnvDataset):
 			condition on both the current observation and the last observation in the plan
 		'''
 		cond = {0: observations[0]}
-		# if "maze" in self.env_name:
-		# 	cond.update({
-		# 		self.kwargs["horizon"] - 1: observations[-1],
-		# 	})
 		return cond
 	
 	def __getitem__(self, idx):

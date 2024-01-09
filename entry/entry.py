@@ -22,7 +22,7 @@ print("\n\n### Check Debug")
 assert os.environ.get("DEBUG", "noname") != "true", \
 	"DEBUG should not be true, or that in all cases data would be loaded from small dataset for debugging."
 if os.environ.get("UDEVICEID", "noname") != "docker": # if not docker
-	os.environ["DEBUG"] = "true"
+	os.environ["DEBUG"] = "false" # ! since I upload job on r730, this is not useful now
 	print("Not in docker, setting DEBUG=true ...")
 	print("Would skip full data collection and use small dataset for debugging...")
 else:

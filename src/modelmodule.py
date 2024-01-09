@@ -273,11 +273,15 @@ def eval_diffuser_witha(diffuser, policy_func=None, plan_freq=None, guide_=None)
 	### distill state
 	states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
 	states_ds = np.stack([each["s"] for each in episodes_ds], axis=0)
+	states_diffuser = np.stack([each["s"] for each in episodes_diffuser], axis=0)
 	# unnormlize
 	### cals common metric
 	LOG_PREFIX = "value"
 	LOG_SUB_PREFIX = "full_rollout"
 	metrics = guide_.metrics(states_full_rollout)
+	for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+	LOG_SUB_PREFIX = "diffuser"
+	metrics = guide_.metrics(states_diffuser)
 	for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
 
 	### cals rollout metric
@@ -294,6 +298,9 @@ def eval_diffuser_witha(diffuser, policy_func=None, plan_freq=None, guide_=None)
 	MAXSTEP = 1000
 	to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb_media_wrapper(
 		renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
+	)]
+	to_log[f"{LOG_PREFIX}/states_diffuser"] = [wandb_media_wrapper(
+		renderer.episodes2img(states_diffuser[:4,:MAXSTEP])
 	)]
 	return to_log
 
@@ -1332,16 +1339,25 @@ class DiffuserBC(DefaultModule):
 		ps. note that the calcultion of "outputs", "preds", "loss" could
 			be task-specific, so we need to implement it in the subclass
 		"""
-		outputs = self.net(batch.s)
+
+		if "trajectories" in batch._fields: # use epsidoes based dataset
+			trajectories, conditions, valids = batch
+			act, s = trajectories[:,0,:self.dynamic_cfg["act_dim"]], trajectories[:,0,self.dynamic_cfg["act_dim"]:]
+		elif "s" in batch._fields: # use transition based dataset
+			act, s = batch.s, batch.act
+		else:
+			raise ValueError
+
+		outputs = self.net(s)
 		res_batch = {
-			"s": batch.s,
-			"s_": batch.s_,
-			"act": batch.act,
+			"s": s,
+			"s_": s,
+			"act": act,
 			# "info": batch["info"],
 			"outputs": outputs,
 			"preds": outputs,
-			"loss": self.hparams.loss_func()(outputs, batch.act),
-			"y": batch.act,
+			"loss": self.hparams.loss_func()(outputs, act),
+			"y": act,
 		}
 		return res_batch
 

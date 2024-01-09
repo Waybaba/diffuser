@@ -57,17 +57,17 @@
 			"justMyCode": true,
 			"noDebug": false,
 			"args": [
-				"wandb.mode=disabled",
+				"wandb.mode=online",
 				// #### mujoco
 				"experiment=train_diffuser_witha",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-expert-v2",
-				"datamodule.dataset.env=halfcheetah-expert-v2",
-				// "datamodule.dataset.env=hopper-expert-v2",
+				// "datamodule.dataset.env=halfcheetah-expert-v2",
+				"datamodule.dataset.env=hopper-expert-v2",
 				// "datamodule.dataset.env=Reacher-v4",
 				// "datamodule.dataset.env=minari:reacher-sac_1000000-v0",
 				"modelmodule.controller.turn_on=true",
-				"modelmodule.net.diffusion.loss_discount=0.0",
+				"modelmodule.net.diffusion.loss_discount=1.0",
 				// "+trainer.enable_progress_bar=False",
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
@@ -75,7 +75,7 @@
 				"global_cfg.horizon=8",
 				// "wandb.buf_dir=null",
 				// "env.delay=0",
-				"modelmodule.controller.guide._target_=diffuser.sampling.CheetahFaster",
+				// "modelmodule.controller.guide._target_=diffuser.sampling.CheetahFaster",
 			],
 		},
 		// entry.py
@@ -93,8 +93,35 @@
 				"experiment=train_diffuser_bc",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-expert-v2",
-				"datamodule.dataset.env=halfcheetah-expert-v2",
-				// "datamodule.dataset.env=hopper-expert-v2",
+				// "datamodule.dataset.env=halfcheetah-expert-v2",
+				"datamodule.dataset.env=hopper-expert-v2",
+				// "datamodule.dataset.env=Reacher-v4",
+				// "datamodule.dataset.env=minari:reacher-sac_1000000-v0",
+				"modelmodule.controller.turn_on=true",
+				// "+trainer.enable_progress_bar=False",
+				// "trainer.save_freq=10000", // save model and rollout
+				// "trainer.sample_freq=1000", // sample and redering
+				// "policy.scale_grad_by_std=true",
+				"global_cfg.horizon=8",
+			],
+		},
+		// entry.py
+		{
+			"name": "train_diffuser_bc_epdataset",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/entry/entry.py",
+			"console": "integratedTerminal",
+			"justMyCode": true,
+			"noDebug": false,
+			"args": [
+				"wandb.mode=disabled",
+				// #### mujoco
+				"experiment=train_diffuser_bc_epdataset",
+				// "datamodule.dataset.env=kitchen-complete-v1",
+				// "datamodule.dataset.env=halfcheetah-expert-v2",
+				// "datamodule.dataset.env=halfcheetah-expert-v2",
+				"datamodule.dataset.env=hopper-expert-v2",
 				// "datamodule.dataset.env=Reacher-v4",
 				// "datamodule.dataset.env=minari:reacher-sac_1000000-v0",
 				"modelmodule.controller.turn_on=true",

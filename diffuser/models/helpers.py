@@ -167,6 +167,7 @@ class WeightedLoss(nn.Module):
         if weight is not None: # for transition_dim
             loss = torch.einsum('i, i... -> i...', weight, loss)
         if valids is not None: # for batch_size x horizon
+            if not valids.all(): pass
             loss = torch.einsum('ij, ij... -> ij...', valids, loss)
             
         weighted_loss = (loss * self.weights).mean()
