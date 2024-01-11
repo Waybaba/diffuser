@@ -18,6 +18,13 @@ from copy import deepcopy
 import torch.nn.functional as F
 import hashlib
 from src.func import *
+import gymnasium as gym
+from gymnasium import spaces
+import numpy as np
+import pandas as pd
+import numpy as np
+from scipy.interpolate import interp1d
+from tqdm import tqdm
 
 ### functions
 
@@ -35,6 +42,187 @@ class DatasetNormalizerW:
 	def unnormalize(self, x, key):
 		return self.normalizers[key].unnormalize(x)
 
+def load_quickdraw(env_name):
+	ds = QuickdrawDataset(data_dir=os.environ['UDATADIR'] + '/quickdraw').get_datadict()
+	env = QuickdrawEnv()
+	return env, ds
+
+class QuickdrawEnv(gym.Env):
+	"""
+	A simple Gym environment where the state is equal to the action taken, and the reward is always 0.
+	"""
+
+	def __init__(self):
+		super().__init__()
+		# Define action and observation space
+		# They must be gym.spaces objects
+		# Example when using discrete actions, you can use spaces.Discrete(N) where N is the action space size
+		self.action_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
+		self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
+
+	def reset(self):
+		"""
+		Reset the environment to the initial state.
+		"""
+		self.state = np.zeros(shape=(3,))
+		return self.state
+
+	def step(self, action):
+		"""
+		Take an action and return the new state, reward, done, and info.
+		"""
+		self.state = action  # State is updated to be equal to the action
+		reward = 0  # Reward is always 0
+		# done = False  # In this simple example, we don't have a terminal state
+		info = {}  # Additional information, empty in this case
+		# action to int
+		action = np.array(action, dtype=int)
+		if (action == 0).all(): done = True
+		else: done = False
+		return self.state, reward, done, info
+
+class QuickdrawDataset:
+	def __init__(self, data_dir, use_buf=True):
+		self.data_dir = data_dir
+		self.use_buf = use_buf
+
+	def make_hidden_stroke(self, start, end, max_dist=5):
+		"""
+		Generate a hidden stroke between two points
+		"""
+		x, y = start
+		x2, y2 = end
+		n =  max(int(np.abs(x - x2) / max_dist) + 1,  int(np.abs(y - y2) / max_dist) + 1)
+		dt = 1 / n
+		t = np.arange(0, 1 + dt, dt)
+		fx = interp1d([0, 1], [x, x2], kind='linear', fill_value="extrapolate")
+		fy = interp1d([0, 1], [y, y2], kind='linear', fill_value="extrapolate")
+		x_new = fx(t)
+		y_new = fy(t)
+		# turn to int
+		x_new = np.array(x_new, dtype=int)
+		y_new = np.array(y_new, dtype=int)
+		# to list
+		x_new = x_new.tolist()
+		y_new = y_new.tolist()
+		return (x_new, y_new)
+
+	def load(self):
+		import os
+		import pickle
+		classes = []
+		for f_name in os.listdir(self.data_dir):
+			if f_name.endswith('.ndjson') and not f_name.startswith('.'): classes.append(f_name[:-7])
+			else: pass
+
+		if self.use_buf and os.path.exists(self.data_dir + '/dfs.pkl') and os.path.exists(self.data_dir + '/ds.pkl'):
+			with open(self.data_dir + '/dfs.pkl', 'rb') as f:
+				self.dfs = pickle.load(f)
+			with open(self.data_dir + '/ds.pkl', 'rb') as f:
+				self.ds = pickle.load(f)
+		else:
+			self.dfs = {}
+			# for c in classes:
+			for c in ["door"]:
+				print(f"loading {c}")
+				self.dfs[c] = pd.read_json(self.data_dir + '/' + c + '.ndjson', lines=True)
+				break # ! TODO only use one class now
+
+			# df = pd.read_json('/path/to/records.ndjson', lines=True)
+			# df.to_json('/path/to/export.ndjson', lines=True)
+			"""
+			s: (x, y, )
+			a: (diff_x, diff_y)
+			d: 0 if not end of stroke, 1 if end of stroke, 2 if end of drawing
+			"""
+			s, done, a = [], [], []
+			x, y, h = [], [], []
+			for c in self.dfs:
+				for i, row in tqdm(self.dfs[c].iterrows()):
+					drawing = row['drawing']
+					# join all list in drawing
+					for i_stroke in range(len(drawing)):
+						stroke = drawing[i_stroke]
+						x += stroke[0]
+						y += stroke[1]
+						h += [0] * (len(stroke[0]))
+						done += [0] * (len(stroke[0]))
+						if i_stroke != len(drawing) - 1:
+							hidden_stroke = self.make_hidden_stroke(
+								start=(drawing[i_stroke][0][-1],drawing[i_stroke][1][-1]), 
+								end=(drawing[i_stroke+1][0][0],drawing[i_stroke+1][1][0]), 
+							)
+							x += hidden_stroke[0]
+							y += hidden_stroke[1]
+							h += [1] * (len(hidden_stroke[0]))
+							done += [0] * (len(hidden_stroke[0]))
+					done[-1] = 1
+					# break
+			s = [[x[i], y[i], h[i]] for i in range(len(x))]
+			s = np.array(s)
+			# a = np.diff(s, axis=0)[:,:2]
+			# a = np.vstack([a, np.zeros(2)])
+			# a[done == 1] = 0
+			a = np.vstack([s[1:,:], np.zeros(3)])
+			a[done==1] = 0
+			r = np.zeros_like(done)
+			self.ds = {"observations": s, "actions": a, "terminals": np.array(done), "rewards": r, "timeouts": np.zeros_like(done)}
+			# self.ds = {"observations": self.ds["observations"], "actions": self.ds["actions"], "terminals": np.array(self.ds["terminals"]), "rewards": self.ds["rewards"], "timeouts": self.ds["timeouts"]}
+
+			with open(self.data_dir + '/dfs.pkl', 'wb') as f:
+				pickle.dump(self.dfs, f)
+			with open(self.data_dir + '/ds.pkl', 'wb') as f:
+				pickle.dump(self.ds, f)
+			# ["observations", "actions", "terminals", "timeouts", "rewards"]
+			# self.ds_2 = {
+			# 	"observations": self.ds["s"],
+			# 	"actions": self.ds["a"],
+			# 	"terminals": self.ds["d"],
+			# 	"timeouts": np.zeros_like(self.ds["d"]),
+			# 	"rewards": self.ds["r"],
+			# }
+		# # drawing and save as ./output/quickdraw/{draw_idx}.png
+		# import matplotlib.pyplot as plt
+		# import os
+		# output_path = "./output" + '/quickdraw'
+		# if not os.path.exists(output_path): os.makedirs(output_path)
+		# drawing_s_cur = []
+		# stroke_s_cur = []
+		# plt.figure()
+		# for i in range(len(s)):
+		# 	# if d[i] == 0: stroke_s_cur.append(s[i])
+		# 	# elif d[i] == 1: 
+		# 	# 	drawing_s_cur.append(stroke_s_cur)
+		# 	# 	stroke_s_cur = []
+		# 	# elif d[i] == 2:
+		# 	# 	drawing_s_cur.append(stroke_s_cur)
+		# 	# 	plt.figure()
+		# 	# 	for stroke in drawing_s_cur:
+		# 	# 		stroke = np.array(stroke)
+		# 	# 		plt.plot(stroke[:, 0], stroke[:, 1])
+		# 	# 	plt.savefig(output_path + '/' + str(i) + '.png')
+		# 	# 	print(f"saved {output_path}/{i}.png")
+		# 	# 	plt.close()
+		# 	# 	drawing_s_cur = []
+		# 	# 	stroke_s_cur = []
+		# 		# break
+		# 	if done[i] == 1:
+		# 		plt.savefig(output_path + '/' + str(i) + '.png')
+		# 		plt.close()
+		# 		plt.figure()
+		# 	elif h[i] == 1:
+		# 		if i+2 >= len(s): continue
+		# 		plt.plot(s[i:i+2, 0], s[i:i+2, 1], color='red')
+		# 	elif h[i] == 0: 
+		# 		if i+2 >= len(s): continue
+		# 		plt.plot(s[i:i+2, 0], s[i:i+2, 1], color='blue')
+			
+		# print(f"saved {output_path}/{i}.png")
+		# # TODO revise y axix
+
+	def get_datadict(self):
+		if not hasattr(self, 'ds'): self.load()
+		return self.ds
 
 ### dataset
 
@@ -79,7 +267,7 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert [env.startswith(v) for v in ["minari:","maze", "walker2d", "hopper", "halfcheetah", "reacher", "kitchen", "hammer", "door", "pen", "relocate"]].count(True) == 1, f"env {env} not supported"
+		assert [env.startswith(v) for v in ["quickdraw", "minari:","maze", "walker2d", "hopper", "halfcheetah", "reacher", "kitchen", "hammer", "door", "pen", "relocate"]].count(True) == 1, f"env {env} not supported"
 
 		### get dataset (setup self.dataset, self.env)
 		self.env_name = env
@@ -105,6 +293,8 @@ class EnvDataset:
 			self.env, self.dataset = env_, {}
 			for k in ds_list[0].keys():
 				self.dataset[k] = np.concatenate([ds[k] for ds in ds_list], axis=0)
+		elif self.env_name.startswith("quickdraw"):
+			self.env, self.dataset = load_quickdraw(self.env_name)
 		else:
 			self.env = load_environment(self.env_name) # TOODO can not use gym.make ?
 			if custom_ds_path: self.dataset = self.env.get_dataset(custom_ds_path)
@@ -119,7 +309,10 @@ class EnvDataset:
 			preprocess_fns = []
 		elif self.env_name.startswith("minari:"):
 			preprocess_fns = []
-		elif "kuka" in self.env_name: preprocess_fns = []
+		elif "kuka" in self.env_name: 
+			preprocess_fns = []
+		elif self.env_name.startswith("quickdraw"):
+			preprocess_fns = []
 		else: raise NotImplementedError("env not supported")
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name) # TOODO do not use original function
 		self.dataset = self.preprocess_fn(self.dataset)
@@ -135,14 +328,15 @@ class EnvDataset:
 			if "maze" in self.env_name: 
 				normalizer = "LimitsNormalizer"
 			elif [self.env_name.startswith(v) for v in ["halfcheetah", "walker2d", "hopper"]].count(True) == 1: 
-				# normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
-				normalizer = "DebugNormalizer"
-			#  "hammer","door", "relocate","pen", "kitchen"
+				normalizer = "GaussianNormalizer" # DebugNormalizer, GaussianNormalizer
+				# normalizer = "DebugNormalizer" # ! Jan 9 
 			elif [self.env_name.startswith(v) for v in ["hammer","door", "relocate","pen", "kitchen"]].count(True) == 1:
 				normalizer = "DebugNormalizer"
 			elif self.env_name.startswith("minari:"):
 				normalizer = "DebugNormalizer"
 			elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
+			elif self.env_name.startswith("quickdraw"): 
+				normalizer = "GaussianNormalizer"
 			else: raise NotImplementedError(f"env {self.env_name} not supported")
 		else:
 			normalizer = normalizer
@@ -178,6 +372,9 @@ class EnvDataset:
 		elif self.env_name.startswith("minari:"):
 			from diffuser.utils.rendering import MuJoCoRenderer
 			self.renderer = MuJoCoRenderer(self.env_name)
+		elif self.env_name.startswith("quickdraw"): 
+			from diffuser.utils.rendering import QuickdrawRenderer
+			self.renderer = QuickdrawRenderer()
 		else:
 			raise NotImplementedError("env not supported")
 
@@ -417,6 +614,36 @@ class EnvEpisodeDataset(EnvDataset):
 			ep_start = 0
 			for ep_end in tqdm(dones_idxes):
 				for i in range(ep_start, ep_end): # 101 200=doneTrue i=101
+					for inter in range(1, multi_step + 1):
+						item_end = i + self.kwargs["horizon"] * inter # 200+101
+						invalid_start = ((ep_end-i) // inter) # 100
+						if item_end < full_len:
+							# 101, 301, 1, 100
+							indices.append([i, item_end, inter, invalid_start])
+				ep_start = ep_end + 1  # Move to the start of the next episode
+				if DEBUG_MODE and len(indices) > 10000: return torch.tensor(indices)
+			
+			indices = torch.tensor(indices)
+		elif self.kwargs["mode"].startswith("valid_multi_step_epstart"):
+			"""
+				same as before but is episode based
+				would use indices cross episodes but mark the ones in the 
+				later as invalid
+				[(start, end, interval, invalid_start)]
+			"""
+			indices = []
+			mode, multi_step = self.kwargs["mode"].split("%")
+			multi_step = int(multi_step)
+			dones = dataset["terminals"]
+			if "timeouts" in dataset: dones |= dataset["timeouts"]
+			dones_idxes = torch.where(dones)[0]
+			full_len = len(dataset["terminals"])
+			
+			print("making indexes for valid episode-based multi-step ...")
+			ep_start = 0
+			for ep_end in tqdm(dones_idxes):
+				if ep_end - ep_start < self.kwargs["horizon"]: continue # ! this would miss a lot of data
+				for i in [ep_start]: # 101 200=doneTrue i=101
 					for inter in range(1, multi_step + 1):
 						item_end = i + self.kwargs["horizon"] * inter # 200+101
 						invalid_start = ((ep_end-i) // inter) # 100
@@ -742,9 +969,6 @@ class EnvDatamodule(LightningDataModule):
 		:param state_dict: The datamodule state returned by `self.state_dict()`.
 		"""
 		pass
-
-
-
 
 
 if __name__ == '__main__':

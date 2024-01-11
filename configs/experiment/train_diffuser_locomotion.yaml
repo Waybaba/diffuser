@@ -18,32 +18,33 @@ modelmodule:
       # clip_denoised: true # ! different from maze in original paper
     net: 
       dim_mults: [1, 2, 4, 8]
-  controller:
-    # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/runs/2023-09-05_09-13-20_740659/
-    # dir: ${oc.env:UOUTDIR}/hydra_log/RL_Diffuser/multiruns/2023-08-30_08-31-28_530341/0
-    turn_on: true
-    dir: /output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0
-    epoch: last
+  evaluator:
+    rolloutor:
+      _target_: src.modelmodule.eval_rollout
+      _partial_: true
+      cfg:
+        plan_freq: 1.0
     policy:
       _target_: diffuser.sampling.GuidedPolicy
       _partial_: true
-      # guide: in python
-      # diffusion_model: in python
-      # normalizer:  in python
-      preprocess_fns: []
-      # the following are **sample_kwargs
+      # ! diffusion_model: in python
+      # ! normalizer:  in python
+      guide:
+        _target_: diffuser.sampling.DummyGuide
+      preprocess_fns: [] # ! chang with env? 
       sample_fn: 
         # _target_: diffuser.sampling.n_step_guided_p_sample
         _target_: diffuser.sampling.n_step_guided_p_sample_freedom_timetravel
         _partial_: true
-      scale: 10000000
+      scale: 0.0 
       n_guide_steps: 1 # ! does not used, only use one step + time travel
       t_stopgrad: 2 # positive: grad[t < t_stopgrad] = 0; bigger is noise
       scale_grad_by_std: true
       grad_interval: [0.1, 1.0]
       travel_repeat: 2 # time travel
       travel_interval: [0.1,0.9] # if float, would use [horizon*travel_interval, horizon]
-    plan_freq: 1.0
-    guide:
-      _target_: diffuser.sampling.DummyGuide
+    controller:
+      type: "diffuser"
+      # dir: /output/hydra_log/RL_Diffuser/multiruns/2023-09-06_10-14-47_373181/0
+      # epoch: last
 

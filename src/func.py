@@ -59,8 +59,8 @@ def load_controller(dir_, epoch_):
 def full_rollout_once(
 		env, 
 		planner, 
-		actor, 
-		normalizer_actor, 
+		actor=None, 
+		normalizer_actor=None, 
 		plan_freq=1,
 		len_max=1000
 	):
@@ -99,10 +99,8 @@ def full_rollout_once(
 		"""
 		TODO: use history in guide
 		"""
-		cond = {
-			0: history[-1]
-		}
-		actions, samples = planner(cond, batch_size=1,verbose=False)
+		cond = {0: history[-1]}
+		action, samples = planner(cond, batch_size=1,verbose=False)
 		plan = samples.observations[0] # (T, obs_dim)
 		return plan
 
@@ -158,12 +156,16 @@ def full_rollout_once_witha(
 		call actor(obs, obs_, batch_size=1, verbose=False) and return act
 	"""
 
-	# assert planner.training == False, "planner should be in eval mode"
+	def make_plan_and_act(planner, history):
+		cond = {0: history[-1]}
+		action, samples = planner(cond, batch_size=1,verbose=False)
+		plan = samples.observations[0] # (T, obs_dim)
+		return plan, action # [T, obs_dim], [act_dim]
+
+	assert planner.diffusion_model.training == False, "planner should be in eval mode"
 	print(f"Start full rollout, plan_freq={plan_freq}, len_max={len_max} ...")
 	res = {"act": [],"s": [],"s_": [],"r": [],}
 	env_step = 0
-
-	t_madeplan = -99999
 	
 	s = env.reset()
 	s = s[0] if isinstance(s, tuple) and len(s)==2 else s # for kuka env
@@ -172,14 +174,15 @@ def full_rollout_once_witha(
 		# 	plan, plan_act = make_plan(planner, res["s"]+[s]) # (horizon, obs_dim)
 		# 	t_madeplan = env_step
 		# a = make_act(res["s"]+[s], plan, plan_act, t_madeplan, normalizer_actor)
-
-		# plan, plan_act = make_plan(planner, res["s"]+[s])
 		# a = plan_act[0]
-		conditions = {0: torch.tensor(s).to("cuda")}
-		conditions = {k: planner.preprocess_fn(v) for k, v in conditions.items()}
-		samples = planner.diffusion_model(conditions, guide=planner.guide, verbose=False, **planner.sample_kwargs) # ! sample kwargs
-		a = samples.trajectories[0, 0, :planner.action_dim]
-		a = a.cpu().numpy()
+		plan, a = make_plan_and_act(planner, res["s"]+[s])
+		
+		# ! June 9: previous manually worked
+		# conditions = {0: torch.tensor(s).to("cuda")}
+		# conditions = {k: planner.preprocess_fn(v) for k, v in conditions.items()}
+		# samples = planner.diffusion_model(conditions, guide=planner.guide, verbose=False, **planner.sample_kwargs) # ! sample kwargs
+		# a = samples.trajectories[0, 0, :planner.action_dim]
+		# a = a.cpu().numpy
 
 		env_res = env.step(a)
 		if len(env_res) == 4: s_, r, done, info = env_res
@@ -196,8 +199,7 @@ def full_rollout_once_witha(
 		if done or env_step > len_max: break
 	
 	# stack
-	for k in res.keys():
-		res[k] = np.stack(res[k], axis=0)
+	for k in res.keys(): res[k] = np.stack(res[k], axis=0)
 	
 	print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
 	return res
@@ -256,8 +258,6 @@ def full_rollout_once_bc(
 	print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
 	return res
 
-
-
 def load_kuka(env, custom_ds_path=None):
 	""" load kuka env 
 	"""
@@ -309,7 +309,6 @@ def load_kuka(env, custom_ds_path=None):
 		"rewards": np.zeros_like(terminals),
 	}
 	return env, dataset
-
 
 def minari_to_d4rl(dataset):
 	# ["observations", "actions", "terminals", "timeouts", "rewards"]

@@ -442,6 +442,123 @@ def rollout_ref(env, ep_ref, model, normalizer):
 		"r": np.stack(ep_r),
 	}
 
+def eval_rollout(policy, controller, env, renderer, cfg={}):
+	"""
+		previous args is TODO from python
+		cfg: cfg about rollout plan_freq:  
+		TODO: add one func for generator without rollout
+	"""
+
+	def make_act(controller, history, plan_samples, t_madeplan):
+		"""
+		actor: would generate act, different for diff methods
+		history: [obs_dim]*t_cur # note the length should be t_cur so that plan would be made
+		"""
+		if controller is None:
+			act = plan_samples.actions[0][0]
+		elif hasattr(controller, "net"):
+			raise NotImplementedError("TODO especiall about the normaize part")
+			s = history[-1]
+			s_ = plan[len(history)-1-t_madeplan+1] # e.g. for first step, len(history)=1, t_madeplan=0, we should use first element of plan as s_
+			model = actor
+			device = next(actor.parameters()).device
+			model.to(device)
+			act = model(torch.cat([
+				torch.tensor(normalizer_actor.normalize(
+					s,
+					"observations"
+				)).to(device), 
+				torch.tensor(normalizer_actor.normalize(
+					s_,
+					"observations"
+				)).to(device)
+			], dim=-1).float().to(device))
+			act = act.detach().cpu().numpy()
+			act = normalizer_actor.unnormalize(act, "actions")
+		return act
+
+	def make_plan(policy, history):
+		"""
+		TODO: use history in guide
+		"""
+		cond = {0: history[-1]}
+		action, plan_samples = policy(cond, batch_size=1,verbose=False)
+		# plan_samples = samples.observations[0] # (T, obs_dim)
+		return plan_samples
+
+	def run_rollout(len_max):
+		print(f"Start full rollout, plan_freq={cfg.plan_freq}, len_max={len_max} ...")
+		res = {"act": [],"s": [],"s_": [],"r": [],}
+		env_step = 0
+		t_madeplan = -99999
+		
+		s = env.reset()
+		s = s[0] if isinstance(s, tuple) and len(s)==2 else s # for kuka env
+		while True: 
+			if env_step - t_madeplan >= cfg.plan_freq: # note the max value is horizon - 1 instead of horizon, since the first step is current
+				plan_samples = make_plan(policy, res["s"]+[s]) # (horizon, obs_dim)
+				t_madeplan = env_step
+			a = make_act(controller, res["s"]+[s], plan_samples, t_madeplan)
+			env_res = env.step(a)
+			if len(env_res) == 4: s_, r, done, info = env_res
+			elif len(env_res) == 5: 
+				s_, r, terminal, timeout, info = env_res
+				done = terminal or timeout
+			s = s_
+			
+			res["act"].append(a)
+			res["s"].append(s)
+			res["s_"].append(s_)
+			res["r"].append(r)
+			env_step += 1
+			if done or env_step > len_max: break
+		
+		# stack
+		for k in res.keys(): res[k] = np.stack(res[k], axis=0)
+		
+		print(f"Full Rollout: len={len(res['act'])} reward_sum={sum(res['r'])}")
+		return res
+
+	### distill
+	N_EPISODES = 1
+	N_FULLROLLOUT = 1
+	LEN_MAX = 1000
+	to_log = {}
+	policy.diffusion_model.to(torch.device("cuda"))
+	policy.diffusion_model.eval()
+	if hasattr(controller, "net"):
+		actor = controller.net
+		actor.to(torch.device("cuda"))
+		actor.eval()
+
+	### episodes - rollout
+	episodes_full_rollout = [run_rollout(len_max=LEN_MAX) for i in range(N_FULLROLLOUT)]  # [{"s": ...}]
+	episodes_full_rollout = safefill_rollout(episodes_full_rollout)
+
+	### distill state
+	states_full_rollout = np.stack([each["s"] for each in episodes_full_rollout], axis=0)
+	
+	### cals common metric in guide_
+	LOG_PREFIX = "value"
+	LOG_SUB_PREFIX = "full_rollout"
+	metrics = policy.guide.metrics(states_full_rollout)
+	for k, v in metrics.items(): to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_{k}"] = v.mean()
+
+	### cals rollout metric
+	LOG_PREFIX = "value"
+	LOG_SUB_PREFIX = "full_rollout"
+	r_sum = np.mean([each["r"].sum() for each in episodes_full_rollout])
+	to_log[f"{LOG_PREFIX}/{LOG_SUB_PREFIX}_reward"] = r_sum
+
+	### render
+	LOG_PREFIX = "val_ep_end"
+	MAXSTEP = 1000
+	to_log[f"{LOG_PREFIX}/states_full_rollout"] = [wandb_media_wrapper(
+		renderer.episodes2img(states_full_rollout[:4,:MAXSTEP])
+	)]
+	return to_log
+
+
 """model wrapper"""
 class ModelWrapperBase(nn.Module):
 	""" 
@@ -1033,8 +1150,6 @@ class DiffuserModule(DefaultModule):
 		**kwargs
 	):
 		super().__init__(**kwargs)
-		if "controller" in self.hparams and self.hparams.controller.turn_on:
-			self.controller = load_controller(self.hparams.controller.dir, self.hparams.controller.epoch)
 		
 	def step(self, batch: Any):
 		""" process the batch from dataloader and return the res_batch
@@ -1065,18 +1180,25 @@ class DiffuserModule(DefaultModule):
 		assert self.net.training == False, "net should be in eval mode"
 		LOG_PREFIX = "val_ep_end"
 		to_log = {}
-
-		### get render data # TODO spilt well
 		dataset = self.dynamic_cfg["dataset"]
-		env = dataset.env
+		env, renderer, normalizer = dataset.env, dataset.renderer, dataset.normalizer
+
+		### get noguide render data # TODO spilt well
 		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
-		# ! TODO get full ep
+		
+		### get guided render data
 		N_FULLROLLOUT = 1
+		if not hasattr(self, "self.controller") and self.hparams.evaluator.controller.type != "diffuser":
+			self.controller = load_controller(self.hparams.evaluator.controller.dir, self.hparams.evaluator.controller.epoch)
+		else: self.controller = None # use diffuser act to act
+		self.policy = self.hparams.evaluator.policy(diffusion_model=self.net.diffusion, normalizer=normalizer)
+		to_log.update(self.hparams.evaluator.rolloutor(self.policy, self.controller, env, renderer))
+
 		# if self.hparams.eval.turn_on:
-		if self.hparams.controller.turn_on:
-			print("Start eval_pair")
-			to_log_ = eval_pair(self, self.controller, self.hparams.controller.policy, plan_freq=self.hparams.controller.plan_freq, guide_=self.hparams.controller.guide)
-			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
+		# print("Start eval_pair")
+		# to_log_ = eval_pair(self, self.controller, self.hparams.controller.policy, plan_freq=self.hparams.controller.plan_freq, guide_=self.hparams.controller.guide)
+		# to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
+		
 		### log
 		LOG_PREFIX="val_ep_end"
 		to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
@@ -1090,7 +1212,7 @@ class DiffuserModule(DefaultModule):
 
 	def render_samples(self):
 		'''
-			renders samples from (ema) diffusion model
+			generate and render samples from (ema) diffusion model, return img
 			we sample batch_size conditions, 
 			for each one in conditions,
 			we generate n_samples trajectories with the same initial condition
@@ -1103,7 +1225,7 @@ class DiffuserModule(DefaultModule):
 				$UOURDIR/xxx/sample-{learning_step}-{batch_size-1}.png
 		'''
 		batch_size = 1
-		N_SAMPLES = 4 # would have same condition, rendered in one img
+		N_SAMPLES = 2 # would have same condition, rendered in one img
 		ref_res, img_res, chain_res = [], [], []
 		dataset = self.dynamic_cfg["data_val"][0]
 		from torch.utils.data.dataloader import default_collate
@@ -1173,7 +1295,6 @@ class DiffuserModule(DefaultModule):
 			# img_res.append(self.dynamic_cfg["dataset"].renderer.episodes2img(observations,path=self.hparams+"/ref_latest.png"))
 			# chain_res.append(self.dynamic_cfg["dataset"].renderer.chains2video(chains,path=self.hparams+"/ref_latest.png"))
 			
-
 		return ref_res, img_res, None if len(chain_res) == 0 else chain_res
 
 class DiffuserWithActModule(DefaultModule):

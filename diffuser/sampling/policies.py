@@ -12,7 +12,7 @@ Trajectories = namedtuple('Trajectories', 'actions observations values')
 
 class GuidedPolicy:
 
-    def __init__(self, guide, diffusion_model, normalizer, preprocess_fns, **sample_kwargs):
+    def __init__(self, guide=None, diffusion_model=None, normalizer=None, preprocess_fns=None, **sample_kwargs):
         self.guide = guide
         self.diffusion_model = diffusion_model
         self.normalizer = normalizer
