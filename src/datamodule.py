@@ -82,6 +82,7 @@ class QuickdrawEnv(gym.Env):
 		return self.state, reward, done, info
 
 class QuickdrawDataset:
+	MODE = "cat"
 	def __init__(self, data_dir, use_buf=True):
 		self.data_dir = data_dir
 		self.use_buf = use_buf
@@ -110,15 +111,16 @@ class QuickdrawDataset:
 	def load(self):
 		import os
 		import pickle
+		FAST_LOAD = False
 		classes = []
 		for f_name in os.listdir(self.data_dir):
 			if f_name.endswith('.ndjson') and not f_name.startswith('.'): classes.append(f_name[:-7])
 			else: pass
 
-		if self.use_buf and os.path.exists(self.data_dir + '/dfs.pkl') and os.path.exists(self.data_dir + '/ds.pkl'):
-			with open(self.data_dir + '/dfs.pkl', 'rb') as f:
+		if FAST_LOAD and self.use_buf and os.path.exists(self.data_dir + f'/{self.MODE}_dfs.pkl') and os.path.exists(self.data_dir + f'/{self.MODE}_ds.pkl'):
+			with open(self.data_dir + f'/{self.MODE}_dfs.pkl', 'rb') as f:
 				self.dfs = pickle.load(f)
-			with open(self.data_dir + '/ds.pkl', 'rb') as f:
+			with open(self.data_dir + f'/{self.MODE}_ds.pkl', 'rb') as f:
 				self.ds = pickle.load(f)
 		else:
 			self.dfs = {}
@@ -126,7 +128,6 @@ class QuickdrawDataset:
 			for c in ["door"]:
 				print(f"loading {c}")
 				self.dfs[c] = pd.read_json(self.data_dir + '/' + c + '.ndjson', lines=True)
-				break # ! TODO only use one class now
 
 			# df = pd.read_json('/path/to/records.ndjson', lines=True)
 			# df.to_json('/path/to/export.ndjson', lines=True)
@@ -157,7 +158,7 @@ class QuickdrawDataset:
 							h += [1] * (len(hidden_stroke[0]))
 							done += [0] * (len(hidden_stroke[0]))
 					done[-1] = 1
-					# break
+					# if i > 10: break # ! for DEBUG
 			s = [[x[i], y[i], h[i]] for i in range(len(x))]
 			s = np.array(s)
 			# a = np.diff(s, axis=0)[:,:2]
@@ -167,12 +168,14 @@ class QuickdrawDataset:
 			a[done==1] = 0
 			r = np.zeros_like(done)
 			self.ds = {"observations": s, "actions": a, "terminals": np.array(done), "rewards": r, "timeouts": np.zeros_like(done)}
-			# self.ds = {"observations": self.ds["observations"], "actions": self.ds["actions"], "terminals": np.array(self.ds["terminals"]), "rewards": self.ds["rewards"], "timeouts": self.ds["timeouts"]}
 
-			with open(self.data_dir + '/dfs.pkl', 'wb') as f:
-				pickle.dump(self.dfs, f)
-			with open(self.data_dir + '/ds.pkl', 'wb') as f:
-				pickle.dump(self.ds, f)
+			self.ds = self.norm_length(self.ds, length=32)
+			# self.ds = {"observations": self.ds["observations"], "actions": self.ds["actions"], "terminals": np.array(self.ds["terminals"]), "rewards": self.ds["rewards"], "timeouts": self.ds["timeouts"]}
+			if FAST_LOAD:
+				with open(self.data_dir + f'/{self.MODE}_dfs.pkl', 'wb') as f:
+					pickle.dump(self.dfs, f)
+				with open(self.data_dir + f'/{self.MODE}_ds.pkl', 'wb') as f:
+					pickle.dump(self.ds, f)
 			# ["observations", "actions", "terminals", "timeouts", "rewards"]
 			# self.ds_2 = {
 			# 	"observations": self.ds["s"],
@@ -189,40 +192,83 @@ class QuickdrawDataset:
 		# drawing_s_cur = []
 		# stroke_s_cur = []
 		# plt.figure()
+		# plt.gca().invert_yaxis()
+		# s, done = self.ds["observations"], self.ds["terminals"]
 		# for i in range(len(s)):
-		# 	# if d[i] == 0: stroke_s_cur.append(s[i])
-		# 	# elif d[i] == 1: 
-		# 	# 	drawing_s_cur.append(stroke_s_cur)
-		# 	# 	stroke_s_cur = []
-		# 	# elif d[i] == 2:
-		# 	# 	drawing_s_cur.append(stroke_s_cur)
-		# 	# 	plt.figure()
-		# 	# 	for stroke in drawing_s_cur:
-		# 	# 		stroke = np.array(stroke)
-		# 	# 		plt.plot(stroke[:, 0], stroke[:, 1])
-		# 	# 	plt.savefig(output_path + '/' + str(i) + '.png')
-		# 	# 	print(f"saved {output_path}/{i}.png")
-		# 	# 	plt.close()
-		# 	# 	drawing_s_cur = []
-		# 	# 	stroke_s_cur = []
-		# 		# break
 		# 	if done[i] == 1:
 		# 		plt.savefig(output_path + '/' + str(i) + '.png')
+		# 		print(f"saved {output_path}/{i}.png")
 		# 		plt.close()
 		# 		plt.figure()
-		# 	elif h[i] == 1:
+		# 	elif s[i,2] == 1:
 		# 		if i+2 >= len(s): continue
 		# 		plt.plot(s[i:i+2, 0], s[i:i+2, 1], color='red')
-		# 	elif h[i] == 0: 
+		# 	elif s[i,2] == 0: 
 		# 		if i+2 >= len(s): continue
 		# 		plt.plot(s[i:i+2, 0], s[i:i+2, 1], color='blue')
-			
-		# print(f"saved {output_path}/{i}.png")
+		# plt.close()
+		
 		# # TODO revise y axix
 
 	def get_datadict(self):
 		if not hasattr(self, 'ds'): self.load()
 		return self.ds
+
+	def norm_length(self, ds, length):
+		""" interpolation ds to make length equal to `length` for each episode
+		1. use "terminals" as indication of episodes
+		2. for "observations" keep the start and end the same, interpolate to length
+		3. for "actions", at the episode end, action is 0, is the next observation for others
+		4. reward and timeouts: all zero
+		ds = {
+			"observations": s, # (l, obs_dim)
+			"actions": a, # (l, act_dim)
+			"terminals": np.array(done), # (l,) # 1 when episode ends
+			"rewards": r, # (l,)
+			"timeouts": np.zeros_like(done) # (l,)
+		}
+		"""
+		new_ds = {
+			"observations": [],
+			"actions": [],
+			"terminals": [],
+			"rewards": [],
+			"timeouts": []
+		}
+
+		# Identifying episode boundaries
+		episode_boundaries = np.where(ds['terminals'] == 1)[0]
+		start_idx = 0
+
+		for end_idx in episode_boundaries:
+			# Interpolating observations and actions
+			episode_data = ds['observations'][start_idx:end_idx + 1]
+			old_time_steps = np.linspace(0, 1, len(episode_data))
+			new_time_steps = np.linspace(0, 1, length)
+
+			# Using linear interpolation
+			interpolator = interp1d(old_time_steps, episode_data, axis=0)
+			new_data = interpolator(new_time_steps)
+
+			# make the [-1] element round to 0,1
+			new_data = np.round(new_data)
+
+			# Handling terminals, rewards, and timeouts
+			new_ds['observations'].append(new_data)
+			new_ds['actions'].append(np.concatenate([new_data[1:], np.zeros((1,ds['actions'].shape[1]))], axis=0))
+			new_ds['terminals'].append(np.array([0]*(length-1) + [1]))
+			new_ds['rewards'].append(np.zeros(length))
+			new_ds['timeouts'].append(np.zeros(length, dtype=np.int32))
+
+			start_idx = end_idx + 1
+
+		# Converting lists to numpy arrays
+		for key in new_ds:
+			new_ds[key] = np.concatenate(new_ds[key], axis=0)
+
+		return new_ds
+
+
 
 ### dataset
 

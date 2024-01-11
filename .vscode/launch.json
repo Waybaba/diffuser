@@ -60,6 +60,7 @@
 				"wandb.mode=online",
 				// #### mujoco
 				"experiment=train_diffuser_witha",
+				"datamodule.dataset.lazyload=false",
 				// "datamodule.dataset.env=kitchen-complete-v1",
 				// "datamodule.dataset.env=halfcheetah-expert-v2",
 				// "datamodule.dataset.env=halfcheetah-expert-v2",
@@ -74,7 +75,7 @@
 				// "trainer.save_freq=10000", // save model and rollout
 				// "trainer.sample_freq=1000", // sample and redering
 				// "policy.scale_grad_by_std=true",
-				"global_cfg.horizon=32",
+				"global_cfg.horizon=64",
 				// "wandb.buf_dir=null",
 				// "env.delay=0",
 				// "modelmodule.controller.guide._target_=diffuser.sampling.CheetahFaster",
