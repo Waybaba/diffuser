@@ -252,6 +252,7 @@ class QuickdrawDataset:
 
 			# make the [-1] element round to 0,1
 			new_data = np.round(new_data)
+			new_data[0] = np.array([0.,0.,0.])
 
 			# Handling terminals, rewards, and timeouts
 			new_ds['observations'].append(new_data)
@@ -313,7 +314,7 @@ class EnvDataset:
 			  **kwargs,
 		):
 		assert type(env) == str, "env should be a string"
-		assert [env.startswith(v) for v in ["quickdraw", "minari:","maze", "walker2d", "hopper", "halfcheetah", "reacher", "kitchen", "hammer", "door", "pen", "relocate"]].count(True) == 1, f"env {env} not supported"
+		assert [env.startswith(v) for v in ["panda", "quickdraw", "minari:","maze", "walker2d", "hopper", "halfcheetah", "reacher", "kitchen", "hammer", "door", "pen", "relocate"]].count(True) == 1, f"env {env} not supported"
 
 		### get dataset (setup self.dataset, self.env)
 		self.env_name = env
@@ -341,6 +342,8 @@ class EnvDataset:
 				self.dataset[k] = np.concatenate([ds[k] for ds in ds_list], axis=0)
 		elif self.env_name.startswith("quickdraw"):
 			self.env, self.dataset = load_quickdraw(self.env_name)
+		elif self.env_name.startswith("panda"):
+			self.env, self.dataset = load_panda(self.env_name)
 		else:
 			self.env = load_environment(self.env_name) # TOODO can not use gym.make ?
 			if custom_ds_path: self.dataset = self.env.get_dataset(custom_ds_path)
@@ -358,6 +361,8 @@ class EnvDataset:
 		elif "kuka" in self.env_name: 
 			preprocess_fns = []
 		elif self.env_name.startswith("quickdraw"):
+			preprocess_fns = []
+		elif self.env_name.startswith("panda"):
 			preprocess_fns = []
 		else: raise NotImplementedError("env not supported")
 		self.preprocess_fn = get_preprocess_fn(preprocess_fns, self.env_name) # TOODO do not use original function
@@ -382,7 +387,9 @@ class EnvDataset:
 				normalizer = "DebugNormalizer"
 			elif "kuka" in self.env_name: normalizer = "LimitsNormalizer"
 			elif self.env_name.startswith("quickdraw"): 
-				normalizer = "GaussianNormalizer"
+				normalizer = "LimitsNormalizer"
+			elif self.env_name.startswith("panda"):
+				normalizer = "LimitsNormalizer"
 			else: raise NotImplementedError(f"env {self.env_name} not supported")
 		else:
 			normalizer = normalizer
@@ -421,6 +428,9 @@ class EnvDataset:
 		elif self.env_name.startswith("quickdraw"): 
 			from diffuser.utils.rendering import QuickdrawRenderer
 			self.renderer = QuickdrawRenderer()
+		elif self.env_name.startswith("panda"):
+			from diffuser.utils.rendering import PandaRenderer
+			self.renderer = PandaRenderer(self.env_name)
 		else:
 			raise NotImplementedError("env not supported")
 

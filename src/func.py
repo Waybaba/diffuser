@@ -13,6 +13,7 @@ from diffuser.sampling.guides import DummyGuide
 from diffuser.sampling.policies import GuidedPolicy
 from diffuser.sampling import n_step_guided_p_sample_freedom_timetravel, n_step_guided_p_sample
 from collections import namedtuple
+import gymnasium as gym
 
 """names"""
 Batch = namedtuple('Batch', 'trajectories conditions')
@@ -24,7 +25,134 @@ MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
 
 
 """Functions"""
+import gymnasium as gym
+class MergeObsActWrapper(gym.Wrapper):
+    """ merge all observation into a single observation
+    original observation space: {
+        'achieved_goal': Box(-10., 10., (3,), float32),
+        'desired_goal': Box(-10., 10., (3,), float32),
+        'observation': Box(-inf, inf, (25,), float32)
+        ...
+    }
+    new observation space: Box([-10., -10., ..., -inf, -inf], [10., 10., ..., inf, inf], (31,), float32)
+    """
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = gym.spaces.Box(
+            low=np.concatenate([env.observation_space[key].low for key in env.observation_space.spaces.keys()]),
+            high=np.concatenate([env.observation_space[key].high for key in env.observation_space.spaces.keys()]),
+            dtype=np.float32
+        )
+
+    def reset(self):
+        res = self.env.reset()
+        if isinstance(res, tuple): obs, info = res
+        else: obs, info = res, {}
+        obs = self.merge_obs(obs)
+        if isinstance(res, tuple):
+            return obs, info
+        else:
+            return obs
+
+
+    def step(self, action):
+        res = self.env.step(action)
+        if len(res) == 4:
+            obs, reward, done, info = res
+            truncated = False
+        elif len(res) == 5:
+            obs, reward, done, truncated, info = res
+        else:
+            raise ValueError("Invalid return value from env.step()")
+        obs = self.merge_obs(obs)
+        # return
+        if len(res) == 4:
+            return obs, reward, done, info
+        elif len(res) == 5:
+            return obs, reward, done, truncated, info
+    
+    def merge_obs(self, obs):
+        return np.concatenate([obs[key] for key in obs.keys()])
+
+class PandaAddStateWrapper(gym.Wrapper):
+    """
+    note this only for rendering since it only set the joint angle
+    without updating the velocity
+    """
+    def __init__(self, env):
+        super().__init__(env)
+        self.joint_dim = len(env.robot.joint_indices)
+        self.observation_space = gym.spaces.Box(
+            low=np.concatenate([env.observation_space.low, -np.ones(self.joint_dim)*10.]),
+            high=np.concatenate([env.observation_space.high, np.ones(self.joint_dim)*10.]),
+            dtype=np.float32
+        )
+
+    def reset(self):
+        res = self.env.reset()
+        if isinstance(res, tuple): obs, info = res
+        else: obs, info = res, {}
+        obs = self.append_extra_obs(obs)
+        if isinstance(res, tuple):
+            return obs, info
+        else:
+            return obs
+
+    def step(self, action):
+        res = self.env.step(action)
+        if len(res) == 4:
+            obs, reward, done, info = res
+            truncated = False
+        elif len(res) == 5:
+            obs, reward, done, truncated, info = res
+        else:
+            raise ValueError("Invalid return value from env.step()")
+        obs = self.append_extra_obs(obs)
+        # return
+        if len(res) == 4:
+            return obs, reward, done, info
+        elif len(res) == 5:
+            return obs, reward, done, truncated, info
+    
+    def get_extra_obs(self):
+        return np.array([
+            self.robot.get_joint_angle(joint) \
+            for joint in self.robot.joint_indices
+        ], dtype=np.float32)
+
+    def append_extra_obs(self, obs):
+        return np.concatenate([obs, self.get_extra_obs()])
+
+    def set_state(self, obs):
+        self.robot.set_joint_angles(obs[-self.joint_dim:])
+        self.sim.set_base_pose("target", obs[-self.joint_dim-3:-self.joint_dim], np.array([0.0, 0.0, 0.0, 1.0]))
+
+def gym_make_panda(env_name):
+	# e.g. pandareachdense-sac_10000
+	import panda_gym
+	e_name = env_name.split("-")[0]
+	e_name = e_name[5:][:-5]
+	e_name = e_name[0].upper() + e_name[1:]
+	e_name = f"Panda{e_name}"
+	e_name += "" if "dense" not in env_name else "Dense"
+	e_name += "-v3"
+	env = gym.make(e_name, render_mode="rgb_array")
+	env = MergeObsActWrapper(env)
+	env = PandaAddStateWrapper(env)
+	return env
+
+def load_panda(env_name):
+	import minari
+	import gymnasium as gym
+	dataset = minari.load_dataset(env_name)
+	env = gym_make_panda(env_name)
+	dataset = minari_to_d4rl(dataset)
+	return env, dataset
+
 def wandb_media_wrapper(media):
+	"""
+	handle two types of rendering result, both to wandb log objects
+	"""
 	if len(media.shape) == 4: # T, Ch, H, W
 		assert media.shape[1] in [3, 4], "Ch number wrong, shape is {media.shape}"
 		return wandb.Video(media)
@@ -333,10 +461,10 @@ def load_minari(env):
 	dataset = minari_to_d4rl(dataset)
 	return env, dataset
 
-def load_custom_minari(env):
+def load_custom_minari(env_name):
 	import minari
 	import gymnasium as gym
-	dataset = minari.load_dataset(env)
+	dataset = minari.load_dataset(env_name)
 	env = dataset.recover_environment()
 	dataset = minari_to_d4rl(dataset)
 	return env, dataset

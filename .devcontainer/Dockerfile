@@ -111,6 +111,8 @@ RUN pip install gymnasium gymnasium-robotics mujoco minari
 
 RUN pip install torchmetrics==0.11.4
 
+RUN pip install panda-gym
+
 # RUN pip install pytorch-lightning==1.8.6
 
 ## Non-root user creation and enter
@@ -174,5 +176,6 @@ RUN pip install gymnasium gymnasium-robotics
 ENV MUJOCO_GL=egl
 
 ### end # comment the following when amlt: amlt need root user to build, but it will switch to a user called aiscuser when running
-USER $USERNAME 
-CMD sleep infinity
+# USER $USERNAME 
+# CMD sleep infinity
+USER root

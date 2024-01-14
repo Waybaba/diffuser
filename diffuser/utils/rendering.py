@@ -13,6 +13,7 @@ import gym
 import mujoco_py as mjc
 from typing import List, Dict, Union, Any
 from copy import deepcopy
+from src.func import *
 
 # Local Application/Library Specific Imports
 from .arrays import to_np
@@ -794,7 +795,7 @@ class MarinaRenderer(MuJoCoRenderer):
 class QuickdrawRenderer(Renderer):
 	def __init__(self):
 		self._remove_margins = False
-		
+
 	def renders(self, observations, conditions=None, title=None):
 		plt.clf()
 		fig = plt.gcf()
@@ -870,7 +871,85 @@ class QuickdrawRenderer(Renderer):
 		# render only first sample to gif
 		# self.render_to_gif(paths[0], savepath[:-4] + '.gif')
 		return images
-	   
+
+class PandaRenderer(Renderer):
+	RENDER_MODE = "video"
+
+	def __init__(self, env):
+		if type(env) is str:
+			self.env = gym_make_panda(env)
+		else:
+			raise ValueError(f'Expected str, got {type(env)}, this would cause env conflicts')
+		self.env.reset()
+		self.composite = self.composite_video if self.RENDER_MODE == "video" else self.composite_img
+
+	def composite_img(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
+		'''
+			savepath : str
+			observations : [ n_paths x horizon x 2 ]
+		'''
+		assert len(paths) % ncol == 0, 'Number of paths must be divisible by number of columns'
+
+		images_res = []
+		# for path, kw in zipkw(paths, **kwargs):
+			# img = self.renders(*path, conditions=conditions, **kw)
+		for path in paths:
+			img = self.renders(path, conditions=conditions)
+			images_res.append(img)
+		images = np.stack(images_res, axis=0)
+
+		nrow = len(images) // ncol
+		images = einops.rearrange(images,
+			'(nrow ncol) H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
+		if savepath is not None:
+			imageio.imsave(savepath, images)
+			print(f'Saved {len(paths)} samples to: {savepath}')
+
+		# render only first sample to gif
+		# self.render_to_gif(paths[0], savepath[:-4] + '.gif')
+		return images
+
+	def composite_video(self, savepath, paths, conditions={}, dim=(1024, 256), ncol=1, **kwargs):
+		images_res = []
+		# for path, kw in zipkw(paths, **kwargs):
+			# img = self.renders(*path, conditions=conditions, **kw)
+		for path in paths:
+			img = self.renders_video(path) # T, H, W, C
+			images_res.append(img)
+		images = np.stack(images_res, axis=0) # N, T, H, W, C
+		
+		nrow = len(images) // ncol
+		# to video # (T, Ch, H, W) stack 4 in one
+		# images = einops.rearrange(images,
+		#     '(nrow ncol) T H W C -> (nrow H) (ncol W) C', nrow=nrow, ncol=ncol)
+		images = einops.rearrange(images, 
+			'(nrow ncol) T H W Ch -> T Ch (nrow H) (ncol W)', nrow=nrow, ncol=ncol
+		)
+
+		# if savepath is not None:
+		#     imageio.imsave(savepath, images)
+		#     print(f'Saved {len(paths)} samples to: {savepath}')
+		
+		return images
+
+	def renders_img(self, observations, conditions=None, title=None):
+		frames = []
+		for obs in observations:
+			self.env.set_state(obs)
+			frame = self.env.render()
+			frames.append(frame) # (h, w, 3)
+		return np.concatenate(frames, axis=1) # 
+
+	def renders_video(self, observations, conditions=None, title=None):
+		# ! DEBUG
+		# observations = observations[:4]
+		frames = []
+		for obs in observations:
+			self.env.set_state(obs)
+			frame = self.env.render()
+			frames.append(frame) # (h, w, 3)
+		return np.stack(frames, axis=0) # (T,h,w,3)
+	
 #-----------------------------------------------------------------------------#
 #---------------------------------- rollouts ---------------------------------#
 #-----------------------------------------------------------------------------#
