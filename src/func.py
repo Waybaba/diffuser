@@ -26,106 +26,213 @@ MUJOCO_ENVS = ["hopper", "walker2d", "halfcheetah"]
 
 """Functions"""
 import gymnasium as gym
+
 class MergeObsActWrapper(gym.Wrapper):
-    """ merge all observation into a single observation
-    original observation space: {
-        'achieved_goal': Box(-10., 10., (3,), float32),
-        'desired_goal': Box(-10., 10., (3,), float32),
-        'observation': Box(-inf, inf, (25,), float32)
-        ...
-    }
-    new observation space: Box([-10., -10., ..., -inf, -inf], [10., 10., ..., inf, inf], (31,), float32)
-    """
-    def __init__(self, env):
-        super().__init__(env)
-        self.observation_space = gym.spaces.Box(
-            low=np.concatenate([env.observation_space[key].low for key in env.observation_space.spaces.keys()]),
-            high=np.concatenate([env.observation_space[key].high for key in env.observation_space.spaces.keys()]),
-            dtype=np.float32
-        )
+	""" merge all observation into a single observation
+	original observation space: {
+		'achieved_goal': Box(-10., 10., (3,), float32),
+		'desired_goal': Box(-10., 10., (3,), float32),
+		'observation': Box(-inf, inf, (25,), float32)
+		...
+	}
+	new observation space: Box([-10., -10., ..., -inf, -inf], [10., 10., ..., inf, inf], (31,), float32)
+	"""
+	def __init__(self, env):
+		super().__init__(env)
+		self.observation_space = gym.spaces.Box(
+			low=np.concatenate([env.observation_space[key].low for key in env.observation_space.spaces.keys()]),
+			high=np.concatenate([env.observation_space[key].high for key in env.observation_space.spaces.keys()]),
+			dtype=np.float32
+		)
 
-    def reset(self):
-        res = self.env.reset()
-        if isinstance(res, tuple): obs, info = res
-        else: obs, info = res, {}
-        obs = self.merge_obs(obs)
-        if isinstance(res, tuple):
-            return obs, info
-        else:
-            return obs
+	def reset(self):
+		res = self.env.reset()
+		if isinstance(res, tuple): obs, info = res
+		else: obs, info = res, {}
+		obs = self.merge_obs(obs)
+		if isinstance(res, tuple):
+			return obs, info
+		else:
+			return obs
 
+	def step(self, action):
+		res = self.env.step(action)
+		if len(res) == 4:
+			obs, reward, done, info = res
+			truncated = False
+		elif len(res) == 5:
+			obs, reward, done, truncated, info = res
+		else:
+			raise ValueError("Invalid return value from env.step()")
+		obs = self.merge_obs(obs)
+		# return
+		if len(res) == 4:
+			return obs, reward, done, info
+		elif len(res) == 5:
+			return obs, reward, done, truncated, info
+	
+	def merge_obs(self, obs):
+		return np.concatenate([obs[key] for key in obs.keys()])
 
-    def step(self, action):
-        res = self.env.step(action)
-        if len(res) == 4:
-            obs, reward, done, info = res
-            truncated = False
-        elif len(res) == 5:
-            obs, reward, done, truncated, info = res
-        else:
-            raise ValueError("Invalid return value from env.step()")
-        obs = self.merge_obs(obs)
-        # return
-        if len(res) == 4:
-            return obs, reward, done, info
-        elif len(res) == 5:
-            return obs, reward, done, truncated, info
-    
-    def merge_obs(self, obs):
-        return np.concatenate([obs[key] for key in obs.keys()])
+class ObsHander:
+	def __init__(self):
+		self.data = []
+	
+	def register(self, name, dim_num, space):
+		""" space can be a float
+		"""
+		if isinstance(space, float):
+			space = gym.spaces.Box(low=-space, high=space, shape=(dim_num,), dtype=np.float32)
+		self.data.append((name, dim_num, space))
+	
+	def distill(self, obs, name):
+		"""
+		obs: (all_dim, ) # where all_dim=sum([dim_num for _, dim_num, _ in self.data])
+		name: str
+		"""
+		idx = 0
+		for name_, dim_num, _ in self.data:
+			if name_ == name:
+				return obs[idx:idx+dim_num]
+			else:
+				idx += dim_num
+		raise ValueError("Invalid name {}".format(name))
+
+	def get_all_space(self):
+		# all_spc = gym.spaces.Box(
+		#     low=np.concatenate([spc.low for _, _, spc in self.data]),
+		#     high=np.concatenate([spc.high for _, _, spc in self.data]),
+		#     dtype=np.float32
+		# )
+		# ! use inf since there are bug of that the obs is out of range from panda-gym
+		all_spc = gym.spaces.Box(
+			low=np.full(sum([dim_num for _, dim_num, _ in self.data]), -np.inf, dtype=np.float32),
+			high=np.full(sum([dim_num for _, dim_num, _ in self.data]), np.inf, dtype=np.float32),
+			dtype=np.float32
+		)
+		return all_spc
 
 class PandaAddStateWrapper(gym.Wrapper):
-    """
-    note this only for rendering since it only set the joint angle
-    without updating the velocity
-    """
-    def __init__(self, env):
-        super().__init__(env)
-        self.joint_dim = len(env.robot.joint_indices)
-        self.observation_space = gym.spaces.Box(
-            low=np.concatenate([env.observation_space.low, -np.ones(self.joint_dim)*10.]),
-            high=np.concatenate([env.observation_space.high, np.ones(self.joint_dim)*10.]),
-            dtype=np.float32
-        )
+	"""
+	note this only for rendering since it only set the joint angle
+	without updating the velocity
+	"""
+	def __init__(self, env):
+		super().__init__(env)
+		self.obs_handler = ObsHander()
+		self.obs_handler.register("base", dim_num=env.observation_space.shape[0], space=env.observation_space)
+		
+		self.joint_dim = len(env.robot.joint_indices)
+		self.obs_handler.register("joint", dim_num=self.joint_dim, space=10.)
+		
+		if "Push" in self.env.spec.id:
+			self.push_obj_dim = 3 # ! only add position, since the orientation is not very useful for rendering and would cost space
+			self.obs_handler.register("push_obj", dim_num=self.push_obj_dim, space=10.)
+		
+		self.observation_space = self.obs_handler.get_all_space()
 
-    def reset(self):
-        res = self.env.reset()
-        if isinstance(res, tuple): obs, info = res
-        else: obs, info = res, {}
-        obs = self.append_extra_obs(obs)
-        if isinstance(res, tuple):
-            return obs, info
-        else:
-            return obs
+	def reset(self):
+		res = self.env.reset()
+		if isinstance(res, tuple): obs, info = res
+		else: obs, info = res, {}
+		obs = self.append_extra_obs(obs)
+		if isinstance(res, tuple):
+			return obs, info
+		else:
+			return obs
 
-    def step(self, action):
-        res = self.env.step(action)
-        if len(res) == 4:
-            obs, reward, done, info = res
-            truncated = False
-        elif len(res) == 5:
-            obs, reward, done, truncated, info = res
-        else:
-            raise ValueError("Invalid return value from env.step()")
-        obs = self.append_extra_obs(obs)
-        # return
-        if len(res) == 4:
-            return obs, reward, done, info
-        elif len(res) == 5:
-            return obs, reward, done, truncated, info
-    
-    def get_extra_obs(self):
-        return np.array([
-            self.robot.get_joint_angle(joint) \
-            for joint in self.robot.joint_indices
-        ], dtype=np.float32)
+	def step(self, action):
+		res = self.env.step(action)
+		if len(res) == 4:
+			obs, reward, done, info = res
+			truncated = False
+		elif len(res) == 5:
+			obs, reward, done, truncated, info = res
+		else:
+			raise ValueError("Invalid return value from env.step()")
+		obs = self.append_extra_obs(obs)
+		# return
+		if len(res) == 4:
+			return obs, reward, done, info
+		elif len(res) == 5:
+			return obs, reward, done, truncated, info
+	
+	def get_extra_obs(self):
+		obs_ = np.array([
+			self.robot.get_joint_angle(joint) \
+			for joint in self.robot.joint_indices
+		], dtype=np.float32)
+		if "Push" in self.env.spec.id:
+			tmp = self.env.task.sim.get_base_position("object").astype(np.float32)
+			obs_ = np.concatenate([obs_, tmp])
+		return obs_
 
-    def append_extra_obs(self, obs):
-        return np.concatenate([obs, self.get_extra_obs()])
+	def append_extra_obs(self, obs):
+		return np.concatenate([obs, self.get_extra_obs()])
 
-    def set_state(self, obs):
-        self.robot.set_joint_angles(obs[-self.joint_dim:])
-        self.sim.set_base_pose("target", obs[-self.joint_dim-3:-self.joint_dim], np.array([0.0, 0.0, 0.0, 1.0]))
+	def set_state(self, obs):
+		self.robot.set_joint_angles(self.obs_handler.distill(obs, "joint"))
+		if "Push" in self.env.spec.id:
+			self.sim.set_base_pose("object", self.obs_handler.distill(obs, "push_obj"), np.array([0.0, 0.0, 0.0, 1.0]))
+
+class PandaNogoalWrapper(gym.Wrapper):
+	""" merge all observation into a single observation
+	original observation space: {
+		'achieved_goal': Box(-10., 10., (3,), float32),
+		'desired_goal': Box(-10., 10., (3,), float32),
+		'observation': Box(-inf, inf, (25,), float32)
+		...
+	}
+	new observation space: Box([-10., -10., ..., -inf, -inf], [10., 10., ..., inf, inf], (31,), float32)
+	"""
+	def __init__(self, env):
+		super().__init__(env)
+		# ! TODO hard code
+		GOAL_DIM = {
+			"Reach": (9, 12),
+			"Push": (21, 24),
+			# TODO
+			# TODO
+		}
+		self.goal_dim = next(dim_ for name, dim_ in GOAL_DIM.items() if name in self.env.spec.id)
+		
+		self.observation_space = gym.spaces.Box(
+			low=self.rm_dims(env.observation_space.high),
+			high=self.rm_dims(env.observation_space.low),
+			dtype=np.float32
+		)
+
+	def reset(self):
+		res = self.env.reset()
+		if isinstance(res, tuple): obs, info = res
+		else: obs, info = res, {}
+		obs = self.merge_obs(obs)
+		if isinstance(res, tuple):
+			return obs, info
+		else:
+			return obs
+
+	def step(self, action):
+		res = self.env.step(action)
+		if len(res) == 4:
+			obs, reward, done, info = res
+			truncated = False
+		elif len(res) == 5:
+			obs, reward, done, truncated, info = res
+		else:
+			raise ValueError("Invalid return value from env.step()")
+		obs = self.merge_obs(obs)
+		# return
+		if len(res) == 4:
+			return obs, reward, done, info
+		elif len(res) == 5:
+			return obs, reward, done, truncated, info
+	
+	def merge_obs(self, obs):
+		return self.rm_dims(obs)
+
+	def rm_dims(self, in_):
+		return np.concatenate([in_[:self.goal_dim[0]], in_[self.goal_dim[1]:]])
 
 def gym_make_panda(env_name):
 	# e.g. pandareachdense-sac_10000
@@ -142,11 +249,19 @@ def gym_make_panda(env_name):
 	return env
 
 def load_panda(env_name):
+	def dataset_rm_goal(dataset, env):
+		return
 	import minari
 	import gymnasium as gym
+	nogoal = False
+	if env_name.endswith("nogoal"):
+		env_name, nogoal = env_name[:-7], True
 	dataset = minari.load_dataset(env_name)
 	env = gym_make_panda(env_name)
 	dataset = minari_to_d4rl(dataset)
+	if nogoal: 
+		dataset = dataset_rm_goal(dataset, env)
+		env = PandaNogoalWrapper(env)
 	return env, dataset
 
 def wandb_media_wrapper(media):
@@ -542,26 +657,26 @@ register(
 )
 
 OPEN55 = \
-        "#######\\"+\
-        "#OOOOO#\\"+\
-        "#OOOOO#\\"+\
-        "#OOGOO#\\"+\
-        "#OOOOO#\\"+\
-        "#OOOOO#\\"+\
-        "#######"
+		"#######\\"+\
+		"#OOOOO#\\"+\
+		"#OOOOO#\\"+\
+		"#OOGOO#\\"+\
+		"#OOOOO#\\"+\
+		"#OOOOO#\\"+\
+		"#######"
 
 register(
-    id='maze2d-open55-v0',
-    entry_point='d4rl.pointmaze:MazeEnv',
-    max_episode_steps=10000, # ! the origin value is 150
-    kwargs={
-        'maze_spec':OPEN55,
-        'reward_type':'sparse',
-        'reset_target': False,
-        'ref_min_score': 0.01,
-        'ref_max_score': 20.66,
-        'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-open-sparse.hdf5'
-    }
+	id='maze2d-open55-v0',
+	entry_point='d4rl.pointmaze:MazeEnv',
+	max_episode_steps=10000, # ! the origin value is 150
+	kwargs={
+		'maze_spec':OPEN55,
+		'reward_type':'sparse',
+		'reset_target': False,
+		'ref_min_score': 0.01,
+		'ref_max_score': 20.66,
+		'dataset_url':'http://rail.eecs.berkeley.edu/datasets/offline_rl/maze2d/maze2d-open-sparse.hdf5'
+	}
 )
 
 if __name__ == "__main__":
