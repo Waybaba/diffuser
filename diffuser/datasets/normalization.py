@@ -163,6 +163,9 @@ class LimitsNormalizer(Normalizer):
         x = (x - self.mins) / (self.maxs - self.mins)
         ## [ -1, 1 ]
         x = 2 * x - 1
+
+        # set the ones where the max and min are the same to 0
+        x[..., self.maxs == self.mins] = 0.
         return x
 
     def unnormalize(self, x, eps=1e-4):
@@ -176,7 +179,11 @@ class LimitsNormalizer(Normalizer):
         ## [ -1, 1 ] --> [ 0, 1 ]
         x = (x + 1) / 2.
 
-        return x * (self.maxs - self.mins) + self.mins
+        x = x * (self.maxs - self.mins) + self.mins
+
+        # set the ones where the max and min are the same to 0
+        x[..., self.maxs == self.mins] = self.mins[self.maxs == self.mins]
+        return x
 
 class SafeLimitsNormalizer(LimitsNormalizer):
     '''

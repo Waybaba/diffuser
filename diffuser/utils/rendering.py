@@ -873,7 +873,7 @@ class QuickdrawRenderer(Renderer):
 		return images
 
 class PandaRenderer(Renderer):
-	RENDER_MODE = "video"
+	RENDER_MODE = "video" # video or image
 
 	def __init__(self, env):
 		if type(env) is str:
@@ -894,7 +894,7 @@ class PandaRenderer(Renderer):
 		# for path, kw in zipkw(paths, **kwargs):
 			# img = self.renders(*path, conditions=conditions, **kw)
 		for path in paths:
-			img = self.renders(path, conditions=conditions)
+			img = self.renders_img(path, conditions=conditions)
 			images_res.append(img)
 		images = np.stack(images_res, axis=0)
 
@@ -933,12 +933,14 @@ class PandaRenderer(Renderer):
 		return images
 
 	def renders_img(self, observations, conditions=None, title=None):
-		frames = []
-		for obs in observations:
-			self.env.set_state(obs)
-			frame = self.env.render()
-			frames.append(frame) # (h, w, 3)
-		return np.concatenate(frames, axis=1) # 
+		frames = draw_3d_path({
+			"goal": (self.env.obs_handler.distill(observations,"goal"), "red"),
+			"endpoint": (self.env.obs_handler.distill(observations,"endpoint"), "green"),
+			"achieved": (self.env.obs_handler.distill(observations,"achieved"), "blue"),
+		})
+		# imageio.imsave("./debug/1123.png", frames)
+		# print(f'Saved samples to: ./debug/1123.png')
+		return frames
 
 	def renders_video(self, observations, conditions=None, title=None):
 		# ! DEBUG
@@ -949,7 +951,61 @@ class PandaRenderer(Renderer):
 			frame = self.env.render()
 			frames.append(frame) # (h, w, 3)
 		return np.stack(frames, axis=0) # (T,h,w,3)
-	
+
+
+def draw_3d_path(lines):
+	"""
+	Draw lines in 3D space and return as a NumPy image array.
+
+	Parameters:
+	lines: Each numpy array represents a line in 3D space, shaped (T, 3).
+		e.g. {
+			"goal": ((T,3), "green"),
+			"endpoint": ((T,3), "red"),
+			"achieved": ((T,3), "blue"),
+		}
+	colors (list of colors): Optional. A list of colors for each line. Must be the same length as lines if specified.
+	"""
+	from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+	   # Create a new 3D plot
+	fig = plt.figure()
+	ax = fig.add_subplot(111, projection='3d')
+	# Iterate over each line
+	for name, (line, color) in lines.items():
+		# Extract x, y, z coordinates
+		x, y, z = line[:, 0], line[:, 1], line[:, 2]
+		# Plot the line
+		ax.plot(x, y, z, color=color, label=name, alpha=1.0, zorder=-1)
+		# plot gradient dot line to see trend
+		for i in range(len(x)-1):
+			# ax.plot([x[i], x[i+1]], [y[i], y[i+1]], [z[i], z[i+1]], color=color, alpha=i/len(x), linewidth=5)
+			ax.scatter(x[i], y[i], z[i], color=color, alpha=i/len(x))
+			# plot a bal
+			# ax.plot_surface(x[i], y[i], z[i], color=color, alpha=i/len(x))
+		if name == "goal":
+			# plot big star sequence
+			ax.plot(x, y, z, color=color, marker='*', markersize=10, zorder=100)
+	# legend
+	ax.legend()
+	# Set labels for axes
+	ax.set_xlabel('X axis')
+	ax.set_ylabel('Y axis')
+	ax.set_zlabel('Z axis')
+	# lim -10., 10.
+	LIM = 5.
+	ax.set_xlim(-LIM, LIM)
+	ax.set_ylim(-LIM, LIM)
+	ax.set_zlim(-LIM*.5, LIM*.5)
+	ax.set_box_aspect((1, 1, 0.5))
+	# Convert the Matplotlib figure to a NumPy array
+	canvas = FigureCanvas(fig)
+	canvas.draw()
+	image = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+	image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+	# Close the figure
+	plt.close(fig)
+	return image
+
 #-----------------------------------------------------------------------------#
 #---------------------------------- rollouts ---------------------------------#
 #-----------------------------------------------------------------------------#

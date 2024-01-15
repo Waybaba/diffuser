@@ -90,13 +90,20 @@ class ObsHander:
 		obs: (all_dim, ) # where all_dim=sum([dim_num for _, dim_num, _ in self.data])
 		name: str
 		"""
-		idx = 0
-		for name_, dim_num, _ in self.data:
-			if name_ == name:
-				return obs[idx:idx+dim_num]
-			else:
-				idx += dim_num
-		raise ValueError("Invalid name {}".format(name))
+		if name == "goal":
+			return self.distill(obs, "base")[...,-3:]
+		elif name == "endpoint":
+			return self.distill(obs, "base")[...,:3]
+		elif name == "achieved":
+			return self.distill(obs, "base")[...,-6:-3]
+		else:
+			idx = 0
+			for name_, dim_num, _ in self.data:
+				if name_ == name:
+					return obs[...,idx:idx+dim_num]
+				else:
+					idx += dim_num
+			raise ValueError("Invalid name {}".format(name))
 
 	def get_all_space(self):
 		# all_spc = gym.spaces.Box(
@@ -111,6 +118,15 @@ class ObsHander:
 			dtype=np.float32
 		)
 		return all_spc
+	
+	def rm_goal(self):
+		# find base index then minus 3
+		base_idx = 0
+		for i in range(len(self.data)):
+			if self.data[i][0] == "base":
+				base_idx = i
+				break
+		self.data[base_idx] = ("base", self.data[base_idx][1]-3, self.data[base_idx][2])
 
 class PandaAddStateWrapper(gym.Wrapper):
 	"""
@@ -172,6 +188,7 @@ class PandaAddStateWrapper(gym.Wrapper):
 
 	def set_state(self, obs):
 		self.robot.set_joint_angles(self.obs_handler.distill(obs, "joint"))
+		self.sim.set_base_pose("target", self.obs_handler.distill(obs, "base")[-3:], np.array([0.0, 0.0, 0.0, 1.0]))
 		if "Push" in self.env.spec.id:
 			self.sim.set_base_pose("object", self.obs_handler.distill(obs, "push_obj"), np.array([0.0, 0.0, 0.0, 1.0]))
 
@@ -185,6 +202,7 @@ class PandaNogoalWrapper(gym.Wrapper):
 	}
 	new observation space: Box([-10., -10., ..., -inf, -inf], [10., 10., ..., inf, inf], (31,), float32)
 	"""
+	NOGOAL = True
 	def __init__(self, env):
 		super().__init__(env)
 		# ! TODO hard code
@@ -194,13 +212,15 @@ class PandaNogoalWrapper(gym.Wrapper):
 			# TODO
 			# TODO
 		}
-		self.goal_dim = next(dim_ for name, dim_ in GOAL_DIM.items() if name in self.env.spec.id)
+		self.goal_dim = next(dim_ for name, dim_ in GOAL_DIM.items() if name in env.spec.id)
 		
 		self.observation_space = gym.spaces.Box(
-			low=self.rm_dims(env.observation_space.high),
-			high=self.rm_dims(env.observation_space.low),
+			low=self.rm_dims(env.observation_space.low),
+			high=self.rm_dims(env.observation_space.high),
 			dtype=np.float32
 		)
+
+		self.obs_handler.rm_goal()
 
 	def reset(self):
 		res = self.env.reset()
@@ -232,7 +252,19 @@ class PandaNogoalWrapper(gym.Wrapper):
 		return self.rm_dims(obs)
 
 	def rm_dims(self, in_):
-		return np.concatenate([in_[:self.goal_dim[0]], in_[self.goal_dim[1]:]])
+		if len(in_.shape) == 1:
+			return np.concatenate([in_[:self.goal_dim[0]], in_[self.goal_dim[1]:]])
+		elif len(in_.shape) == 2:
+			return np.concatenate([in_[:,:self.goal_dim[0]], in_[:,self.goal_dim[1]:]], axis=1)
+		else:
+			raise ValueError("Invalid shape {}".format(in_.shape))
+
+	def set_state(self, obs):
+		self.env.set_state(obs)
+		self.sim.set_base_pose("target", np.array([0.,0.,0.]), np.array([0.0, 0.0, 0.0, 1.0]))
+
+	def distill(self, obs, name):
+		return self.obs_handler.distill(obs, name)
 
 def gym_make_panda(env_name):
 	# e.g. pandareachdense-sac_10000
@@ -246,22 +278,24 @@ def gym_make_panda(env_name):
 	env = gym.make(e_name, render_mode="rgb_array")
 	env = MergeObsActWrapper(env)
 	env = PandaAddStateWrapper(env)
+	if env_name.endswith("nogoal"):
+		env = PandaNogoalWrapper(env)
 	return env
 
 def load_panda(env_name):
 	def dataset_rm_goal(dataset, env):
-		return
+		dataset["observations"] = env.rm_dims(dataset["observations"])
+		return dataset
 	import minari
 	import gymnasium as gym
-	nogoal = False
-	if env_name.endswith("nogoal"):
-		env_name, nogoal = env_name[:-7], True
-	dataset = minari.load_dataset(env_name)
 	env = gym_make_panda(env_name)
-	dataset = minari_to_d4rl(dataset)
-	if nogoal: 
+	if env_name.endswith("nogoal"):
+		dataset = minari.load_dataset(env_name[:-7])
+		dataset = minari_to_d4rl(dataset)
 		dataset = dataset_rm_goal(dataset, env)
-		env = PandaNogoalWrapper(env)
+	else:
+		dataset = minari.load_dataset(env_name)
+		dataset = minari_to_d4rl(dataset)
 	return env, dataset
 
 def wandb_media_wrapper(media):
