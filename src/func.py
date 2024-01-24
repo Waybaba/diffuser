@@ -270,7 +270,7 @@ def gym_make_panda(env_name):
 	# e.g. pandareachdense-sac_10000
 	import panda_gym
 	e_name = env_name.split("-")[0]
-	e_name = e_name[5:][:-5]
+	e_name = e_name[5:][:-5] # remove "panda" and "dense"
 	e_name = e_name[0].upper() + e_name[1:]
 	e_name = f"Panda{e_name}"
 	e_name += "" if "dense" not in env_name else "Dense"

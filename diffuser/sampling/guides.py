@@ -516,7 +516,6 @@ class MujocoLower(MujocoGuide):
 	INDEX = 6
 	NAME = "height"
 
-
 class CheetahFaster(MujocoFaster):
 	INDEX = 14
 
@@ -833,3 +832,453 @@ class Maze2dAvoidGuide(NoTrainGuide):
 			return {
 				"TargetGap": self.cal_value(x),
 			}
+
+## Panda
+class PandaHigherGuide(SingleValueGuide):
+	INDEX = 2 + 3
+	LOWER = False
+	NAME = "height"
+
+class PandaLowerGuide(SingleValueGuide):
+	INDEX = 2 + 3
+	LOWER = True
+	NAME = "height"
+
+class PandaLeftGuide(SingleValueGuide):
+	INDEX = 0 + 3
+	LOWER = False
+	NAME = "x"
+
+class PandaRightGuide(SingleValueGuide):
+	INDEX = 0 + 3
+	LOWER = False
+	NAME = "x"
+
+class PandaDistance(NoTrainGuide):
+	"""
+	make the total distance of the trajectory become shorter or longer
+	"""
+	SHORTER = None
+	HALF = False
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		total_distance = self.cal_distance(x)
+
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance
+		else: return total_distance
+	
+	def cal_distance(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		coord = x[:, :, 0 + 3:3 + 3]
+
+		# if HALF, only use the first half of the trajectory
+		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
+
+		# A: Compute differences between successive coordinates along the trace
+		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
+		total_distance = sqdist.sum(dim=-1).sqrt()
+
+		# B: absolute distance sum
+		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
+		# total_distance = sqdist.sum(dim=-1)
+
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"distance": self.cal_distance(x),
+			}
+
+class PandaShorter(PandaDistance):
+	SHORTER = True
+
+class PandaLonger(PandaDistance):
+	SHORTER = False
+
+class PandaHalfShorter(PandaDistance):
+	SHORTER = True
+	HALF = True
+
+class PandaHalfLonger(PandaDistance):
+	SHORTER = False
+	HALF = True
+
+class PandaSpeed(NoTrainGuide):
+	"""
+	make the total distance of the trajectory become shorter or longer
+	"""
+	SHORTER = None
+	HALF = False
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		total_distance = self.cal_distance(x)
+
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance
+		else: return total_distance
+	
+	def cal_distance(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		coord = x[:, :, 3 + 3:6 + 3]
+
+		# A: Compute differences between successive coordinates along the trace
+		sqdist = ((coord[:, :, :])**2).sum(dim=-1)
+		total_distance = sqdist.sum(dim=-1).sqrt()
+
+		# B: absolute distance sum
+		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
+		# total_distance = sqdist.sum(dim=-1)
+
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"distance": self.cal_distance(x),
+			}
+
+class PandaSlower(PandaSpeed):
+	SHORTER = True
+
+class PandaFaster(PandaSpeed):
+	SHORTER = False
+
+class Maze2dTargetGuide(NoTrainGuide):
+	def __init__(self, target=[0.0457, 0.0458], **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		ACT_DIM = 2
+		# z = x[:, :, ACT_DIM+0] # height
+		# vx = x[:, :, ACT_DIM+8] # v horizontal
+		# vz = x[:, :, ACT_DIM+9] # v vertical/height
+		pos_x = x[:, -1, ACT_DIM+0]
+		pos_y = x[:, -1, ACT_DIM+1]
+		total_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
+		if self.kwargs["distance_type"] == "l1":
+			total_distance = total_distance.sqrt() # comment this would lead to l2
+		else:
+			total_distance = total_distance.abs()
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+class Maze2dTargetXGuide(NoTrainGuide):
+	def __init__(self, target=0.0457, **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		ACT_DIM = 2
+		# z = x[:, :, ACT_DIM+0] # height
+		# vx = x[:, :, ACT_DIM+8] # v horizontal
+		# vz = x[:, :, ACT_DIM+9] # v vertical/height
+		pos_x = x[:, -1, ACT_DIM+0]
+		pos_y = x[:, -1, ACT_DIM+1]
+		total_distance = (pos_x - self.kwargs["target"]) ** 2
+		if self.kwargs["distance_type"] == "l1":
+			total_distance = total_distance.sqrt() # comment this would lead to l2
+		else:
+			total_distance = total_distance.abs()
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+class Maze2dTargetYGuide(NoTrainGuide):
+	def __init__(self, target=0.0457, **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act*6, root_x, root_y, root_vx, root_vy, ...]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		ACT_DIM = 2
+		# z = x[:, :, ACT_DIM+0] # height
+		# vx = x[:, :, ACT_DIM+8] # v horizontal
+		# vz = x[:, :, ACT_DIM+9] # v vertical/height
+		pos_x = x[:, -1, ACT_DIM+0]
+		pos_y = x[:, -1, ACT_DIM+1]
+		total_distance = (pos_y - self.kwargs["target"]) ** 2
+		if self.kwargs["distance_type"] == "l1":
+			total_distance = total_distance.sqrt() # comment this would lead to l2
+		else:
+			total_distance = total_distance.abs()
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+class Maze2dAvoidGuide(NoTrainGuide):
+	def __init__(self, target=[0.0457, 0.0458], **kwargs):
+		kwargs["target"] = target
+		super().__init__(**kwargs)
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		value = self.cal_value(x)
+		return - value
+	
+	def cal_value(self, x):
+		ACT_DIM = 2
+		RADIUS = self.kwargs["radius"]
+
+		# Extract x, y coordinates for all time steps
+		pos_x = x[:, :, ACT_DIM+0]
+		pos_y = x[:, :, ACT_DIM+1]
+
+		# Calculate squared distance from the target for all time steps
+		total_distance = (pos_x - self.kwargs["target"][0]) ** 2 + (pos_y - self.kwargs["target"][1]) ** 2
+
+		# Calculate the distance (L2 norm) for all time steps
+		total_distance = total_distance.sqrt() # (B, T)
+
+		# Only apply loss for positions within radius R of the target
+		mask = (total_distance <= RADIUS)
+		
+		# Make sure the mask is float type
+		mask = mask.float()
+
+		# Apply the mask to compute the effective loss for all time steps
+		effective_loss = total_distance * mask
+
+		return effective_loss.mean(dim=1)
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"TargetGap": self.cal_value(x),
+			}
+
+## Panda Push
+class PandaPushLeftGuide(SingleValueGuide):
+	INDEX = 0 + 3 + 18 # 18 is the dims before the box pos
+	LOWER = False
+	NAME = "x"
+
+class PandaPushRightGuide(SingleValueGuide):
+	INDEX = 0 + 3 + 18 # 18 is the dims before the box pos
+	LOWER = False
+	NAME = "x"
+
+class PandaPushDistance(NoTrainGuide):
+	"""
+	make the total distance of the trajectory become shorter or longer
+	"""
+	SHORTER = None
+	HALF = False
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		total_distance = self.cal_distance(x)
+
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance
+		else: return total_distance
+	
+	def cal_distance(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		coord = x[:, :, 0+3+18:3+3+18]
+
+		# if HALF, only use the first half of the trajectory
+		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
+
+		# A: Compute differences between successive coordinates along the trace
+		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
+		total_distance = sqdist.sum(dim=-1).sqrt()
+
+		# B: absolute distance sum
+		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
+		# total_distance = sqdist.sum(dim=-1)
+
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"distance": self.cal_distance(x),
+			}
+
+class PandaPushShorter(PandaPushDistance):
+	SHORTER = True
+
+class PandaPushLonger(PandaPushDistance):
+	SHORTER = False
+
+class PandaPushHalfShorter(PandaPushDistance):
+	SHORTER = True
+	HALF = True
+
+class PandaPushHalfLonger(PandaPushDistance):
+	SHORTER = False
+	HALF = True
+
+class PandaPushSpeed(NoTrainGuide):
+	"""
+	make the total distance of the trajectory become shorter or longer
+	"""
+	SHORTER = None
+	HALF = False
+
+	def forward(self, x, cond, t):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [x, y, vx, vy, act_x, act_y]
+			we only use x, y to calculate distance
+		"""
+		total_distance = self.cal_distance(x)
+
+		if self.SHORTER is None: raise NotImplementedError("SHOTER is not defined")
+		if self.SHORTER: return -total_distance
+		else: return total_distance
+	
+	def cal_distance(self, x):
+		"""
+		cal total distance
+		x: (batch_size, trace_length, 6)
+			the last dim is [act_x, act_y, x, y, vx, vy]
+			we only use x, y to calculate distance
+		"""
+		# Extract x, y coordinates
+		coord = x[:, :, 3+3+18:6+3+18]
+
+		# A: Compute differences between successive coordinates along the trace
+		sqdist = ((coord[:, :, :])**2).sum(dim=-1)
+		total_distance = sqdist.sum(dim=-1).sqrt()
+
+		# B: absolute distance sum
+		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
+		# total_distance = sqdist.sum(dim=-1)
+
+		return total_distance
+	
+	def metrics(self, x, **kwargs):
+		# if x is numpy array, convert it to torch tensor
+		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
+		with torch.no_grad():
+			return {
+				"distance": self.cal_distance(x),
+			}
+
+class PandaPushSlower(PandaPushSpeed):
+	SHORTER = True
+
+class PandaPushFaster(PandaPushSpeed):
+	SHORTER = False
