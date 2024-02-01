@@ -1339,14 +1339,13 @@ class DiffuserWithActModule(DefaultModule):
 		env = dataset.env
 		# ! TODO uncomment the following
 		ref_samples, img_samples, chain_samples = self.render_samples() # a [list of batch_size] with each one as one img but a composite one
-		if self.hparams.controller.turn_on:
-			to_log_ = eval_diffuser_witha(
-				self, 
-				self.hparams.controller.policy, 
-				plan_freq=self.hparams.controller.plan_freq,
-				guide_=self.hparams.controller.guide
-			)
-			to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
+		to_log_ = eval_diffuser_witha(
+			self, 
+			self.hparams.controller.policy, 
+			plan_freq=self.hparams.controller.plan_freq,
+			guide_=self.hparams.controller.guide
+		)
+		to_log.update({"eval_pair/"+k: v for k, v in to_log_.items()})
 		### log
 		to_log["ref"] = [wandb_media_wrapper(_) for _ in ref_samples]
 		if chain_samples is not None: 

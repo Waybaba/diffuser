@@ -888,8 +888,9 @@ class PandaDistance(NoTrainGuide):
 		if self.HALF: coord = coord[:, :coord.shape[1]//2, :]
 
 		# A: Compute differences between successive coordinates along the trace
-		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1)
-		total_distance = sqdist.sum(dim=-1).sqrt()
+		# [Bsz,len,3] # 3 is (x,y,z)
+		sqdist = ((coord[:, 1:, :] - coord[:, :-1, :])**2).sum(dim=-1).sqrt()
+		total_distance = sqdist.sum(dim=-1)
 
 		# B: absolute distance sum
 		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
@@ -950,8 +951,8 @@ class PandaSpeed(NoTrainGuide):
 		coord = x[:, :, 3 + 3:6 + 3]
 
 		# A: Compute differences between successive coordinates along the trace
-		sqdist = ((coord[:, :, :])**2).sum(dim=-1)
-		total_distance = sqdist.sum(dim=-1).sqrt()
+		sqdist = ((coord[:, :, :])**2).sum(dim=-1).sqrt()
+		total_distance = sqdist.mean(dim=-1)
 
 		# B: absolute distance sum
 		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
@@ -964,7 +965,8 @@ class PandaSpeed(NoTrainGuide):
 		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
 		with torch.no_grad():
 			return {
-				"distance": self.cal_distance(x),
+				"speed": self.cal_distance(x),
+				"metric": self.cal_distance(x),
 			}
 
 class PandaSlower(PandaSpeed):
@@ -1260,8 +1262,8 @@ class PandaPushSpeed(NoTrainGuide):
 		coord = x[:, :, 3+3+18:6+3+18]
 
 		# A: Compute differences between successive coordinates along the trace
-		sqdist = ((coord[:, :, :])**2).sum(dim=-1)
-		total_distance = sqdist.sum(dim=-1).sqrt()
+		sqdist = ((coord[:, :, :])**2).sum(dim=-1).sqrt()
+		total_distance = sqdist.mean(dim=-1)
 
 		# B: absolute distance sum
 		# sqdist = (coord[:, 1:, :] - coord[:, :-1, :]).abs().sum(dim=-1)
@@ -1274,7 +1276,8 @@ class PandaPushSpeed(NoTrainGuide):
 		if isinstance(x, np.ndarray): x = torch.from_numpy(x)
 		with torch.no_grad():
 			return {
-				"distance": self.cal_distance(x),
+				"speed": self.cal_distance(x),
+				"metric": self.cal_distance(x),
 			}
 
 class PandaPushSlower(PandaPushSpeed):
