@@ -1,12 +1,12 @@
 ### pytorch image base
 # python==3.10.8
-# FROM pytorch/pytorch:1.13.1-cuda11.6-cudnn8-devel as base 
+# FROM pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime as base 
 # python==3.9.12
-FROM pytorch/pytorch:1.13.0-cuda11.6-cudnn8-devel as base
+FROM pytorch/pytorch:1.13.0-cuda11.6-cudnn8-runtime as base
 # python==3.7.13
-# FROM pytorch/pytorch:1.12.1-cuda11.3-cudnn8-devel as base
+# FROM pytorch/pytorch:1.12.1-cuda11.3-cudnn8-runtime as base
 # python==3.8.12
-# FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel as base
+# FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-runtime as base
 # python==3.11.9
 # FROM pytorch/pytorch:2.4.0-cuda11.8-cudnn9-runtime as base
 
